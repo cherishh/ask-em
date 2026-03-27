@@ -22,6 +22,10 @@ export function shouldSyncWorkspaceProvider(
   return sourceProvider !== targetProvider && enabledProviders.includes(targetProvider);
 }
 
+export function isProviderEnabled(enabledProviders: Provider[], provider: Provider): boolean {
+  return enabledProviders.includes(provider);
+}
+
 export function matchesExpectedTarget(
   snapshot: AdapterSnapshot,
   expected: {

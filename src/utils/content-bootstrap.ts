@@ -1,10 +1,21 @@
 import type { SiteAdapter } from '../adapters/types';
 import type { DeliverPromptMessage, PingMessage, PingResponseMessage, RuntimeMessage } from '../runtime/protocol';
-import { buildHeartbeatMessage, buildHelloMessage, buildUserSubmitMessage, observeUrlChanges, sendRuntimeMessage } from './content-routing';
+import {
+  buildHeartbeatMessage,
+  buildHelloMessage,
+  buildUserSubmitMessage,
+  observeUrlChanges,
+  sendRuntimeMessage,
+} from './content-routing';
 
 type UiState = 'idle' | 'listening' | 'syncing' | 'blocked';
 
-function ensureUi(adapter: SiteAdapter) {
+type UiContext = {
+  workspaceId: string | null;
+  providerEnabled: boolean;
+};
+
+function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Promise<void>) {
   const { mountId, className } = adapter.getUiSpec();
 
   if (!document.getElementById('ask-em-content-style')) {
@@ -20,25 +31,39 @@ function ensureUi(adapter: SiteAdapter) {
         align-items: center;
         gap: 8px;
         min-height: 28px;
-        padding: 0 10px;
+        padding: 0 11px;
         border-radius: 999px;
-        border: 1px solid rgba(15, 23, 42, 0.08);
-        background: rgba(255, 255, 255, 0.72);
-        backdrop-filter: blur(14px) saturate(1.2);
-        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-        color: rgba(15, 23, 42, 0.72);
-        font: 500 11px/1.1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, Consolas, monospace;
-        letter-spacing: 0.08em;
+        border: 1px solid rgba(15, 23, 42, 0.18);
+        background: rgba(255, 252, 246, 0.9);
+        backdrop-filter: blur(16px) saturate(1.35);
+        box-shadow:
+          0 12px 28px rgba(15, 23, 42, 0.14),
+          inset 0 1px 0 rgba(255, 255, 255, 0.72);
+        color: rgba(15, 23, 42, 0.84);
+        font: 700 11px/1.1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, Consolas, monospace;
+        letter-spacing: 0.11em;
         text-transform: uppercase;
-        opacity: 0.28;
+        opacity: 0.82;
         transform: translateY(0);
-        transition: opacity 180ms ease, transform 180ms ease, border-color 180ms ease, color 180ms ease;
-        pointer-events: none;
+        transition:
+          opacity 180ms ease,
+          transform 180ms ease,
+          border-color 180ms ease,
+          color 180ms ease,
+          background 180ms ease,
+          box-shadow 180ms ease;
+        pointer-events: auto;
         user-select: none;
+        cursor: default;
+      }
+
+      .ask-em-sync-pill[data-interactive="true"] {
+        cursor: pointer;
       }
 
       .ask-em-sync-pill:hover {
-        opacity: 0.82;
+        opacity: 0.98;
+        transform: translateY(-1px);
       }
 
       .ask-em-sync-pill::before {
@@ -47,7 +72,9 @@ function ensureUi(adapter: SiteAdapter) {
         height: 6px;
         border-radius: 999px;
         background: var(--ask-em-accent, rgba(15, 23, 42, 0.45));
-        box-shadow: 0 0 0 4px color-mix(in srgb, var(--ask-em-accent, #0f172a) 12%, transparent);
+        box-shadow:
+          0 0 0 4px color-mix(in srgb, var(--ask-em-accent, #0f172a) 16%, transparent),
+          0 0 12px color-mix(in srgb, var(--ask-em-accent, #0f172a) 18%, transparent);
       }
 
       .ask-em-sync-pill[data-state="idle"] {
@@ -55,57 +82,196 @@ function ensureUi(adapter: SiteAdapter) {
       }
 
       .ask-em-sync-pill[data-state="listening"] {
-        opacity: 0.58;
+        border-color: rgba(14, 116, 144, 0.24);
         --ask-em-accent: rgba(14, 116, 144, 0.72);
       }
 
       .ask-em-sync-pill[data-state="syncing"] {
-        opacity: 0.88;
-        color: rgba(15, 23, 42, 0.88);
+        border-color: rgba(37, 99, 235, 0.28);
+        background: rgba(246, 249, 255, 0.94);
+        color: rgba(15, 23, 42, 0.92);
         --ask-em-accent: rgba(37, 99, 235, 0.82);
       }
 
       .ask-em-sync-pill[data-state="blocked"] {
-        opacity: 0.88;
+        border-color: rgba(220, 38, 38, 0.28);
+        background: rgba(255, 246, 246, 0.94);
         color: rgba(127, 29, 29, 0.78);
         --ask-em-accent: rgba(220, 38, 38, 0.82);
+      }
+
+      .ask-em-sync-pill[data-provider-enabled="false"] {
+        background: rgba(247, 242, 235, 0.94);
+        color: rgba(68, 64, 60, 0.84);
+        --ask-em-accent: rgba(120, 113, 108, 0.8);
+      }
+
+      .ask-em-sync-pill[data-busy="true"] {
+        opacity: 0.94;
+        cursor: progress;
+      }
+
+      .ask-em-pill-label {
+        white-space: nowrap;
+      }
+
+      .ask-em-pill-toggle {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        width: 26px;
+        height: 14px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.38);
+        transition: background 180ms ease;
+      }
+
+      .ask-em-pill-toggle::after {
+        content: "";
+        position: absolute;
+        left: 2px;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 1px 6px rgba(15, 23, 42, 0.2);
+        transition: transform 180ms ease;
+      }
+
+      .ask-em-sync-pill[data-provider-enabled="true"] .ask-em-pill-toggle {
+        background: color-mix(in srgb, var(--ask-em-accent, #2563eb) 26%, white);
+      }
+
+      .ask-em-sync-pill[data-provider-enabled="true"] .ask-em-pill-toggle::after {
+        transform: translateX(12px);
       }
     `;
     document.documentElement.appendChild(style);
   }
 
-  let mount = document.getElementById(mountId);
+  let mount = document.getElementById(mountId) as HTMLButtonElement | null;
   if (!mount) {
-    mount = document.createElement('div');
+    mount = document.createElement('button');
+    mount.type = 'button';
     mount.id = mountId;
     mount.className = className;
     mount.classList.add('ask-em-sync-pill');
     mount.dataset.state = 'idle';
-    mount.textContent = "ask'em";
+    mount.dataset.providerEnabled = 'false';
+    mount.dataset.interactive = 'false';
+    mount.innerHTML = `
+      <span class="ask-em-pill-label">${adapter.name} solo</span>
+      <span class="ask-em-pill-toggle" aria-hidden="true"></span>
+    `;
     document.body.appendChild(mount);
   }
 
+  const label = mount.querySelector('.ask-em-pill-label');
+  const context: UiContext = {
+    workspaceId: null,
+    providerEnabled: false,
+  };
+
+  const updateLabel = (text: string) => {
+    if (label) {
+      label.textContent = text;
+    }
+  };
+
+  mount.addEventListener('click', () => {
+    if (mount?.dataset.interactive !== 'true' || mount.dataset.busy === 'true') {
+      return;
+    }
+
+    mount.dataset.busy = 'true';
+    void onToggle(!context.providerEnabled).finally(() => {
+      if (mount) {
+        mount.dataset.busy = 'false';
+      }
+    });
+  });
+
   return {
-    setState(state: UiState, label?: string) {
+    setState(state: UiState, labelText?: string) {
       mount.dataset.state = state;
-      mount.textContent = label ?? "ask'em";
+      updateLabel(labelText ?? `${adapter.name} ${context.providerEnabled ? 'on' : 'off'}`);
+    },
+    setContext(nextContext: UiContext) {
+      context.workspaceId = nextContext.workspaceId;
+      context.providerEnabled = nextContext.providerEnabled;
+      mount.dataset.providerEnabled = String(nextContext.providerEnabled);
+      mount.dataset.interactive = String(Boolean(nextContext.workspaceId));
+      updateLabel(
+        nextContext.workspaceId
+          ? `${adapter.name} ${nextContext.providerEnabled ? 'on' : 'off'}`
+          : `${adapter.name} solo`,
+      );
     },
   };
 }
 
 export function bootstrapContentScript(adapter: SiteAdapter): void {
-  const ui = ensureUi(adapter);
+  let uiContext: UiContext = {
+    workspaceId: null,
+    providerEnabled: false,
+  };
+
+  const ui = ensureUi(adapter, async (nextEnabled) => {
+    if (!uiContext.workspaceId) {
+      return;
+    }
+
+    await sendRuntimeMessage({
+      type: 'SET_WORKSPACE_PROVIDER_ENABLED',
+      workspaceId: uiContext.workspaceId,
+      provider: adapter.name,
+      enabled: nextEnabled,
+    });
+
+    uiContext = {
+      ...uiContext,
+      providerEnabled: nextEnabled,
+    };
+    ui.setContext(uiContext);
+    ui.setState('idle');
+  });
+
   let suppressSubmissionsUntil = 0;
   let lastFingerprint = '';
   let lastFingerprintAt = 0;
 
-  const reportPresence = async (kind: 'HELLO' | 'HEARTBEAT') => {
-    if (kind === 'HELLO') {
-      await sendRuntimeMessage(buildHelloMessage(adapter));
-      return;
-    }
+  const logDebug = async (entry: {
+    level: 'info' | 'warn' | 'error';
+    message: string;
+    detail?: string;
+    workspaceId?: string;
+  }) => {
+    await sendRuntimeMessage({
+      type: 'LOG_DEBUG',
+      level: entry.level,
+      scope: 'content',
+      provider: adapter.name,
+      workspaceId: entry.workspaceId ?? uiContext.workspaceId ?? undefined,
+      message: entry.message,
+      detail: entry.detail,
+    });
+  };
 
-    await sendRuntimeMessage(buildHeartbeatMessage(adapter));
+  const reportPresence = async (kind: 'HELLO' | 'HEARTBEAT') => {
+    const response =
+      kind === 'HELLO'
+        ? await sendRuntimeMessage<{ workspaceId?: string | null; providerEnabled?: boolean }>(
+            buildHelloMessage(adapter),
+          )
+        : await sendRuntimeMessage<{ workspaceId?: string | null; providerEnabled?: boolean }>(
+            buildHeartbeatMessage(adapter),
+          );
+
+    uiContext = {
+      workspaceId: response?.workspaceId ?? null,
+      providerEnabled: response?.providerEnabled ?? false,
+    };
+    ui.setContext(uiContext);
   };
 
   const reportUserSubmit = async (rawContent: string) => {
@@ -123,7 +289,12 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
 
     lastFingerprint = fingerprint;
     lastFingerprintAt = Date.now();
-    ui.setState('listening', 'sync armed');
+    ui.setState('listening', `${adapter.name} armed`);
+    await logDebug({
+      level: 'info',
+      message: 'Detected user submit',
+      detail: content.slice(0, 120),
+    });
 
     await sendRuntimeMessage(buildUserSubmitMessage(status, content));
     window.setTimeout(() => ui.setState('idle'), 1_500);
@@ -172,28 +343,68 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
 
       const snapshot = adapter.getStatus();
       if (!adapter.canDeliverPrompt?.(message as DeliverPromptMessage, snapshot)) {
-        ui.setState('blocked', 'sync blocked');
+        await logDebug({
+          level: 'warn',
+          message: 'Blocked prompt delivery in content',
+          detail: JSON.stringify(snapshot),
+          workspaceId: message.workspaceId,
+        });
+        ui.setState('blocked', `${adapter.name} blocked`);
         sendResponse({ ok: false, blocked: true, snapshot });
         return;
       }
 
       try {
         suppressSubmissionsUntil = Date.now() + 2_500;
-        ui.setState('syncing', 'syncing');
+        ui.setState('syncing', `${adapter.name} sync`);
+        await logDebug({
+          level: 'info',
+          message: 'Starting prompt delivery in content',
+          detail: message.content.slice(0, 120),
+          workspaceId: message.workspaceId,
+        });
 
         const baselineUrl = adapter.getCurrentUrl();
         await adapter.setComposerText?.(message.content);
         await adapter.submit?.();
 
-        void adapter
-          .waitForSessionRefUpdate?.(baselineUrl)
-          .then(() => sendRuntimeMessage(buildHeartbeatMessage(adapter)))
-          .catch(() => null);
+        const shouldAwaitSessionRef =
+          snapshot.sessionId === null ||
+          message.expectedSessionId === null ||
+          snapshot.pageKind === 'new-chat';
+
+        if (shouldAwaitSessionRef) {
+          void adapter
+            .waitForSessionRefUpdate?.(baselineUrl)
+            .then(async (ref) => {
+              await logDebug({
+                level: 'info',
+                message: 'Observed session ref update',
+                detail: ref.url,
+                workspaceId: message.workspaceId,
+              });
+              return sendRuntimeMessage(buildHeartbeatMessage(adapter));
+            })
+            .catch(async (error) => {
+              await logDebug({
+                level: 'warn',
+                message: 'Expected session ref update was not observed',
+                detail: error instanceof Error ? error.message : String(error),
+                workspaceId: message.workspaceId,
+              });
+            });
+        }
 
         window.setTimeout(() => ui.setState('idle'), 1_500);
         sendResponse({ ok: true });
       } catch (error) {
-        ui.setState('blocked', 'sync failed');
+        await logDebug({
+          level: 'error',
+          message: 'Content delivery failed',
+          detail: error instanceof Error ? error.message : String(error),
+          workspaceId: message.workspaceId,
+        });
+        ui.setState('blocked', `${adapter.name} failed`);
         sendResponse({
           ok: false,
           error: error instanceof Error ? error.message : String(error),

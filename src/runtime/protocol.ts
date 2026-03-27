@@ -28,6 +28,19 @@ export type Workspace = {
   pendingSource?: Provider;
 };
 
+export type DefaultEnabledProviders = Record<Provider, boolean>;
+
+export type DebugLogEntry = {
+  id: string;
+  timestamp: number;
+  level: 'info' | 'warn' | 'error';
+  scope: 'background' | 'content';
+  provider?: Provider;
+  workspaceId?: string;
+  message: string;
+  detail?: string;
+};
+
 export type WorkspaceIndex = Record<string, string>;
 
 export type ClaimedTab = {
@@ -42,8 +55,10 @@ export type ClaimedTab = {
 
 export type LocalState = {
   globalSyncEnabled: boolean;
+  defaultEnabledProviders: DefaultEnabledProviders;
   workspaces: Record<string, Workspace>;
   workspaceIndex: WorkspaceIndex;
+  debugLogs: DebugLogEntry[];
 };
 
 export type SessionState = {
@@ -116,7 +131,22 @@ export type StatusResponseMessage = {
   type: 'STATUS_RESPONSE';
   globalSyncEnabled: boolean;
   workspaceLimit: number;
+  defaultEnabledProviders: DefaultEnabledProviders;
   workspaces: WorkspaceSummary[];
+  recentLogs: DebugLogEntry[];
+};
+
+export type GetDebugLogsMessage = {
+  type: 'GET_DEBUG_LOGS';
+};
+
+export type DebugLogsResponseMessage = {
+  type: 'DEBUG_LOGS_RESPONSE';
+  logs: DebugLogEntry[];
+};
+
+export type ClearDebugLogsMessage = {
+  type: 'CLEAR_DEBUG_LOGS';
 };
 
 export type ClearWorkspaceMessage = {
@@ -130,6 +160,28 @@ export type ClearWorkspaceProviderMessage = {
   provider: Provider;
 };
 
+export type SetDefaultEnabledProvidersMessage = {
+  type: 'SET_DEFAULT_ENABLED_PROVIDERS';
+  providers: Provider[];
+};
+
+export type SetWorkspaceProviderEnabledMessage = {
+  type: 'SET_WORKSPACE_PROVIDER_ENABLED';
+  workspaceId: string;
+  provider: Provider;
+  enabled: boolean;
+};
+
+export type DebugLogMessage = {
+  type: 'LOG_DEBUG';
+  level: DebugLogEntry['level'];
+  scope: DebugLogEntry['scope'];
+  provider?: Provider;
+  workspaceId?: string;
+  message: string;
+  detail?: string;
+};
+
 export type RuntimeMessage =
   | HelloMessage
   | HeartbeatMessage
@@ -138,8 +190,14 @@ export type RuntimeMessage =
   | PingMessage
   | PingResponseMessage
   | GetStatusMessage
+  | GetDebugLogsMessage
   | ClearWorkspaceMessage
   | ClearWorkspaceProviderMessage
+  | ClearDebugLogsMessage
+  | SetDefaultEnabledProvidersMessage
+  | SetWorkspaceProviderEnabledMessage
+  | DebugLogMessage
+  | DebugLogsResponseMessage
   | StatusResponseMessage;
 
 export const MAX_WORKSPACES = 3;
@@ -152,6 +210,19 @@ export const STORAGE_KEYS = {
   local: 'ask-em-local-state',
   session: 'ask-em-session-state',
 } as const;
+
+export const ALL_PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek'];
+
+export function createDefaultEnabledProviders(
+  enabledProviders: Provider[] = ALL_PROVIDERS,
+): DefaultEnabledProviders {
+  return {
+    claude: enabledProviders.includes('claude'),
+    chatgpt: enabledProviders.includes('chatgpt'),
+    gemini: enabledProviders.includes('gemini'),
+    deepseek: enabledProviders.includes('deepseek'),
+  };
+}
 
 export function toWorkspaceIndexKey(provider: Provider, sessionId: string): string {
   return `${provider}:${sessionId}`;

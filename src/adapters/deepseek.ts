@@ -8,7 +8,10 @@ import {
   getEditableText,
   isElementWithin,
   queryVisible,
+  sleep,
   setEditableText,
+  triggerPointerClick,
+  waitFor,
   waitForUrlChange,
 } from './dom';
 
@@ -39,7 +42,7 @@ function findNewChatButton(): HTMLElement | null {
 
 function getStatus(): ProviderStatus {
   const currentUrl = window.location.href;
-  const isReady = Boolean(findComposer() || findNewChatButton());
+  const isReady = Boolean(findComposer());
   const pageState = isReady
     ? 'ready'
     : detectLoginRequired(['log in', 'sign in', 'phone number'])
@@ -130,10 +133,14 @@ export const deepseekAdapter: SiteAdapter = {
     setEditableText(findComposer(), content);
   },
   async submit() {
-    const sendButton = findSendButton();
+    await sleep(150);
+    const sendButton = await waitFor(() => {
+      const button = findSendButton();
+      return button && button.getAttribute('aria-disabled') !== 'true' ? button : null;
+    }, 2_000);
 
     if (sendButton && sendButton.getAttribute('aria-disabled') !== 'true') {
-      sendButton.click();
+      triggerPointerClick(sendButton);
       return;
     }
 

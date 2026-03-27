@@ -177,6 +177,13 @@ body {
   padding: 15px;
 }
 
+.askem-card-copy {
+  margin: 10px 0 0;
+  color: var(--askem-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .askem-card-top,
 .askem-provider-row,
 .askem-provider-actions {
@@ -212,6 +219,39 @@ body {
 .askem-provider-grid {
   display: grid;
   gap: 8px;
+}
+
+.askem-default-provider-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.askem-provider-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(35, 25, 8, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 10px 12px;
+  color: var(--askem-ink);
+  cursor: pointer;
+  font: 700 11px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.askem-provider-chip.is-active {
+  border-color: rgba(37, 87, 214, 0.28);
+  background: rgba(246, 249, 255, 0.94);
+}
+
+.askem-provider-chip:hover {
+  transform: translateY(-1px);
 }
 
 .askem-provider-row {
@@ -289,4 +329,61 @@ body {
   color: var(--askem-muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.askem-logs-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.askem-log-row {
+  border-top: 1px solid rgba(35, 25, 8, 0.08);
+  padding-top: 8px;
+}
+
+.askem-log-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.askem-log-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--askem-muted);
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.askem-log-level.is-info {
+  color: var(--askem-accent);
+}
+
+.askem-log-level.is-warn {
+  color: var(--askem-warn);
+}
+
+.askem-log-level.is-error {
+  color: var(--askem-danger);
+}
+
+.askem-log-row p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.askem-log-row code,
+.askem-logs-empty {
+  display: block;
+  margin-top: 6px;
+  color: var(--askem-muted);
+  font: 600 11px/1.4 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+}
+
+.askem-log-actions {
+  display: flex;
+  gap: 8px;
 }

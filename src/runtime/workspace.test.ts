@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HEARTBEAT_STALE_MS, type LocalState, type SessionState } from './protocol';
+import { createDefaultEnabledProviders, HEARTBEAT_STALE_MS, type LocalState, type SessionState } from './protocol';
 import {
   bindWorkspaceMember,
   cleanupPendingWorkspaces,
@@ -7,15 +7,19 @@ import {
   clearWorkspaceProvider,
   createPendingWorkspace,
   enforceWorkspaceLimit,
+  getDefaultEnabledProviderList,
   lookupWorkspaceBySession,
+  setWorkspaceProviderEnabled,
 } from './workspace';
 import { isClaimedTabStale } from './recovery';
 
 function createEmptyState(): LocalState {
   return {
     globalSyncEnabled: true,
+    defaultEnabledProviders: createDefaultEnabledProviders(),
     workspaces: {},
     workspaceIndex: {},
+    debugLogs: [],
   };
 }
 
@@ -153,12 +157,14 @@ describe('workspace state', () => {
   it('enforces the workspace limit of three', () => {
     const state: LocalState = {
       globalSyncEnabled: true,
+      defaultEnabledProviders: createDefaultEnabledProviders(),
       workspaces: {
         w1: { id: 'w1', members: {}, enabledProviders: [], createdAt: 1, updatedAt: 1 },
         w2: { id: 'w2', members: {}, enabledProviders: [], createdAt: 2, updatedAt: 2 },
         w3: { id: 'w3', members: {}, enabledProviders: [], createdAt: 3, updatedAt: 3 },
       },
       workspaceIndex: {},
+      debugLogs: [],
     };
 
     expect(() => enforceWorkspaceLimit(state)).toThrow(/Workspace limit reached/);
@@ -193,5 +199,28 @@ describe('workspace state', () => {
         100 + HEARTBEAT_STALE_MS + 1,
       ),
     ).toBe(true);
+  });
+
+  it('builds default enabled providers while forcing the source provider in', () => {
+    const state: LocalState = {
+      ...createEmptyState(),
+      defaultEnabledProviders: createDefaultEnabledProviders(['chatgpt', 'deepseek']),
+    };
+
+    expect(getDefaultEnabledProviderList(state, 'gemini')).toEqual(['gemini', 'chatgpt', 'deepseek']);
+  });
+
+  it('can pause a provider without removing its binding', () => {
+    let state = createPendingWorkspace(createEmptyState(), {
+      sourceProvider: 'gemini',
+      sourceUrl: 'https://gemini.google.com/app',
+      workspaceId: 'w1',
+      enabledProviders: ['gemini', 'chatgpt', 'claude'],
+    });
+
+    state = setWorkspaceProviderEnabled(state, 'w1', 'chatgpt', false);
+
+    expect(state.workspaces.w1.enabledProviders).toEqual(['gemini', 'claude']);
+    expect(state.workspaces.w1.members.gemini).toBeDefined();
   });
 });

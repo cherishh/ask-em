@@ -34,6 +34,18 @@ export type PendingWorkspaceCleanupResult = {
   removedWorkspaceIds: string[];
 };
 
+export function getDefaultEnabledProviderList(state: LocalState, sourceProvider?: Provider): Provider[] {
+  const selected = Object.entries(state.defaultEnabledProviders)
+    .filter(([, enabled]) => enabled)
+    .map(([provider]) => provider as Provider);
+
+  if (sourceProvider && !selected.includes(sourceProvider)) {
+    selected.unshift(sourceProvider);
+  }
+
+  return Array.from(new Set(selected));
+}
+
 export function createPendingWorkspace(
   state: LocalState,
   input: CreatePendingWorkspaceInput,
@@ -185,6 +197,35 @@ export function clearWorkspaceProvider(
       },
     },
     workspaceIndex: nextWorkspaceIndex,
+  };
+}
+
+export function setWorkspaceProviderEnabled(
+  state: LocalState,
+  workspaceId: string,
+  provider: Provider,
+  enabled: boolean,
+): LocalState {
+  const workspace = state.workspaces[workspaceId];
+
+  if (!workspace) {
+    return state;
+  }
+
+  const enabledProviders = enabled
+    ? Array.from(new Set([...workspace.enabledProviders, provider]))
+    : workspace.enabledProviders.filter((item) => item !== provider);
+
+  return {
+    ...state,
+    workspaces: {
+      ...state.workspaces,
+      [workspaceId]: {
+        ...workspace,
+        enabledProviders,
+        updatedAt: Date.now(),
+      },
+    },
   };
 }
 

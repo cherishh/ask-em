@@ -71,6 +71,22 @@ export function setEditableText(element: HTMLElement | null, content: string): v
     return;
   }
 
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+
+  if (typeof document.execCommand === 'function') {
+    document.execCommand('selectAll', false);
+    const inserted = document.execCommand('insertText', false, content);
+
+    if (inserted) {
+      dispatchInputEvents(element, content);
+      return;
+    }
+  }
+
   element.textContent = '';
   const lines = content.split('\n');
 
@@ -84,16 +100,16 @@ export function setEditableText(element: HTMLElement | null, content: string): v
     element.textContent = content;
   }
 
-  dispatchInputEvents(element);
+  dispatchInputEvents(element, content);
 }
 
-export function dispatchInputEvents(element: HTMLElement): void {
+export function dispatchInputEvents(element: HTMLElement, data: string | null = null): void {
   element.dispatchEvent(
     new InputEvent('beforeinput', {
       bubbles: true,
       cancelable: true,
       inputType: 'insertText',
-      data: null,
+      data,
     }),
   );
   element.dispatchEvent(
@@ -101,7 +117,7 @@ export function dispatchInputEvents(element: HTMLElement): void {
       bubbles: true,
       cancelable: true,
       inputType: 'insertText',
-      data: null,
+      data,
     }),
   );
   element.dispatchEvent(new Event('change', { bubbles: true }));
@@ -157,4 +173,34 @@ export function isElementWithin(target: EventTarget | null, container: HTMLEleme
 export function detectLoginRequired(keywords: string[]): boolean {
   const bodyText = normalizeWhitespace(document.body?.innerText || '').toLowerCase();
   return keywords.some((keyword) => bodyText.includes(keyword.toLowerCase()));
+}
+
+export async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function waitFor<T>(
+  getter: () => T | null | undefined,
+  timeoutMs = 4_000,
+  intervalMs = 100,
+): Promise<T | null> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const result = getter();
+    if (result) {
+      return result;
+    }
+
+    await sleep(intervalMs);
+  }
+
+  return null;
+}
+
+export function triggerPointerClick(element: HTMLElement): void {
+  element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+  element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 }

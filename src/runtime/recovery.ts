@@ -66,6 +66,26 @@ export async function pingContentTab(tabId: number): Promise<PingResponseMessage
   }
 }
 
+export async function waitForContentReady(
+  tabId: number,
+  provider: Provider,
+  timeoutMs = 15_000,
+): Promise<PingResponseMessage | null> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const response = await pingContentTab(tabId);
+
+    if (response?.provider === provider && response.pageState === 'ready') {
+      return response;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  return null;
+}
+
 export async function waitForTabLoad(tabId: number, timeoutMs = 15_000): Promise<boolean> {
   const current = await chrome.tabs.get(tabId);
   if (current.status === 'complete') {
@@ -119,7 +139,11 @@ export async function resolveDeliveryTarget(
   if (claimedTab && !isClaimedTabStale(claimedTab)) {
     const ping = await pingContentTab(claimedTab.tabId);
 
-    if (ping && (!expectedSessionId || ping.sessionId === expectedSessionId)) {
+    if (
+      ping &&
+      ping.pageState === 'ready' &&
+      (!expectedSessionId || ping.sessionId === expectedSessionId)
+    ) {
       return {
         tabId: claimedTab.tabId,
         expectedSessionId,
@@ -132,6 +156,7 @@ export async function resolveDeliveryTarget(
 
       if (updatedTab?.id) {
         await waitForTabLoad(updatedTab.id);
+        await waitForContentReady(updatedTab.id, provider);
         return {
           tabId: updatedTab.id,
           expectedSessionId,
@@ -148,6 +173,7 @@ export async function resolveDeliveryTarget(
   }
 
   await waitForTabLoad(createdTab.id);
+  await waitForContentReady(createdTab.id, provider);
 
   return {
     tabId: createdTab.id,

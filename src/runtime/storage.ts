@@ -1,4 +1,6 @@
 import {
+  createDefaultEnabledProviders,
+  type DebugLogEntry,
   STORAGE_KEYS,
   type ClaimedTab,
   type LocalState,
@@ -9,8 +11,10 @@ import { toClaimedTabKey } from './protocol';
 
 export const DEFAULT_LOCAL_STATE: LocalState = {
   globalSyncEnabled: true,
+  defaultEnabledProviders: createDefaultEnabledProviders(),
   workspaces: {},
   workspaceIndex: {},
+  debugLogs: [],
 };
 
 export const DEFAULT_SESSION_STATE: SessionState = {
@@ -70,6 +74,33 @@ export async function updateSessionState(
 
 export async function clearSessionState(): Promise<void> {
   await chrome.storage.session.remove(STORAGE_KEYS.session);
+}
+
+export async function appendDebugLog(entry: Omit<DebugLogEntry, 'id' | 'timestamp'> & Partial<Pick<DebugLogEntry, 'id' | 'timestamp'>>): Promise<LocalState> {
+  return updateLocalState((state) => {
+    const debugLog: DebugLogEntry = {
+      id: entry.id ?? crypto.randomUUID(),
+      timestamp: entry.timestamp ?? Date.now(),
+      level: entry.level,
+      scope: entry.scope,
+      provider: entry.provider,
+      workspaceId: entry.workspaceId,
+      message: entry.message,
+      detail: entry.detail,
+    };
+
+    return {
+      ...state,
+      debugLogs: [...state.debugLogs, debugLog].slice(-1000),
+    };
+  });
+}
+
+export async function clearDebugLogs(): Promise<LocalState> {
+  return updateLocalState((state) => ({
+    ...state,
+    debugLogs: [],
+  }));
 }
 
 export async function upsertClaimedTab(

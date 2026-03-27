@@ -1,4 +1,5 @@
 import { SUPPORTED_SITES } from '../adapters/sites';
+import { createDefaultEnabledProviders, type DebugLogEntry } from '../runtime/protocol';
 import {
   type GetStatusMessage,
   type HeartbeatMessage,
@@ -9,8 +10,10 @@ import {
   type UserSubmitMessage,
 } from '../runtime/protocol';
 import {
-  getLocalState,
+  appendDebugLog,
+  clearDebugLogs,
   getSessionState,
+  getLocalState,
   setLocalState,
   setSessionState,
   upsertClaimedTab,
@@ -21,16 +24,22 @@ import {
   clearWorkspace,
   clearWorkspaceProvider,
   createPendingWorkspace,
+  getDefaultEnabledProviderList,
   getWorkspacesOrdered,
   lookupWorkspaceBySession,
+  setWorkspaceProviderEnabled,
 } from '../runtime/workspace';
-import { canCreateWorkspaceFromSubmit, shouldSyncWorkspaceProvider } from '../runtime/guards';
+import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
 import {
   getClaimedTabByTabId,
   isClaimedTabStale,
   removeClaimedTabsForWorkspace,
   resolveDeliveryTarget,
 } from '../runtime/recovery';
+
+async function logDebug(entry: Omit<DebugLogEntry, 'id' | 'timestamp'> & Partial<Pick<DebugLogEntry, 'id' | 'timestamp'>>) {
+  await appendDebugLog(entry);
+}
 
 async function refreshPendingState() {
   const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
@@ -67,7 +76,7 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
   }
 
   if (!workspaceLookup?.workspace) {
-    return { ok: true, workspaceId: null };
+    return { ok: true, workspaceId: null, providerEnabled: false };
   }
 
   await upsertClaimedTab(workspaceLookup.workspaceId, message.provider, {
@@ -93,7 +102,12 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
     await setLocalState(localState);
   }
 
-  return { ok: true, workspaceId: workspaceLookup.workspaceId };
+  return {
+    ok: true,
+    workspaceId: workspaceLookup.workspaceId,
+    providerEnabled: isProviderEnabled(workspaceLookup.workspace.enabledProviders, message.provider),
+    enabledProviders: workspaceLookup.workspace.enabledProviders,
+  };
 }
 
 async function deliverPromptToWorkspaceTargets(
@@ -114,8 +128,26 @@ async function deliverPromptToWorkspaceTargets(
   await Promise.allSettled(
     providers.map(async (provider) => {
       const target = await resolveDeliveryTarget(workspace, provider, sessionState);
+      await upsertClaimedTab(workspaceId, provider, {
+        provider,
+        workspaceId,
+        tabId: target.tabId,
+        lastSeenAt: Date.now(),
+        pageState: 'not-ready',
+        currentUrl: target.expectedUrl ?? '',
+        sessionId: target.expectedSessionId,
+      });
 
-      await chrome.tabs.sendMessage(target.tabId, {
+      await logDebug({
+        level: 'info',
+        scope: 'background',
+        provider,
+        workspaceId,
+        message: 'Delivering prompt',
+        detail: `${message.provider} -> ${provider} @ ${target.expectedSessionId ?? 'new-chat'}`,
+      });
+
+      const response = await chrome.tabs.sendMessage(target.tabId, {
         type: 'DELIVER_PROMPT',
         workspaceId,
         provider,
@@ -124,6 +156,18 @@ async function deliverPromptToWorkspaceTargets(
         expectedUrl: target.expectedUrl,
         timestamp: Date.now(),
       });
+
+      const payload = response as { ok?: boolean; blocked?: boolean; error?: string } | undefined;
+      if (!payload?.ok) {
+        await logDebug({
+          level: payload?.blocked ? 'warn' : 'error',
+          scope: 'background',
+          provider,
+          workspaceId,
+          message: payload?.blocked ? 'Prompt delivery blocked' : 'Prompt delivery failed',
+          detail: payload?.error,
+        });
+      }
     }),
   );
 }
@@ -131,10 +175,10 @@ async function deliverPromptToWorkspaceTargets(
 async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runtime.MessageSender) {
   const tabId = sender.tab?.id;
   let { localState } = await refreshPendingState();
-  const enabledProviders = SUPPORTED_SITES.map((site) => site.name);
   let workspaceLookup = lookupWorkspaceBySession(localState, message.provider, message.sessionId);
 
   if (!workspaceLookup && canCreateWorkspaceFromSubmit(localState, message)) {
+    const enabledProviders = getDefaultEnabledProviderList(localState, message.provider);
     localState = createPendingWorkspace(localState, {
       sourceProvider: message.provider,
       sourceUrl: message.currentUrl,
@@ -144,10 +188,29 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
     const workspace = getWorkspacesOrdered(localState)[0];
     workspaceLookup = workspace ? { workspaceId: workspace.id, workspace } : null;
     await setLocalState(localState);
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      provider: message.provider,
+      workspaceId: workspaceLookup?.workspaceId,
+      message: 'Created workspace from new-chat submit',
+      detail: enabledProviders.join(', '),
+    });
   }
 
   if (!workspaceLookup?.workspace) {
     return { ok: true, synced: false };
+  }
+
+  if (!isProviderEnabled(workspaceLookup.workspace.enabledProviders, message.provider)) {
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      provider: message.provider,
+      workspaceId: workspaceLookup.workspaceId,
+      message: 'Ignored submit from disabled provider',
+    });
+    return { ok: true, synced: false, workspaceId: workspaceLookup.workspaceId };
   }
 
   if (message.sessionId) {
@@ -174,6 +237,14 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
     });
   }
 
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    provider: message.provider,
+    workspaceId: workspaceLookup.workspaceId,
+    message: 'User submit routed',
+    detail: message.content.slice(0, 120),
+  });
   await deliverPromptToWorkspaceTargets(workspaceLookup.workspaceId, message);
 
   return {
@@ -217,7 +288,17 @@ async function handleGetStatus(_message: GetStatusMessage): Promise<StatusRespon
     type: 'STATUS_RESPONSE',
     globalSyncEnabled: localState.globalSyncEnabled,
     workspaceLimit: 3,
+    defaultEnabledProviders: localState.defaultEnabledProviders,
     workspaces,
+    recentLogs: localState.debugLogs.slice(-20).reverse(),
+  };
+}
+
+async function handleGetDebugLogs() {
+  const localState = await getLocalState();
+  return {
+    type: 'DEBUG_LOGS_RESPONSE' as const,
+    logs: localState.debugLogs,
   };
 }
 
@@ -250,6 +331,57 @@ async function handleWorkspaceClear(
   return { ok: true };
 }
 
+async function handleSetDefaultEnabledProviders(
+  message: Extract<RuntimeMessage, { type: 'SET_DEFAULT_ENABLED_PROVIDERS' }>,
+) {
+  const nextProviders = createDefaultEnabledProviders(message.providers);
+  const localState = await getLocalState();
+  await setLocalState({
+    ...localState,
+    defaultEnabledProviders: nextProviders,
+  });
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    message: 'Updated default enabled providers',
+    detail: message.providers.join(', '),
+  });
+  return { ok: true };
+}
+
+async function handleSetWorkspaceProviderEnabled(
+  message: Extract<RuntimeMessage, { type: 'SET_WORKSPACE_PROVIDER_ENABLED' }>,
+) {
+  const localState = await getLocalState();
+  const nextState = setWorkspaceProviderEnabled(
+    localState,
+    message.workspaceId,
+    message.provider,
+    message.enabled,
+  );
+  await setLocalState(nextState);
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    workspaceId: message.workspaceId,
+    provider: message.provider,
+    message: message.enabled ? 'Provider rejoined workspace sync' : 'Provider paused for workspace sync',
+  });
+  return { ok: true };
+}
+
+async function handleDebugLog(
+  message: Extract<RuntimeMessage, { type: 'LOG_DEBUG' }>,
+) {
+  await logDebug(message);
+  return { ok: true };
+}
+
+async function handleClearDebugLogs() {
+  await clearDebugLogs();
+  return { ok: true };
+}
+
 export default defineBackground(() => {
   chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendResponse) => {
     void (async () => {
@@ -263,6 +395,21 @@ export default defineBackground(() => {
           return;
         case 'GET_STATUS':
           sendResponse(await handleGetStatus(message));
+          return;
+        case 'GET_DEBUG_LOGS':
+          sendResponse(await handleGetDebugLogs());
+          return;
+        case 'SET_DEFAULT_ENABLED_PROVIDERS':
+          sendResponse(await handleSetDefaultEnabledProviders(message));
+          return;
+        case 'SET_WORKSPACE_PROVIDER_ENABLED':
+          sendResponse(await handleSetWorkspaceProviderEnabled(message));
+          return;
+        case 'LOG_DEBUG':
+          sendResponse(await handleDebugLog(message));
+          return;
+        case 'CLEAR_DEBUG_LOGS':
+          sendResponse(await handleClearDebugLogs());
           return;
         case 'CLEAR_WORKSPACE':
         case 'CLEAR_WORKSPACE_PROVIDER':

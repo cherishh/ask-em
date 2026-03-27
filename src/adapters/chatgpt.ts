@@ -8,7 +8,10 @@ import {
   getEditableText,
   isElementWithin,
   queryVisible,
+  sleep,
   setEditableText,
+  triggerPointerClick,
+  waitFor,
   waitForUrlChange,
 } from './dom';
 
@@ -33,7 +36,7 @@ function findNewChatButton(): HTMLElement | null {
 
 function getStatus(): ProviderStatus {
   const currentUrl = window.location.href;
-  const isReady = Boolean(findComposer() || findNewChatButton());
+  const isReady = Boolean(findComposer());
   const pageState = isReady
     ? 'ready'
     : detectLoginRequired(['log in', 'sign up', 'continue with google'])
@@ -124,10 +127,14 @@ export const chatgptAdapter: SiteAdapter = {
     setEditableText(findComposer(), content);
   },
   async submit() {
-    const sendButton = findSendButton();
+    await sleep(200);
+    const sendButton = await waitFor(() => {
+      const button = findSendButton();
+      return button && !button.hasAttribute('disabled') ? button : null;
+    }, 2_500);
 
     if (sendButton) {
-      sendButton.click();
+      triggerPointerClick(sendButton);
       return;
     }
 
