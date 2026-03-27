@@ -1,15 +1,46 @@
-export type Provider = 'claude' | 'chatgpt' | 'gemini' | 'deepseek';
+import type {
+  DeliverPromptMessage,
+  PageKind,
+  PageState,
+  Provider,
+  ProviderStatus,
+} from '../runtime/protocol';
 
-export interface ConversationRef {
+export type { Provider };
+
+export interface AdapterSnapshot {
   provider: Provider;
+  currentUrl: string;
   sessionId: string | null;
-  url: string;
+  pageState: PageState;
+  pageKind: PageKind;
+}
+
+export interface ProviderUiSpec {
+  tone: 'minimal' | 'neutral';
+  mountId: string;
+  className: string;
 }
 
 export interface SiteAdapter {
   name: Provider;
+  matches: string[];
   getCurrentUrl(): string;
   extractSessionId(url: string): string | null;
   isBlankChatUrl(url: string): boolean;
-  detectPageState(): 'ready' | 'login-required' | 'not-ready';
+  detectPageState(): PageState;
+  getPageKind(url?: string): PageKind;
+  getStatus(): ProviderStatus;
+  getUiSpec(): ProviderUiSpec;
+  subscribeToUserSubmissions?(onSubmit: (content: string) => void): () => void;
+  setComposerText?(content: string): Promise<void> | void;
+  submit?(): Promise<void> | void;
+  openNewChat?(): Promise<void> | void;
+  waitForSessionRefUpdate?(
+    baselineUrl: string,
+  ): Promise<{ sessionId: string | null; url: string }>;
+  canDeliverPrompt?(
+    message: DeliverPromptMessage,
+    snapshot: AdapterSnapshot,
+  ): boolean;
 }
