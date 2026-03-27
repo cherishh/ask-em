@@ -44,6 +44,16 @@ const AUTO_CLEAR_GROUP_DELAY_MS = 15_000;
 const EMPTY_GROUP_DELETE_DELAY_MS = 2_000;
 const pendingGroupGcTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+async function notifyTabsToRefreshContext(tabIds: number[]) {
+  await Promise.allSettled(
+    Array.from(new Set(tabIds)).map(async (tabId) => {
+      await chrome.tabs.sendMessage(tabId, {
+        type: 'REFRESH_CONTENT_CONTEXT',
+      });
+    }),
+  );
+}
+
 async function logDebug(entry: Omit<DebugLogEntry, 'id' | 'timestamp'> & Partial<Pick<DebugLogEntry, 'id' | 'timestamp'>>) {
   await appendDebugLog(entry);
 }
@@ -441,13 +451,20 @@ async function handleWorkspaceClear(
   const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
 
   if (message.type === 'CLEAR_WORKSPACE') {
+    const targetTabIds = Object.values(sessionState.claimedTabs)
+      .filter((claimedTab) => claimedTab.workspaceId === message.workspaceId)
+      .map((claimedTab) => claimedTab.tabId);
+
     await Promise.all([
       setLocalState(clearWorkspace(localState, message.workspaceId)),
       setSessionState(removeClaimedTabsForWorkspace(sessionState, message.workspaceId)),
     ]);
+    await notifyTabsToRefreshContext(targetTabIds);
 
     return { ok: true };
   }
+
+  const claimedTab = sessionState.claimedTabs[`${message.workspaceId}:${message.provider}`];
 
   await Promise.all([
     setLocalState(clearWorkspaceProvider(localState, message.workspaceId, message.provider)),
@@ -460,6 +477,9 @@ async function handleWorkspaceClear(
       ),
     }),
   ]);
+  if (claimedTab) {
+    await notifyTabsToRefreshContext([claimedTab.tabId]);
+  }
 
   const nextLocalState = clearWorkspaceProvider(localState, message.workspaceId, message.provider);
   const nextWorkspace = nextLocalState.workspaces[message.workspaceId];

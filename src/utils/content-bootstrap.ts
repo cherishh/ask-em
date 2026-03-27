@@ -15,6 +15,11 @@ type UiContext = {
   providerEnabled: boolean;
 };
 
+function shouldShowStandaloneIndicator(adapter: SiteAdapter): boolean {
+  const status = adapter.getStatus();
+  return status.pageKind === 'new-chat' && status.pageState === 'ready';
+}
+
 function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Promise<void>) {
   const { mountId, className } = adapter.getUiSpec();
 
@@ -54,6 +59,10 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
         pointer-events: auto;
         user-select: none;
         cursor: default;
+      }
+
+      .ask-em-sync-pill[data-visible="false"] {
+        display: none;
       }
 
       .ask-em-sync-pill[data-interactive="true"] {
@@ -183,6 +192,7 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
     mount.dataset.state = 'idle';
     mount.dataset.providerEnabled = 'true';
     mount.dataset.interactive = 'false';
+    mount.dataset.visible = 'false';
     mount.innerHTML = `
       <span class="ask-em-pill-label">${adapter.name} ready</span>
       <span class="ask-em-pill-toggle" aria-hidden="true"></span>
@@ -221,6 +231,9 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
   });
 
   return {
+    setVisible(visible: boolean) {
+      mount.dataset.visible = String(visible);
+    },
     setState(state: UiState, labelText?: string) {
       mount.dataset.state = state;
       updateLabel(labelText ?? getDefaultLabel());
@@ -283,6 +296,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
   };
 
   const reportPresence = async (kind: 'HELLO' | 'HEARTBEAT') => {
+    const status = adapter.getStatus();
     const response =
       kind === 'HELLO'
         ? await sendRuntimeMessage<{ workspaceId?: string | null; providerEnabled?: boolean }>(
@@ -292,11 +306,21 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
             buildHeartbeatMessage(adapter),
           );
 
+    const standaloneVisible = shouldShowStandaloneIndicator(adapter);
     uiContext = {
       workspaceId: response?.workspaceId ?? null,
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? false) : true,
     };
     ui.setContext(uiContext);
+    ui.setVisible(Boolean(response?.workspaceId) || standaloneVisible);
+
+    if (!response?.workspaceId && !standaloneVisible) {
+      return;
+    }
+
+    if (!response?.workspaceId && status.pageKind === 'new-chat') {
+      ui.setState('idle');
+    }
   };
 
   const reportUserSubmit = async (rawContent: string) => {
@@ -370,6 +394,12 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
           pageKind: status.pageKind,
         };
         sendResponse(response);
+        return;
+      }
+
+      if (message.type === 'REFRESH_CONTENT_CONTEXT') {
+        await reportPresence('HELLO');
+        sendResponse({ ok: true });
         return;
       }
 
