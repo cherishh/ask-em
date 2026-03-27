@@ -40,6 +40,7 @@ import {
 } from '../runtime/recovery';
 
 const AUTO_CLEAR_GROUP_DELAY_MS = 15_000;
+const EMPTY_GROUP_DELETE_DELAY_MS = 2_000;
 const pendingGroupGcTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 async function logDebug(entry: Omit<DebugLogEntry, 'id' | 'timestamp'> & Partial<Pick<DebugLogEntry, 'id' | 'timestamp'>>) {
@@ -87,6 +88,42 @@ async function scheduleGroupGcIfEmpty(workspaceId: string) {
       });
     })();
   }, AUTO_CLEAR_GROUP_DELAY_MS);
+
+  pendingGroupGcTimers.set(workspaceId, timeoutId);
+}
+
+async function scheduleEmptyGroupDeletion(workspaceId: string) {
+  cancelScheduledGroupGc(workspaceId);
+
+  const timeoutId = setTimeout(() => {
+    pendingGroupGcTimers.delete(workspaceId);
+
+    void (async () => {
+      const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
+      const workspace = localState.workspaces[workspaceId];
+
+      if (!workspace) {
+        return;
+      }
+
+      const hasVisibleProviders =
+        workspace.enabledProviders.length > 0 || Object.keys(workspace.members).length > 0;
+      if (hasVisibleProviders) {
+        return;
+      }
+
+      await Promise.all([
+        setLocalState(clearWorkspace(localState, workspaceId)),
+        setSessionState(removeClaimedTabsForWorkspace(sessionState, workspaceId)),
+      ]);
+      await logDebug({
+        level: 'info',
+        scope: 'background',
+        workspaceId,
+        message: 'Deleted empty group after provider removal',
+      });
+    })();
+  }, EMPTY_GROUP_DELETE_DELAY_MS);
 
   pendingGroupGcTimers.set(workspaceId, timeoutId);
 }
@@ -312,7 +349,10 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
 
 async function handleGetStatus(_message: GetStatusMessage): Promise<StatusResponseMessage> {
   const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
-  const workspaces = getWorkspacesOrdered(localState).map((workspace) => {
+  const visibleWorkspaces = getWorkspacesOrdered(localState).filter(
+    (workspace) => workspace.enabledProviders.length > 0 || Object.keys(workspace.members).length > 0,
+  );
+  const workspaces = visibleWorkspaces.map((workspace) => {
     const memberStates = Object.fromEntries(
       SUPPORTED_SITES.map((site) => {
         const member = workspace.members[site.name];
@@ -323,14 +363,14 @@ async function handleGetStatus(_message: GetStatusMessage): Promise<StatusRespon
         }
 
         if (!member) {
-          return [site.name, 'offline'];
+          return [site.name, 'inactive'];
         }
 
         if (!claimedTab) {
-          return [site.name, 'offline'];
+          return [site.name, 'inactive'];
         }
 
-        return [site.name, isClaimedTabStale(claimedTab) ? 'stale' : 'online'];
+        return [site.name, isClaimedTabStale(claimedTab) ? 'stale' : 'active'];
       }),
     );
 
@@ -384,6 +424,17 @@ async function handleWorkspaceClear(
       ),
     }),
   ]);
+
+  const nextLocalState = clearWorkspaceProvider(localState, message.workspaceId, message.provider);
+  const nextWorkspace = nextLocalState.workspaces[message.workspaceId];
+  const isEmptyGroup =
+    nextWorkspace &&
+    nextWorkspace.enabledProviders.length === 0 &&
+    Object.keys(nextWorkspace.members).length === 0;
+
+  if (isEmptyGroup) {
+    await scheduleEmptyGroupDeletion(message.workspaceId);
+  }
 
   return { ok: true };
 }

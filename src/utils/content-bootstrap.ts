@@ -47,7 +47,6 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
         transform: translateY(0);
         transition:
           opacity 180ms ease,
-          transform 180ms ease,
           border-color 180ms ease,
           color 180ms ease,
           background 180ms ease,
@@ -63,18 +62,17 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
 
       .ask-em-sync-pill:hover {
         opacity: 0.98;
-        transform: translateY(-1px);
       }
 
       .ask-em-sync-pill::before {
         content: "";
-        width: 7px;
-        height: 7px;
+        width: 6px;
+        height: 6px;
         border-radius: 999px;
         background: var(--ask-em-accent, rgba(15, 23, 42, 0.45));
         box-shadow:
-          0 0 0 3px color-mix(in srgb, var(--ask-em-accent, #0f172a) 16%, transparent),
-          0 0 12px color-mix(in srgb, var(--ask-em-accent, #0f172a) 20%, transparent);
+          0 0 0 2px color-mix(in srgb, var(--ask-em-accent, #0f172a) 16%, transparent),
+          0 0 10px color-mix(in srgb, var(--ask-em-accent, #0f172a) 18%, transparent);
       }
 
       .ask-em-sync-pill[data-state="idle"] {
@@ -148,7 +146,7 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
       }
 
       .ask-em-sync-pill[data-provider-enabled="true"] .ask-em-pill-toggle {
-        background: color-mix(in srgb, var(--ask-em-accent, #2563eb) 26%, white);
+        background: var(--ask-em-accent, rgba(22, 163, 74, 0.95));
       }
 
       .ask-em-sync-pill[data-provider-enabled="true"] .ask-em-pill-toggle::after {
@@ -158,17 +156,17 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
       @keyframes ask-em-pulse {
         0%,
         100% {
-          transform: scale(0.96);
+          transform: scale(0.94);
           box-shadow:
-            0 0 0 3px color-mix(in srgb, var(--ask-em-accent, #16a34a) 18%, transparent),
-            0 0 8px color-mix(in srgb, var(--ask-em-accent, #16a34a) 16%, transparent);
+            0 0 0 2px color-mix(in srgb, var(--ask-em-accent, #16a34a) 18%, transparent),
+            0 0 7px color-mix(in srgb, var(--ask-em-accent, #16a34a) 14%, transparent);
         }
 
         50% {
-          transform: scale(1.08);
+          transform: scale(1.04);
           box-shadow:
-            0 0 0 5px color-mix(in srgb, var(--ask-em-accent, #16a34a) 22%, transparent),
-            0 0 14px color-mix(in srgb, var(--ask-em-accent, #16a34a) 24%, transparent);
+            0 0 0 4px color-mix(in srgb, var(--ask-em-accent, #16a34a) 20%, transparent),
+            0 0 11px color-mix(in srgb, var(--ask-em-accent, #16a34a) 20%, transparent);
         }
       }
     `;
@@ -183,10 +181,10 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
     mount.className = className;
     mount.classList.add('ask-em-sync-pill');
     mount.dataset.state = 'idle';
-    mount.dataset.providerEnabled = 'false';
+    mount.dataset.providerEnabled = 'true';
     mount.dataset.interactive = 'false';
     mount.innerHTML = `
-      <span class="ask-em-pill-label">${adapter.name} paused</span>
+      <span class="ask-em-pill-label">${adapter.name} ready</span>
       <span class="ask-em-pill-toggle" aria-hidden="true"></span>
     `;
     document.body.appendChild(mount);
@@ -195,7 +193,7 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
   const label = mount.querySelector('.ask-em-pill-label');
   const context: UiContext = {
     workspaceId: null,
-    providerEnabled: false,
+    providerEnabled: true,
   };
 
   const updateLabel = (text: string) => {
@@ -205,7 +203,9 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
   };
 
   const getDefaultLabel = () =>
-    `${adapter.name} ${context.providerEnabled ? 'sync' : 'paused'}`;
+    context.workspaceId
+      ? `${adapter.name} ${context.providerEnabled ? 'sync' : 'paused'}`
+      : `${adapter.name} ready`;
 
   mount.addEventListener('click', () => {
     if (mount?.dataset.interactive !== 'true' || mount.dataset.busy === 'true') {
@@ -238,7 +238,7 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
 export function bootstrapContentScript(adapter: SiteAdapter): void {
   let uiContext: UiContext = {
     workspaceId: null,
-    providerEnabled: false,
+    providerEnabled: true,
   };
 
   const ui = ensureUi(adapter, async (nextEnabled) => {
@@ -294,7 +294,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
 
     uiContext = {
       workspaceId: response?.workspaceId ?? null,
-      providerEnabled: response?.providerEnabled ?? false,
+      providerEnabled: response?.workspaceId ? (response.providerEnabled ?? false) : true,
     };
     ui.setContext(uiContext);
   };
@@ -321,7 +321,19 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
       detail: content.slice(0, 120),
     });
 
-    await sendRuntimeMessage(buildUserSubmitMessage(status, content));
+    const response = await sendRuntimeMessage<{ workspaceId?: string | null; synced?: boolean }>(
+      buildUserSubmitMessage(status, content),
+    );
+
+    if (response?.workspaceId) {
+      uiContext = {
+        workspaceId: response.workspaceId,
+        providerEnabled: true,
+      };
+      ui.setContext(uiContext);
+      ui.setState('idle');
+    }
+
     window.setTimeout(() => ui.setState(uiContext.providerEnabled ? 'idle' : 'blocked'), 1_500);
   };
 

@@ -346,6 +346,13 @@ function WorkspaceCard({
   onClearProvider: (workspaceId: string, provider: Provider) => Promise<void>;
 }) {
   const { workspace, memberStates } = workspaceSummary;
+  const visibleProviders = Array.from(
+    new Set([
+      ...workspace.enabledProviders,
+      ...(Object.keys(workspace.members) as Provider[]),
+      ...(workspace.pendingSource ? [workspace.pendingSource] : []),
+    ]),
+  );
 
   return (
     <article className="askem-card">
@@ -359,7 +366,7 @@ function WorkspaceCard({
           onClick={() => void onClearWorkspace(workspace.id)}
           disabled={busyKey === workspace.id}
         >
-          Clear Group
+          Delete Group
         </button>
       </div>
 
@@ -369,9 +376,10 @@ function WorkspaceCard({
       </div>
 
       <div className="askem-provider-grid">
-        {PROVIDERS.map((provider) => {
+        {visibleProviders.map((provider) => {
           const member = workspace.members[provider];
-          const state = memberStates[provider] ?? 'offline';
+          const state = memberStates[provider] ?? 'inactive';
+          const sessionLabel = member?.sessionId ? member.sessionId.slice(0, 8) : 'not connected';
 
           return (
             <div className="askem-provider-row" key={`${workspace.id}:${provider}`}>
@@ -380,13 +388,13 @@ function WorkspaceCard({
                 <span className={`askem-state askem-state-${state}`}>{state}</span>
               </div>
               <div className="askem-provider-actions">
-                <code>{member?.sessionId ? member.sessionId.slice(0, 8) : 'unbound'}</code>
+                <code>{sessionLabel}</code>
                 <button
                   className="askem-provider-clear"
                   onClick={() => void onClearProvider(workspace.id, provider)}
-                  disabled={!member || busyKey === `${workspace.id}:${provider}`}
+                  disabled={busyKey === `${workspace.id}:${provider}`}
                 >
-                  Clear
+                  Remove
                 </button>
               </div>
             </div>

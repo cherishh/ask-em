@@ -130,8 +130,23 @@ describe('workspace state', () => {
 
     expect(nextState.workspaces.w1).toBeDefined();
     expect(nextState.workspaces.w1.members.chatgpt).toBeUndefined();
+    expect(nextState.workspaces.w1.enabledProviders).not.toContain('chatgpt');
     expect(nextState.workspaceIndex['chatgpt:gpt-9']).toBeUndefined();
     expect(nextState.workspaceIndex['claude:c-1']).toBe('w1');
+  });
+
+  it('can remove a provider that is enabled but not yet bound', () => {
+    const state = createPendingWorkspace(createEmptyState(), {
+      sourceProvider: 'gemini',
+      sourceUrl: 'https://gemini.google.com/app',
+      workspaceId: 'w1',
+      enabledProviders: ['gemini', 'claude'],
+    });
+
+    const nextState = clearWorkspaceProvider(state, 'w1', 'claude');
+
+    expect(nextState.workspaces.w1.enabledProviders).toEqual(['gemini']);
+    expect(nextState.workspaces.w1.members.claude).toBeUndefined();
   });
 
   it('clears an entire workspace and all of its member indexes', () => {

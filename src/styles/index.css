@@ -90,13 +90,12 @@ body {
   background: rgba(255, 255, 255, 0.78);
   color: var(--askem-ink);
   cursor: pointer;
-  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+  transition: border-color 140ms ease, background 140ms ease;
 }
 
 .askem-refresh:hover,
 .askem-clear-workspace:hover,
 .askem-provider-clear:hover {
-  transform: translateY(-1px);
   border-color: rgba(35, 25, 8, 0.2);
   background: rgba(255, 255, 255, 0.96);
 }
@@ -106,7 +105,6 @@ body {
 .askem-provider-clear:disabled {
   cursor: default;
   opacity: 0.45;
-  transform: none;
 }
 
 .askem-refresh {
@@ -367,17 +365,13 @@ body {
   font: 700 11px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+  transition: border-color 140ms ease, background 140ms ease;
 }
 
 .askem-provider-chip.is-active {
   border-color: rgba(37, 87, 214, 0.28);
   background: rgba(246, 249, 255, 0.94);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-}
-
-.askem-provider-chip:hover {
-  transform: translateY(-1px);
 }
 
 .askem-provider-row {
@@ -408,7 +402,7 @@ body {
   text-transform: uppercase;
 }
 
-.askem-state-online {
+.askem-state-active {
   background: rgba(31, 122, 89, 0.12);
   color: var(--askem-ok);
 }
@@ -418,7 +412,7 @@ body {
   color: var(--askem-warn);
 }
 
-.askem-state-offline {
+.askem-state-inactive {
   background: rgba(107, 100, 89, 0.1);
   color: var(--askem-muted);
 }

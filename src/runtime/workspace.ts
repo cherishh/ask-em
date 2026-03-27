@@ -171,19 +171,24 @@ export function clearWorkspaceProvider(
   provider: Provider,
 ): LocalState {
   const workspace = state.workspaces[workspaceId];
-  const member = workspace?.members[provider];
 
-  if (!workspace || !member) {
+  if (!workspace) {
     return state;
   }
 
+  const member = workspace.members[provider];
+
   const nextMembers = { ...workspace.members };
-  delete nextMembers[provider];
+  if (member) {
+    delete nextMembers[provider];
+  }
 
   const nextWorkspaceIndex = { ...state.workspaceIndex };
-  if (member.sessionId) {
+  if (member?.sessionId) {
     delete nextWorkspaceIndex[toWorkspaceIndexKey(provider, member.sessionId)];
   }
+
+  const enabledProviders = workspace.enabledProviders.filter((item) => item !== provider);
 
   return {
     ...state,
@@ -192,6 +197,7 @@ export function clearWorkspaceProvider(
       [workspaceId]: {
         ...workspace,
         members: nextMembers,
+        enabledProviders,
         updatedAt: Date.now(),
         pendingSource: workspace.pendingSource === provider ? undefined : workspace.pendingSource,
       },
