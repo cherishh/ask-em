@@ -30,20 +30,20 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        min-height: 28px;
-        padding: 0 11px;
+        min-height: 30px;
+        padding: 0 12px;
         border-radius: 999px;
-        border: 1px solid rgba(15, 23, 42, 0.18);
-        background: rgba(255, 252, 246, 0.9);
+        border: 1px solid rgba(15, 23, 42, 0.22);
+        background: rgba(255, 252, 246, 0.96);
         backdrop-filter: blur(16px) saturate(1.35);
         box-shadow:
-          0 12px 28px rgba(15, 23, 42, 0.14),
+          0 14px 34px rgba(15, 23, 42, 0.18),
           inset 0 1px 0 rgba(255, 255, 255, 0.72);
         color: rgba(15, 23, 42, 0.84);
         font: 700 11px/1.1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, Consolas, monospace;
         letter-spacing: 0.11em;
         text-transform: uppercase;
-        opacity: 0.82;
+        opacity: 0.96;
         transform: translateY(0);
         transition:
           opacity 180ms ease,
@@ -68,42 +68,51 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
 
       .ask-em-sync-pill::before {
         content: "";
-        width: 6px;
-        height: 6px;
+        width: 8px;
+        height: 8px;
         border-radius: 999px;
         background: var(--ask-em-accent, rgba(15, 23, 42, 0.45));
         box-shadow:
           0 0 0 4px color-mix(in srgb, var(--ask-em-accent, #0f172a) 16%, transparent),
-          0 0 12px color-mix(in srgb, var(--ask-em-accent, #0f172a) 18%, transparent);
+          0 0 14px color-mix(in srgb, var(--ask-em-accent, #0f172a) 22%, transparent);
       }
 
       .ask-em-sync-pill[data-state="idle"] {
-        --ask-em-accent: rgba(100, 116, 139, 0.65);
+        --ask-em-accent: rgba(22, 163, 74, 0.95);
+        border-color: rgba(22, 163, 74, 0.2);
+      }
+
+      .ask-em-sync-pill[data-state="idle"][data-provider-enabled="true"]::before,
+      .ask-em-sync-pill[data-state="listening"][data-provider-enabled="true"]::before,
+      .ask-em-sync-pill[data-state="syncing"][data-provider-enabled="true"]::before {
+        animation: ask-em-pulse 1.2s ease-in-out infinite;
       }
 
       .ask-em-sync-pill[data-state="listening"] {
-        border-color: rgba(14, 116, 144, 0.24);
-        --ask-em-accent: rgba(14, 116, 144, 0.72);
+        border-color: rgba(22, 163, 74, 0.24);
+        background: rgba(243, 252, 245, 0.97);
+        --ask-em-accent: rgba(22, 163, 74, 0.95);
       }
 
       .ask-em-sync-pill[data-state="syncing"] {
-        border-color: rgba(37, 99, 235, 0.28);
-        background: rgba(246, 249, 255, 0.94);
+        border-color: rgba(22, 163, 74, 0.26);
+        background: rgba(241, 252, 245, 0.98);
         color: rgba(15, 23, 42, 0.92);
-        --ask-em-accent: rgba(37, 99, 235, 0.82);
+        --ask-em-accent: rgba(22, 163, 74, 0.95);
       }
 
       .ask-em-sync-pill[data-state="blocked"] {
-        border-color: rgba(220, 38, 38, 0.28);
-        background: rgba(255, 246, 246, 0.94);
-        color: rgba(127, 29, 29, 0.78);
-        --ask-em-accent: rgba(220, 38, 38, 0.82);
+        border-color: rgba(217, 119, 6, 0.34);
+        background: rgba(255, 249, 235, 0.98);
+        color: rgba(120, 53, 15, 0.9);
+        --ask-em-accent: rgba(245, 158, 11, 0.96);
       }
 
       .ask-em-sync-pill[data-provider-enabled="false"] {
-        background: rgba(247, 242, 235, 0.94);
-        color: rgba(68, 64, 60, 0.84);
-        --ask-em-accent: rgba(120, 113, 108, 0.8);
+        border-color: rgba(120, 113, 108, 0.2);
+        background: rgba(246, 244, 241, 0.98);
+        color: rgba(68, 64, 60, 0.88);
+        --ask-em-accent: rgba(120, 113, 108, 0.84);
       }
 
       .ask-em-sync-pill[data-busy="true"] {
@@ -145,6 +154,23 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
       .ask-em-sync-pill[data-provider-enabled="true"] .ask-em-pill-toggle::after {
         transform: translateX(12px);
       }
+
+      @keyframes ask-em-pulse {
+        0%,
+        100% {
+          transform: scale(0.95);
+          box-shadow:
+            0 0 0 4px color-mix(in srgb, var(--ask-em-accent, #16a34a) 18%, transparent),
+            0 0 10px color-mix(in srgb, var(--ask-em-accent, #16a34a) 16%, transparent);
+        }
+
+        50% {
+          transform: scale(1.14);
+          box-shadow:
+            0 0 0 6px color-mix(in srgb, var(--ask-em-accent, #16a34a) 22%, transparent),
+            0 0 18px color-mix(in srgb, var(--ask-em-accent, #16a34a) 28%, transparent);
+        }
+      }
     `;
     document.documentElement.appendChild(style);
   }
@@ -178,6 +204,11 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
     }
   };
 
+  const getDefaultLabel = () =>
+    context.workspaceId
+      ? `${adapter.name} ${context.providerEnabled ? 'sync' : 'paused'}`
+      : `${adapter.name} solo`;
+
   mount.addEventListener('click', () => {
     if (mount?.dataset.interactive !== 'true' || mount.dataset.busy === 'true') {
       return;
@@ -194,18 +225,14 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
   return {
     setState(state: UiState, labelText?: string) {
       mount.dataset.state = state;
-      updateLabel(labelText ?? `${adapter.name} ${context.providerEnabled ? 'on' : 'off'}`);
+      updateLabel(labelText ?? getDefaultLabel());
     },
     setContext(nextContext: UiContext) {
       context.workspaceId = nextContext.workspaceId;
       context.providerEnabled = nextContext.providerEnabled;
       mount.dataset.providerEnabled = String(nextContext.providerEnabled);
       mount.dataset.interactive = String(Boolean(nextContext.workspaceId));
-      updateLabel(
-        nextContext.workspaceId
-          ? `${adapter.name} ${nextContext.providerEnabled ? 'on' : 'off'}`
-          : `${adapter.name} solo`,
-      );
+      updateLabel(getDefaultLabel());
     },
   };
 }
@@ -297,7 +324,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     });
 
     await sendRuntimeMessage(buildUserSubmitMessage(status, content));
-    window.setTimeout(() => ui.setState('idle'), 1_500);
+    window.setTimeout(() => ui.setState(uiContext.providerEnabled ? 'idle' : 'blocked'), 1_500);
   };
 
   const unsubscribe = adapter.subscribeToUserSubmissions?.((content) => {

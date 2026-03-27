@@ -74,6 +74,7 @@ export default function App() {
   const workspaceCount = status?.workspaces.length ?? 0;
   const limit = status?.workspaceLimit ?? 3;
   const atLimit = workspaceCount >= limit;
+  const availableSlots = Math.max(0, limit - workspaceCount);
 
   const toggleDefaultProvider = async (provider: Provider) => {
     const nextProviders = selectedProviders.includes(provider)
@@ -119,7 +120,7 @@ export default function App() {
 
         <section className="askem-summary">
           <div>
-            <span className="askem-summary-label">Workspaces</span>
+            <span className="askem-summary-label">Groups</span>
             <strong>{workspaceCount}</strong>
           </div>
           <div>
@@ -136,11 +137,11 @@ export default function App() {
           <div className="askem-card-top">
             <div>
               <p className="askem-card-label">Default Targets</p>
-              <h2>New Workspace Fan-out</h2>
+              <h2>New Group Fan-out</h2>
             </div>
           </div>
           <p className="askem-card-copy">
-            Choose which providers should join when a workspace is first created. The source provider
+            Choose which providers should join when a group is first created. The source provider
             is always kept in.
           </p>
           <div className="askem-default-provider-list">
@@ -162,11 +163,20 @@ export default function App() {
           </div>
         </section>
 
-        <section className={`askem-notice ${atLimit ? 'is-warning' : ''}`}>
-          {atLimit
-            ? 'Workspace limit reached. Clear an old mirror set before creating a new one.'
-            : 'Bound sessions can continue syncing from any provider tab in the workspace.'}
-        </section>
+        {atLimit ? (
+          <section className="askem-limit-banner" role="status" aria-live="polite">
+            <span className="askem-limit-kicker">Group limit reached</span>
+            <strong>{limit} of {limit} groups are active.</strong>
+            <p>
+              New sends from a fresh chat will not create another group until you clear one below.
+            </p>
+          </section>
+        ) : (
+          <section className="askem-notice">
+            {availableSlots} slot{availableSlots === 1 ? '' : 's'} left. Bound chats can continue syncing
+            from any provider tab in the same group.
+          </section>
+        )}
 
         <section className="askem-workspaces">
           {status?.workspaces.length ? (
@@ -181,7 +191,7 @@ export default function App() {
             ))
           ) : (
             <div className="askem-empty">
-              <p>No active workspaces.</p>
+              <p>No active groups.</p>
               <span>Create one by sending the first prompt from a new-chat page.</span>
             </div>
           )}
@@ -247,15 +257,15 @@ function WorkspaceCard({
     <article className="askem-card">
       <div className="askem-card-top">
         <div>
-          <p className="askem-card-label">Workspace</p>
-          <h2>{workspace.id.slice(0, 8)}</h2>
+          <p className="askem-card-label">Group</p>
+          <h2>#{workspace.id.slice(0, 8)}</h2>
         </div>
         <button
           className="askem-clear-workspace"
           onClick={() => void onClearWorkspace(workspace.id)}
           disabled={busyKey === workspace.id}
         >
-          Clear All
+          Clear Group
         </button>
       </div>
 

@@ -161,9 +161,63 @@ body {
   line-height: 1.45;
 }
 
-.askem-notice.is-warning {
-  border-left-color: rgba(156, 107, 0, 0.68);
-  color: #6b4b00;
+.askem-limit-banner {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(156, 107, 0, 0.22);
+  border-radius: 20px;
+  padding: 15px 16px 16px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 211, 125, 0.38), transparent 30%),
+    linear-gradient(145deg, rgba(255, 250, 238, 0.96), rgba(255, 244, 213, 0.94));
+  box-shadow:
+    0 18px 32px rgba(156, 107, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.askem-limit-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    115deg,
+    transparent 0,
+    transparent 14px,
+    rgba(156, 107, 0, 0.045) 14px,
+    rgba(156, 107, 0, 0.045) 15px
+  );
+  pointer-events: none;
+}
+
+.askem-limit-kicker {
+  position: relative;
+  display: inline-flex;
+  margin-bottom: 8px;
+  color: #815400;
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.askem-limit-banner strong,
+.askem-limit-banner p {
+  position: relative;
+}
+
+.askem-limit-banner strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #5c3b00;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.askem-limit-banner p {
+  margin: 0;
+  color: #7a5600;
+  font-size: 13px;
+  line-height: 1.48;
 }
 
 .askem-workspaces {
@@ -248,6 +302,7 @@ body {
 .askem-provider-chip.is-active {
   border-color: rgba(37, 87, 214, 0.28);
   background: rgba(246, 249, 255, 0.94);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .askem-provider-chip:hover {
