@@ -1,1 +1,292 @@
 @import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --askem-ink: #171717;
+  --askem-muted: #6b6459;
+  --askem-panel: rgba(255, 252, 246, 0.92);
+  --askem-line: rgba(35, 25, 8, 0.12);
+  --askem-shadow: rgba(55, 35, 0, 0.12);
+  --askem-accent: #2557d6;
+  --askem-danger: #b9382f;
+  --askem-warn: #9c6b00;
+  --askem-ok: #1f7a59;
+}
+
+body {
+  margin: 0;
+  min-width: 396px;
+  min-height: 560px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 212, 160, 0.26), transparent 38%),
+    radial-gradient(circle at bottom right, rgba(92, 132, 255, 0.18), transparent 34%),
+    linear-gradient(160deg, #f7f1e7 0%, #f3eee6 48%, #eee7dc 100%);
+  color: var(--askem-ink);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.askem-popup-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.askem-popup-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(130deg, rgba(255, 255, 255, 0.44), transparent 36%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(92, 71, 26, 0.018) 0,
+      rgba(92, 71, 26, 0.018) 1px,
+      transparent 1px,
+      transparent 14px
+    );
+  pointer-events: none;
+}
+
+.askem-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.askem-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.askem-eyebrow {
+  margin: 0 0 6px;
+  color: var(--askem-muted);
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.askem-hero h1 {
+  margin: 0;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-size: 34px;
+  line-height: 0.95;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.askem-refresh,
+.askem-clear-workspace,
+.askem-provider-clear {
+  border: 1px solid var(--askem-line);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--askem-ink);
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.askem-refresh:hover,
+.askem-clear-workspace:hover,
+.askem-provider-clear:hover {
+  transform: translateY(-1px);
+  border-color: rgba(35, 25, 8, 0.2);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.askem-refresh:disabled,
+.askem-clear-workspace:disabled,
+.askem-provider-clear:disabled {
+  cursor: default;
+  opacity: 0.45;
+  transform: none;
+}
+
+.askem-refresh {
+  border-radius: 999px;
+  padding: 9px 12px;
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.askem-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.askem-summary > div,
+.askem-card {
+  border: 1px solid var(--askem-line);
+  background: var(--askem-panel);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 18px 35px var(--askem-shadow);
+}
+
+.askem-summary > div {
+  border-radius: 18px;
+  padding: 12px 13px;
+}
+
+.askem-summary-label,
+.askem-card-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--askem-muted);
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.askem-summary strong,
+.askem-card h2 {
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.askem-notice {
+  border-left: 3px solid rgba(37, 87, 214, 0.58);
+  padding-left: 12px;
+  color: var(--askem-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.askem-notice.is-warning {
+  border-left-color: rgba(156, 107, 0, 0.68);
+  color: #6b4b00;
+}
+
+.askem-workspaces {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.askem-card {
+  border-radius: 22px;
+  padding: 15px;
+}
+
+.askem-card-top,
+.askem-provider-row,
+.askem-provider-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.askem-card h2 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.askem-clear-workspace,
+.askem-provider-clear {
+  border-radius: 999px;
+  padding: 7px 10px;
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.askem-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 14px;
+  color: var(--askem-muted);
+  font-size: 12px;
+}
+
+.askem-provider-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.askem-provider-row {
+  border-top: 1px solid rgba(35, 25, 8, 0.08);
+  padding-top: 8px;
+}
+
+.askem-provider-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.askem-provider-name {
+  display: block;
+  margin-bottom: 4px;
+  font: 700 12px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.askem-state {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.askem-state-healthy {
+  background: rgba(31, 122, 89, 0.12);
+  color: var(--askem-ok);
+}
+
+.askem-state-stale {
+  background: rgba(156, 107, 0, 0.14);
+  color: var(--askem-warn);
+}
+
+.askem-state-missing {
+  background: rgba(107, 100, 89, 0.1);
+  color: var(--askem-muted);
+}
+
+.askem-state-pending {
+  background: rgba(37, 87, 214, 0.12);
+  color: var(--askem-accent);
+}
+
+.askem-provider-actions code {
+  color: var(--askem-muted);
+  font: 600 11px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+}
+
+.askem-empty {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 180px;
+  border: 1px dashed rgba(35, 25, 8, 0.18);
+  border-radius: 22px;
+  background: rgba(255, 252, 246, 0.52);
+  padding: 18px;
+  text-align: center;
+}
+
+.askem-empty p {
+  margin: 0;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-size: 24px;
+}
+
+.askem-empty span {
+  color: var(--askem-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
