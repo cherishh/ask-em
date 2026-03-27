@@ -2,6 +2,7 @@ import { getSiteInfoByProvider } from './sites';
 import type { AdapterSnapshot, SiteAdapter } from './types';
 import type { DeliverPromptMessage, PageKind, ProviderStatus } from '../runtime/protocol';
 import {
+  detectLoginRequired,
   dispatchEnterKey,
   findClickableByText,
   getEditableText,
@@ -25,9 +26,9 @@ function findSendButton(): HTMLElement | null {
     return null;
   }
 
-  const buttons = Array.from(container.querySelectorAll<HTMLElement>('div[role="button"][aria-disabled]')).filter(
-    (element) => isElementWithin(element, container),
-  );
+  const buttons = Array.from(
+    container.querySelectorAll<HTMLElement>('div.ds-icon-button[role="button"][aria-disabled]'),
+  ).filter((element) => isElementWithin(element, container));
 
   return buttons.at(-1) ?? null;
 }
@@ -38,13 +39,19 @@ function findNewChatButton(): HTMLElement | null {
 
 function getStatus(): ProviderStatus {
   const currentUrl = window.location.href;
+  const isReady = Boolean(findComposer() || findNewChatButton());
+  const pageState = isReady
+    ? 'ready'
+    : detectLoginRequired(['log in', 'sign in', 'phone number'])
+      ? 'login-required'
+      : 'not-ready';
 
   return {
     provider: 'deepseek',
     currentUrl,
     sessionId: site.extractSessionId(currentUrl),
     pageKind: site.isBlankChatUrl(currentUrl) ? 'new-chat' : 'existing-session',
-    pageState: findComposer() || findNewChatButton() ? 'ready' : 'not-ready',
+    pageState,
     mounted: true,
   };
 }
@@ -136,7 +143,13 @@ export const deepseekAdapter: SiteAdapter = {
     }
   },
   async openNewChat() {
-    findNewChatButton()?.click();
+    const newChatButton = findNewChatButton();
+    if (newChatButton) {
+      newChatButton.click();
+      return;
+    }
+
+    window.location.href = site.origin;
   },
   waitForSessionRefUpdate(baselineUrl) {
     return waitForUrlChange(site.extractSessionId, baselineUrl);

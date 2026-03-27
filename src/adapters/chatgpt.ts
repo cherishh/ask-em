@@ -2,6 +2,7 @@ import { getSiteInfoByProvider } from './sites';
 import type { AdapterSnapshot, SiteAdapter } from './types';
 import type { DeliverPromptMessage, PageKind, ProviderStatus } from '../runtime/protocol';
 import {
+  detectLoginRequired,
   dispatchEnterKey,
   findClickableByText,
   getEditableText,
@@ -21,6 +22,7 @@ function findSendButton(): HTMLElement | null {
   return queryVisible([
     '#composer-submit-button',
     'button[data-testid="send-button"]',
+    'button[data-testid="composer-send-button"]',
     'form[aria-label="Chat with ChatGPT"] button[class*="composer-submit-button"]',
   ]);
 }
@@ -31,13 +33,19 @@ function findNewChatButton(): HTMLElement | null {
 
 function getStatus(): ProviderStatus {
   const currentUrl = window.location.href;
+  const isReady = Boolean(findComposer() || findNewChatButton());
+  const pageState = isReady
+    ? 'ready'
+    : detectLoginRequired(['log in', 'sign up', 'continue with google'])
+      ? 'login-required'
+      : 'not-ready';
 
   return {
     provider: 'chatgpt',
     currentUrl,
     sessionId: site.extractSessionId(currentUrl),
     pageKind: site.isBlankChatUrl(currentUrl) ? 'new-chat' : 'existing-session',
-    pageState: findComposer() || findNewChatButton() ? 'ready' : 'not-ready',
+    pageState,
     mounted: true,
   };
 }
@@ -129,7 +137,13 @@ export const chatgptAdapter: SiteAdapter = {
     }
   },
   async openNewChat() {
-    findNewChatButton()?.click();
+    const newChatButton = findNewChatButton();
+    if (newChatButton) {
+      newChatButton.click();
+      return;
+    }
+
+    window.location.href = site.origin;
   },
   waitForSessionRefUpdate(baselineUrl) {
     return waitForUrlChange(site.extractSessionId, baselineUrl);

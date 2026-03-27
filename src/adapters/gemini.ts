@@ -2,6 +2,7 @@ import { getSiteInfoByProvider } from './sites';
 import type { AdapterSnapshot, SiteAdapter } from './types';
 import type { DeliverPromptMessage, PageKind, ProviderStatus } from '../runtime/protocol';
 import {
+  detectLoginRequired,
   dispatchEnterKey,
   findClickableByText,
   getEditableText,
@@ -27,13 +28,19 @@ function findNewChatButton(): HTMLElement | null {
 
 function getStatus(): ProviderStatus {
   const currentUrl = window.location.href;
+  const isReady = Boolean(findComposer() || findNewChatButton());
+  const pageState = isReady
+    ? 'ready'
+    : detectLoginRequired(['sign in', 'log in', 'google account'])
+      ? 'login-required'
+      : 'not-ready';
 
   return {
     provider: 'gemini',
     currentUrl,
     sessionId: site.extractSessionId(currentUrl),
     pageKind: site.isBlankChatUrl(currentUrl) ? 'new-chat' : 'existing-session',
-    pageState: findComposer() || findNewChatButton() ? 'ready' : 'not-ready',
+    pageState,
     mounted: true,
   };
 }
@@ -125,7 +132,13 @@ export const geminiAdapter: SiteAdapter = {
     }
   },
   async openNewChat() {
-    findNewChatButton()?.click();
+    const newChatButton = findNewChatButton();
+    if (newChatButton) {
+      newChatButton.click();
+      return;
+    }
+
+    window.location.href = site.origin + '/app';
   },
   waitForSessionRefUpdate(baselineUrl) {
     return waitForUrlChange(site.extractSessionId, baselineUrl);

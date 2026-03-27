@@ -153,3 +153,8 @@ export function waitForUrlChange(
 export function isElementWithin(target: EventTarget | null, container: HTMLElement | null): boolean {
   return target instanceof Node && Boolean(container?.contains(target));
 }
+
+export function detectLoginRequired(keywords: string[]): boolean {
+  const bodyText = normalizeWhitespace(document.body?.innerText || '').toLowerCase();
+  return keywords.some((keyword) => bodyText.includes(keyword.toLowerCase()));
+}
