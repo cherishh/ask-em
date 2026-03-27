@@ -11,6 +11,7 @@ import { toClaimedTabKey } from './protocol';
 
 export const DEFAULT_LOCAL_STATE: LocalState = {
   globalSyncEnabled: true,
+  debugLoggingEnabled: false,
   defaultEnabledProviders: createDefaultEnabledProviders(),
   workspaces: {},
   workspaceIndex: {},
@@ -78,6 +79,10 @@ export async function clearSessionState(): Promise<void> {
 
 export async function appendDebugLog(entry: Omit<DebugLogEntry, 'id' | 'timestamp'> & Partial<Pick<DebugLogEntry, 'id' | 'timestamp'>>): Promise<LocalState> {
   return updateLocalState((state) => {
+    if (!state.debugLoggingEnabled) {
+      return state;
+    }
+
     const debugLog: DebugLogEntry = {
       id: entry.id ?? crypto.randomUUID(),
       timestamp: entry.timestamp ?? Date.now(),

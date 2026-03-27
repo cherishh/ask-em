@@ -24,6 +24,16 @@ async function requestFullLogs(): Promise<DebugLogEntry[]> {
   return response?.logs ?? [];
 }
 
+function downloadJsonFile(filename: string, payload: string) {
+  const blob = new Blob([payload], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function App() {
   const [status, setStatus] = useState<StatusResponseMessage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,6 +114,23 @@ export default function App() {
     setLogActionBusy(false);
   };
 
+  const toggleDebugLogging = async () => {
+    const nextEnabled = !status?.debugLoggingEnabled;
+    setLogActionBusy(true);
+    await chrome.runtime.sendMessage({ type: 'SET_DEBUG_LOGGING_ENABLED', enabled: nextEnabled });
+    await refresh();
+    setLogActionBusy(false);
+  };
+
+  const downloadLogs = async () => {
+    setLogActionBusy(true);
+    const logs = await requestFullLogs();
+    const payload = JSON.stringify(logs, null, 2);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    downloadJsonFile(`ask-em-debug-logs-${timestamp}.json`, payload);
+    setLogActionBusy(false);
+  };
+
   return (
     <main className="askem-popup-shell">
       <div className="askem-popup-backdrop" />
@@ -132,6 +159,19 @@ export default function App() {
             <strong>{status?.globalSyncEnabled ? 'On' : 'Off'}</strong>
           </div>
         </section>
+
+        {atLimit ? (
+          <WarningCard
+            eyebrow="Warning"
+            title="You reached your group limit."
+            body="New sends from a fresh chat will not create another group until you clear one below."
+          />
+        ) : (
+          <section className="askem-notice">
+            {availableSlots} slot{availableSlots === 1 ? '' : 's'} left. Bound chats can continue syncing
+            from any provider tab in the same group.
+          </section>
+        )}
 
         <section className="askem-card askem-defaults-card">
           <div className="askem-card-top">
@@ -163,21 +203,6 @@ export default function App() {
           </div>
         </section>
 
-        {atLimit ? (
-          <section className="askem-limit-banner" role="status" aria-live="polite">
-            <span className="askem-limit-kicker">Group limit reached</span>
-            <strong>{limit} of {limit} groups are active.</strong>
-            <p>
-              New sends from a fresh chat will not create another group until you clear one below.
-            </p>
-          </section>
-        ) : (
-          <section className="askem-notice">
-            {availableSlots} slot{availableSlots === 1 ? '' : 's'} left. Bound chats can continue syncing
-            from any provider tab in the same group.
-          </section>
-        )}
-
         <section className="askem-workspaces">
           {status?.workspaces.length ? (
             status.workspaces.map((workspaceSummary) => (
@@ -200,26 +225,57 @@ export default function App() {
         <section className="askem-card askem-logs-card">
           <div className="askem-card-top">
             <div>
-              <p className="askem-card-label">Persistent Logs</p>
-              <h2>Debug Trace</h2>
+              <p className="askem-card-label">Debug Mode</p>
+              <h2>Trace Capture</h2>
             </div>
             <div className="askem-log-actions">
-              <button className="askem-provider-clear" onClick={() => void copyLogs()} disabled={logActionBusy}>
-                Copy Logs
+              <button
+                className={`askem-provider-chip askem-log-toggle ${status?.debugLoggingEnabled ? 'is-active' : ''}`}
+                onClick={() => void toggleDebugLogging()}
+                disabled={logActionBusy}
+              >
+                <span>Logging</span>
+                <span>{status?.debugLoggingEnabled ? 'on' : 'off'}</span>
               </button>
-              <button className="askem-provider-clear" onClick={() => void clearLogs()} disabled={logActionBusy}>
-                Clear Logs
-              </button>
+              {status?.debugLoggingEnabled ? (
+                <>
+                  <button className="askem-provider-clear" onClick={() => void copyLogs()} disabled={logActionBusy}>
+                    Copy Logs
+                  </button>
+                  <button className="askem-provider-clear" onClick={() => void downloadLogs()} disabled={logActionBusy}>
+                    Download Logs
+                  </button>
+                  <button className="askem-provider-clear" onClick={() => void clearLogs()} disabled={logActionBusy}>
+                    Clear Logs
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
+          <p className="askem-card-copy">
+            Logging is off by default. Turn it on only when you need a bug report trail, then export
+            the JSON file and send it over.
+          </p>
           <div className="askem-logs-list">
-            {status?.recentLogs.length ? (
-              status.recentLogs.map((log) => <LogRow key={log.id} log={log} />)
+            {status?.debugLoggingEnabled ? (
+              status?.recentLogs.length ? (
+                status.recentLogs.map((log) => <LogRow key={log.id} log={log} />)
+              ) : (
+                <p className="askem-logs-empty">Logging is enabled, but no events have been captured yet.</p>
+              )
             ) : (
-              <p className="askem-logs-empty">No recent events.</p>
+              <p className="askem-logs-empty">Logging is currently off.</p>
             )}
           </div>
         </section>
+
+        <footer className="askem-footer">
+          <span>by </span>
+          <a href="https://tuxi.dev/" target="_blank" rel="noreferrer">
+            Tuxi
+          </a>
+          <span> · one77r@gmail.com</span>
+        </footer>
       </section>
     </main>
   );
@@ -237,6 +293,44 @@ function LogRow({ log }: { log: DebugLogEntry }) {
       <p>{log.message}</p>
       {log.detail ? <code>{log.detail}</code> : null}
     </div>
+  );
+}
+
+export function WarningCard({
+  eyebrow,
+  title,
+  body,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <section className="askem-warning-card" role="status" aria-live="polite">
+      <span className="askem-warning-kicker">{eyebrow}</span>
+      <div className="askem-warning-headline">
+        <strong>{title}</strong>
+      </div>
+      <p>{body}</p>
+    </section>
+  );
+}
+
+export function PremiumCard({
+  eyebrow,
+  title,
+  body,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <section className="askem-premium-card">
+      <span className="askem-premium-kicker">{eyebrow}</span>
+      <strong>{title}</strong>
+      <p>{body}</p>
+    </section>
   );
 }
 

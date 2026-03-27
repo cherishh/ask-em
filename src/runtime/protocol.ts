@@ -55,6 +55,7 @@ export type ClaimedTab = {
 
 export type LocalState = {
   globalSyncEnabled: boolean;
+  debugLoggingEnabled: boolean;
   defaultEnabledProviders: DefaultEnabledProviders;
   workspaces: Record<string, Workspace>;
   workspaceIndex: WorkspaceIndex;
@@ -130,6 +131,7 @@ export type WorkspaceSummary = {
 export type StatusResponseMessage = {
   type: 'STATUS_RESPONSE';
   globalSyncEnabled: boolean;
+  debugLoggingEnabled: boolean;
   workspaceLimit: number;
   defaultEnabledProviders: DefaultEnabledProviders;
   workspaces: WorkspaceSummary[];
@@ -172,6 +174,11 @@ export type SetWorkspaceProviderEnabledMessage = {
   enabled: boolean;
 };
 
+export type SetDebugLoggingEnabledMessage = {
+  type: 'SET_DEBUG_LOGGING_ENABLED';
+  enabled: boolean;
+};
+
 export type DebugLogMessage = {
   type: 'LOG_DEBUG';
   level: DebugLogEntry['level'];
@@ -196,6 +203,7 @@ export type RuntimeMessage =
   | ClearDebugLogsMessage
   | SetDefaultEnabledProvidersMessage
   | SetWorkspaceProviderEnabledMessage
+  | SetDebugLoggingEnabledMessage
   | DebugLogMessage
   | DebugLogsResponseMessage
   | StatusResponseMessage;

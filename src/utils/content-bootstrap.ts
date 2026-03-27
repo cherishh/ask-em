@@ -68,13 +68,13 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
 
       .ask-em-sync-pill::before {
         content: "";
-        width: 8px;
-        height: 8px;
+        width: 7px;
+        height: 7px;
         border-radius: 999px;
         background: var(--ask-em-accent, rgba(15, 23, 42, 0.45));
         box-shadow:
-          0 0 0 4px color-mix(in srgb, var(--ask-em-accent, #0f172a) 16%, transparent),
-          0 0 14px color-mix(in srgb, var(--ask-em-accent, #0f172a) 22%, transparent);
+          0 0 0 3px color-mix(in srgb, var(--ask-em-accent, #0f172a) 16%, transparent),
+          0 0 12px color-mix(in srgb, var(--ask-em-accent, #0f172a) 20%, transparent);
       }
 
       .ask-em-sync-pill[data-state="idle"] {
@@ -158,17 +158,17 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
       @keyframes ask-em-pulse {
         0%,
         100% {
-          transform: scale(0.95);
+          transform: scale(0.96);
           box-shadow:
-            0 0 0 4px color-mix(in srgb, var(--ask-em-accent, #16a34a) 18%, transparent),
-            0 0 10px color-mix(in srgb, var(--ask-em-accent, #16a34a) 16%, transparent);
+            0 0 0 3px color-mix(in srgb, var(--ask-em-accent, #16a34a) 18%, transparent),
+            0 0 8px color-mix(in srgb, var(--ask-em-accent, #16a34a) 16%, transparent);
         }
 
         50% {
-          transform: scale(1.14);
+          transform: scale(1.08);
           box-shadow:
-            0 0 0 6px color-mix(in srgb, var(--ask-em-accent, #16a34a) 22%, transparent),
-            0 0 18px color-mix(in srgb, var(--ask-em-accent, #16a34a) 28%, transparent);
+            0 0 0 5px color-mix(in srgb, var(--ask-em-accent, #16a34a) 22%, transparent),
+            0 0 14px color-mix(in srgb, var(--ask-em-accent, #16a34a) 24%, transparent);
         }
       }
     `;

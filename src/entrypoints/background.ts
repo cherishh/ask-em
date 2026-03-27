@@ -287,6 +287,7 @@ async function handleGetStatus(_message: GetStatusMessage): Promise<StatusRespon
   return {
     type: 'STATUS_RESPONSE',
     globalSyncEnabled: localState.globalSyncEnabled,
+    debugLoggingEnabled: localState.debugLoggingEnabled,
     workspaceLimit: 3,
     defaultEnabledProviders: localState.defaultEnabledProviders,
     workspaces,
@@ -370,6 +371,27 @@ async function handleSetWorkspaceProviderEnabled(
   return { ok: true };
 }
 
+async function handleSetDebugLoggingEnabled(
+  message: Extract<RuntimeMessage, { type: 'SET_DEBUG_LOGGING_ENABLED' }>,
+) {
+  const localState = await getLocalState();
+  await setLocalState({
+    ...localState,
+    debugLoggingEnabled: message.enabled,
+    debugLogs: message.enabled ? localState.debugLogs : [],
+  });
+
+  if (message.enabled) {
+    await appendDebugLog({
+      level: 'info',
+      scope: 'background',
+      message: 'Debug logging enabled',
+    });
+  }
+
+  return { ok: true };
+}
+
 async function handleDebugLog(
   message: Extract<RuntimeMessage, { type: 'LOG_DEBUG' }>,
 ) {
@@ -404,6 +426,9 @@ export default defineBackground(() => {
           return;
         case 'SET_WORKSPACE_PROVIDER_ENABLED':
           sendResponse(await handleSetWorkspaceProviderEnabled(message));
+          return;
+        case 'SET_DEBUG_LOGGING_ENABLED':
+          sendResponse(await handleSetDebugLoggingEnabled(message));
           return;
         case 'LOG_DEBUG':
           sendResponse(await handleDebugLog(message));

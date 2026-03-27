@@ -16,6 +16,7 @@ import { isClaimedTabStale } from './recovery';
 function createEmptyState(): LocalState {
   return {
     globalSyncEnabled: true,
+    debugLoggingEnabled: false,
     defaultEnabledProviders: createDefaultEnabledProviders(),
     workspaces: {},
     workspaceIndex: {},
@@ -157,6 +158,7 @@ describe('workspace state', () => {
   it('enforces the workspace limit of three', () => {
     const state: LocalState = {
       globalSyncEnabled: true,
+      debugLoggingEnabled: false,
       defaultEnabledProviders: createDefaultEnabledProviders(),
       workspaces: {
         w1: { id: 'w1', members: {}, enabledProviders: [], createdAt: 1, updatedAt: 1 },
