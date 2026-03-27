@@ -1,0 +1,28 @@
+{
+  "name": "ask-em",
+  "description": "Sync prompts across AI chat providers",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "compile": "tsc --noEmit",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/chrome": "^0.1.38",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@wxt-dev/module-react": "^1.1.5",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.9.3",
+    "wxt": "^0.20.20"
+  }
+}
