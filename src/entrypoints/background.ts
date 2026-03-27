@@ -54,6 +54,13 @@ async function notifyTabsToRefreshContext(tabIds: number[]) {
   );
 }
 
+async function notifyAllTabsToRefreshContext() {
+  const tabs = await chrome.tabs.query({});
+  await notifyTabsToRefreshContext(
+    tabs.map((tab) => tab.id).filter((tabId): tabId is number => typeof tabId === 'number'),
+  );
+}
+
 async function logDebug(entry: Omit<DebugLogEntry, 'id' | 'timestamp'> & Partial<Pick<DebugLogEntry, 'id' | 'timestamp'>>) {
   await appendDebugLog(entry);
 }
@@ -175,7 +182,12 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
   }
 
   if (!workspaceLookup?.workspace) {
-    return { ok: true, workspaceId: null, providerEnabled: false };
+    return {
+      ok: true,
+      workspaceId: null,
+      providerEnabled: false,
+      globalSyncEnabled: localState.globalSyncEnabled,
+    };
   }
 
   cancelScheduledGroupGc(workspaceLookup.workspaceId);
@@ -207,6 +219,7 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
     ok: true,
     workspaceId: workspaceLookup.workspaceId,
     providerEnabled: isProviderEnabled(workspaceLookup.workspace.enabledProviders, message.provider),
+    globalSyncEnabled: localState.globalSyncEnabled,
     enabledProviders: workspaceLookup.workspace.enabledProviders,
   };
 }
@@ -336,7 +349,12 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
   }
 
   if (!workspaceLookup?.workspace) {
-    return { ok: true, synced: false };
+    return {
+      ok: true,
+      synced: false,
+      workspaceId: null,
+      globalSyncEnabled: localState.globalSyncEnabled,
+    };
   }
 
   cancelScheduledGroupGc(workspaceLookup.workspaceId);
@@ -349,7 +367,13 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
       workspaceId: workspaceLookup.workspaceId,
       message: 'Ignored submit from disabled provider',
     });
-    return { ok: true, synced: false, workspaceId: workspaceLookup.workspaceId };
+    return {
+      ok: true,
+      synced: false,
+      workspaceId: workspaceLookup.workspaceId,
+      providerEnabled: false,
+      globalSyncEnabled: localState.globalSyncEnabled,
+    };
   }
 
   if (message.sessionId) {
@@ -384,12 +408,32 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
     message: 'User submit routed',
     detail: message.content.slice(0, 120),
   });
+
+  if (!localState.globalSyncEnabled) {
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      provider: message.provider,
+      workspaceId: workspaceLookup.workspaceId,
+      message: 'Skipped sync fan-out because global sync is paused',
+    });
+    return {
+      ok: true,
+      synced: false,
+      workspaceId: workspaceLookup.workspaceId,
+      providerEnabled: true,
+      globalSyncEnabled: false,
+    };
+  }
+
   await deliverPromptToWorkspaceTargets(workspaceLookup.workspaceId, message);
 
   return {
     ok: true,
     synced: true,
     workspaceId: workspaceLookup.workspaceId,
+    providerEnabled: true,
+    globalSyncEnabled: true,
   };
 }
 
@@ -534,6 +578,23 @@ async function handleSetWorkspaceProviderEnabled(
   return { ok: true };
 }
 
+async function handleSetGlobalSyncEnabled(
+  message: Extract<RuntimeMessage, { type: 'SET_GLOBAL_SYNC_ENABLED' }>,
+) {
+  const localState = await getLocalState();
+  await setLocalState({
+    ...localState,
+    globalSyncEnabled: message.enabled,
+  });
+  await notifyAllTabsToRefreshContext();
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    message: message.enabled ? 'Global sync resumed' : 'Global sync paused',
+  });
+  return { ok: true };
+}
+
 async function handleSetDebugLoggingEnabled(
   message: Extract<RuntimeMessage, { type: 'SET_DEBUG_LOGGING_ENABLED' }>,
 ) {
@@ -613,6 +674,9 @@ export default defineBackground(() => {
           return;
         case 'SET_WORKSPACE_PROVIDER_ENABLED':
           sendResponse(await handleSetWorkspaceProviderEnabled(message));
+          return;
+        case 'SET_GLOBAL_SYNC_ENABLED':
+          sendResponse(await handleSetGlobalSyncEnabled(message));
           return;
         case 'SET_DEBUG_LOGGING_ENABLED':
           sendResponse(await handleSetDebugLoggingEnabled(message));

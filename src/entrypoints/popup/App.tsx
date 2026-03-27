@@ -1,6 +1,5 @@
 import { startTransition, useEffect, useState } from 'react';
 import type { DebugLogEntry, Provider, StatusResponseMessage, WorkspaceSummary } from '../../runtime/protocol';
-import { DidYouKnowCard } from './components/DidYouKnowCard';
 
 const PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek'];
 
@@ -99,6 +98,16 @@ export default function App() {
     await refresh();
   };
 
+  const toggleGlobalSync = async () => {
+    const nextEnabled = !status?.globalSyncEnabled;
+    setLoading(true);
+    await chrome.runtime.sendMessage({
+      type: 'SET_GLOBAL_SYNC_ENABLED',
+      enabled: nextEnabled,
+    });
+    await refresh();
+  };
+
   const copyLogs = async () => {
     setLogActionBusy(true);
     const logs = await requestFullLogs();
@@ -154,10 +163,14 @@ export default function App() {
             <span className="askem-summary-label">Limit</span>
             <strong>{limit}</strong>
           </div>
-          <div>
+          <button
+            className={`askem-summary-toggle ${status?.globalSyncEnabled ? 'is-active' : 'is-paused'}`}
+            onClick={() => void toggleGlobalSync()}
+            disabled={loading}
+          >
             <span className="askem-summary-label">Global Sync</span>
             <strong>{status?.globalSyncEnabled ? 'On' : 'Off'}</strong>
-          </div>
+          </button>
         </section>
 
         {atLimit ? (
@@ -166,9 +179,7 @@ export default function App() {
             title="You reached your group limit."
             body="New sends from a fresh chat will not create another group until you clear one below."
           />
-        ) : (
-          <DidYouKnowCard />
-        )}
+        ) : null}
 
         <section className="askem-card askem-defaults-card">
           <div className="askem-card-top">

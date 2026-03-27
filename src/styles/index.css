@@ -122,16 +122,43 @@ body {
 }
 
 .askem-summary > div,
+.askem-summary-toggle,
 .askem-card {
   border: 1px solid var(--askem-line);
   background: var(--askem-panel);
   backdrop-filter: blur(12px);
 }
 
-.askem-summary > div {
+.askem-summary > div,
+.askem-summary-toggle {
   border-radius: 18px;
   padding: 12px 13px;
   box-shadow: 0 3px 8px rgba(55, 35, 0, 0.035);
+}
+
+.askem-summary-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.askem-summary-toggle:hover {
+  border-color: rgba(35, 25, 8, 0.18);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.askem-summary-toggle.is-paused {
+  border-color: rgba(184, 78, 24, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 249, 244, 0.94), rgba(255, 242, 232, 0.92));
+}
+
+.askem-summary-toggle:disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
 .askem-card {

@@ -179,6 +179,11 @@ export type SetDebugLoggingEnabledMessage = {
   enabled: boolean;
 };
 
+export type SetGlobalSyncEnabledMessage = {
+  type: 'SET_GLOBAL_SYNC_ENABLED';
+  enabled: boolean;
+};
+
 export type DebugLogMessage = {
   type: 'LOG_DEBUG';
   level: DebugLogEntry['level'];
@@ -207,6 +212,7 @@ export type RuntimeMessage =
   | ClearDebugLogsMessage
   | SetDefaultEnabledProvidersMessage
   | SetWorkspaceProviderEnabledMessage
+  | SetGlobalSyncEnabledMessage
   | SetDebugLoggingEnabledMessage
   | DebugLogMessage
   | RefreshContentContextMessage

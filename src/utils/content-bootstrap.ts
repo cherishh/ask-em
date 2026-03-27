@@ -13,6 +13,7 @@ type UiState = 'idle' | 'listening' | 'syncing' | 'blocked';
 type UiContext = {
   workspaceId: string | null;
   providerEnabled: boolean;
+  globalSyncEnabled: boolean;
 };
 
 function shouldShowStandaloneIndicator(adapter: SiteAdapter): boolean {
@@ -122,6 +123,17 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
         --ask-em-accent: rgba(120, 113, 108, 0.84);
       }
 
+      .ask-em-sync-pill[data-global-sync-enabled="false"] {
+        border-color: rgba(120, 113, 108, 0.16);
+        background: rgba(236, 233, 229, 0.72);
+        color: rgba(68, 64, 60, 0.76);
+        box-shadow:
+          0 10px 24px rgba(15, 23, 42, 0.1),
+          inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        opacity: 0.84;
+        --ask-em-accent: rgba(120, 113, 108, 0.7);
+      }
+
       .ask-em-sync-pill[data-busy="true"] {
         opacity: 0.94;
         cursor: progress;
@@ -191,6 +203,7 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
     mount.classList.add('ask-em-sync-pill');
     mount.dataset.state = 'idle';
     mount.dataset.providerEnabled = 'true';
+    mount.dataset.globalSyncEnabled = 'true';
     mount.dataset.interactive = 'false';
     mount.dataset.visible = 'false';
     mount.innerHTML = `
@@ -204,6 +217,7 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
   const context: UiContext = {
     workspaceId: null,
     providerEnabled: true,
+    globalSyncEnabled: true,
   };
 
   const updateLabel = (text: string) => {
@@ -213,7 +227,9 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
   };
 
   const getDefaultLabel = () =>
-    context.workspaceId
+    !context.globalSyncEnabled
+      ? 'global paused'
+      : context.workspaceId
       ? `${adapter.name} ${context.providerEnabled ? 'sync' : 'paused'}`
       : `${adapter.name} ready`;
 
@@ -241,7 +257,9 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
     setContext(nextContext: UiContext) {
       context.workspaceId = nextContext.workspaceId;
       context.providerEnabled = nextContext.providerEnabled;
+      context.globalSyncEnabled = nextContext.globalSyncEnabled;
       mount.dataset.providerEnabled = String(nextContext.providerEnabled);
+      mount.dataset.globalSyncEnabled = String(nextContext.globalSyncEnabled);
       mount.dataset.interactive = String(Boolean(nextContext.workspaceId));
       updateLabel(getDefaultLabel());
     },
@@ -252,6 +270,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
   let uiContext: UiContext = {
     workspaceId: null,
     providerEnabled: true,
+    globalSyncEnabled: true,
   };
 
   const ui = ensureUi(adapter, async (nextEnabled) => {
@@ -268,7 +287,8 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
 
     uiContext = {
       ...uiContext,
-      providerEnabled: nextEnabled,
+        providerEnabled: nextEnabled,
+        globalSyncEnabled: uiContext.globalSyncEnabled,
     };
     ui.setContext(uiContext);
     ui.setState('idle');
@@ -299,10 +319,10 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     const status = adapter.getStatus();
     const response =
       kind === 'HELLO'
-        ? await sendRuntimeMessage<{ workspaceId?: string | null; providerEnabled?: boolean }>(
+        ? await sendRuntimeMessage<{ workspaceId?: string | null; providerEnabled?: boolean; globalSyncEnabled?: boolean }>(
             buildHelloMessage(adapter),
           )
-        : await sendRuntimeMessage<{ workspaceId?: string | null; providerEnabled?: boolean }>(
+        : await sendRuntimeMessage<{ workspaceId?: string | null; providerEnabled?: boolean; globalSyncEnabled?: boolean }>(
             buildHeartbeatMessage(adapter),
           );
 
@@ -310,6 +330,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     uiContext = {
       workspaceId: response?.workspaceId ?? null,
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? false) : true,
+      globalSyncEnabled: response?.globalSyncEnabled ?? true,
     };
     ui.setContext(uiContext);
     ui.setVisible(Boolean(response?.workspaceId) || standaloneVisible);
@@ -345,18 +366,23 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
       detail: content.slice(0, 120),
     });
 
-    const response = await sendRuntimeMessage<{ workspaceId?: string | null; synced?: boolean }>(
+    const response = await sendRuntimeMessage<{
+      workspaceId?: string | null;
+      synced?: boolean;
+      providerEnabled?: boolean;
+      globalSyncEnabled?: boolean;
+    }>(
       buildUserSubmitMessage(status, content),
     );
 
-    if (response?.workspaceId) {
-      uiContext = {
-        workspaceId: response.workspaceId,
-        providerEnabled: true,
-      };
-      ui.setContext(uiContext);
-      ui.setState('idle');
-    }
+    uiContext = {
+      workspaceId: response?.workspaceId ?? null,
+      providerEnabled: response?.workspaceId ? (response.providerEnabled ?? true) : true,
+      globalSyncEnabled: response?.globalSyncEnabled ?? uiContext.globalSyncEnabled,
+    };
+    ui.setContext(uiContext);
+    ui.setVisible(Boolean(uiContext.workspaceId) || shouldShowStandaloneIndicator(adapter));
+    ui.setState('idle');
 
     window.setTimeout(() => ui.setState(uiContext.providerEnabled ? 'idle' : 'blocked'), 1_500);
   };
