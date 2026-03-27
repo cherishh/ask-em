@@ -223,10 +223,14 @@ export default function App() {
         </section>
 
         <section className="askem-card askem-logs-card">
-          <div className="askem-card-top">
-            <div>
+          <div className="askem-debug-top">
+            <div className="askem-debug-copy">
               <p className="askem-card-label">Debug Mode</p>
               <h2>Trace Capture</h2>
+              <p className="askem-card-copy">
+                Logging is off by default. Turn it on only when you need a bug report trail, then
+                export the JSON file and send it over.
+              </p>
             </div>
             <div className="askem-log-actions">
               <button
@@ -252,11 +256,8 @@ export default function App() {
               ) : null}
             </div>
           </div>
-          <p className="askem-card-copy">
-            Logging is off by default. Turn it on only when you need a bug report trail, then export
-            the JSON file and send it over.
-          </p>
-          <div className="askem-logs-list">
+          <div className="askem-logs-panel">
+            <div className="askem-logs-list">
             {status?.debugLoggingEnabled ? (
               status?.recentLogs.length ? (
                 status.recentLogs.map((log) => <LogRow key={log.id} log={log} />)
@@ -266,6 +267,7 @@ export default function App() {
             ) : (
               <p className="askem-logs-empty">Logging is currently off.</p>
             )}
+            </div>
           </div>
         </section>
 

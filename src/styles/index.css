@@ -451,15 +451,70 @@ body {
   line-height: 1.5;
 }
 
+.askem-logs-card {
+  overflow: hidden;
+}
+
+.askem-debug-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 252px);
+  gap: 18px;
+  align-items: start;
+}
+
+.askem-debug-copy h2 {
+  max-width: 8ch;
+}
+
+.askem-debug-copy .askem-card-copy {
+  max-width: 38ch;
+  margin-top: 12px;
+}
+
+.askem-logs-panel {
+  margin-top: 16px;
+  border: 1px solid rgba(35, 25, 8, 0.08);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(249, 244, 235, 0.72)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(92, 71, 26, 0.018) 0,
+      rgba(92, 71, 26, 0.018) 1px,
+      transparent 1px,
+      transparent 18px
+    );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.66);
+}
+
 .askem-logs-list {
   display: grid;
   gap: 8px;
-  margin-top: 12px;
+  max-height: 1080px;
+  overflow: auto;
+  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 96, 76, 0.4) transparent;
+}
+
+.askem-logs-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.askem-logs-list::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(110, 96, 76, 0.32);
+  background-clip: padding-box;
+}
+
+.askem-logs-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .askem-log-row {
   border-top: 1px solid rgba(35, 25, 8, 0.08);
-  padding-top: 8px;
+  padding-top: 10px;
 }
 
 .askem-log-row:first-child {
@@ -491,8 +546,8 @@ body {
 
 .askem-log-row p {
   margin: 6px 0 0;
-  font-size: 13px;
-  line-height: 1.4;
+  font: 600 12px/1.55 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.01em;
 }
 
 .askem-log-row code,
@@ -504,13 +559,32 @@ body {
 }
 
 .askem-log-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .askem-log-toggle {
-  min-width: 112px;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.askem-logs-empty {
+  margin: 0;
+}
+
+@media (max-width: 440px) {
+  .askem-debug-top {
+    grid-template-columns: 1fr;
+  }
+
+  .askem-debug-copy h2 {
+    max-width: none;
+  }
+
+  .askem-log-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .askem-footer {
