@@ -11,6 +11,7 @@ import {
 } from '../runtime/protocol';
 import {
   appendDebugLog,
+  clearClaimedTab,
   clearDebugLogs,
   getSessionState,
   getLocalState,
@@ -153,11 +154,12 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
 
   if (!workspaceLookup) {
     const claimedTab = getClaimedTabByTabId(sessionState, tabId, message.provider);
+    const claimedWorkspace = claimedTab ? localState.workspaces[claimedTab.workspaceId] : null;
 
-    if (claimedTab) {
+    if (claimedTab && claimedWorkspace) {
       workspaceLookup = {
         workspaceId: claimedTab.workspaceId,
-        workspace: localState.workspaces[claimedTab.workspaceId],
+        workspace: claimedWorkspace,
       };
     }
   }
@@ -265,8 +267,42 @@ async function deliverPromptToWorkspaceTargets(
 
 async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runtime.MessageSender) {
   const tabId = sender.tab?.id;
-  let { localState } = await refreshPendingState();
+  let { localState, sessionState } = await refreshPendingState();
   let workspaceLookup = lookupWorkspaceBySession(localState, message.provider, message.sessionId);
+
+  if (!workspaceLookup && tabId && message.pageKind === 'new-chat' && message.sessionId === null) {
+    const claimedTab = getClaimedTabByTabId(sessionState, tabId, message.provider);
+    const claimedWorkspace = claimedTab ? localState.workspaces[claimedTab.workspaceId] : null;
+    const isPendingSourceBinding = Boolean(
+      claimedWorkspace &&
+      claimedWorkspace.pendingSource === message.provider &&
+      claimedWorkspace.members[message.provider]?.sessionId === null,
+    );
+
+    if (claimedTab && claimedWorkspace && !isPendingSourceBinding) {
+      localState = clearWorkspaceProvider(localState, claimedTab.workspaceId, message.provider);
+      sessionState = await clearClaimedTab(claimedTab.workspaceId, message.provider);
+
+      const nextWorkspace = localState.workspaces[claimedTab.workspaceId];
+      const isEmptyGroup =
+        nextWorkspace &&
+        nextWorkspace.enabledProviders.length === 0 &&
+        Object.keys(nextWorkspace.members).length === 0;
+
+      await setLocalState(localState);
+      await logDebug({
+        level: 'info',
+        scope: 'background',
+        workspaceId: claimedTab.workspaceId,
+        provider: message.provider,
+        message: 'Detached provider from previous group on new-chat submit',
+      });
+
+      if (isEmptyGroup) {
+        await scheduleEmptyGroupDeletion(claimedTab.workspaceId);
+      }
+    }
+  }
 
   if (!workspaceLookup && canCreateWorkspaceFromSubmit(localState, message)) {
     const enabledProviders = getDefaultEnabledProviderList(localState, message.provider);
