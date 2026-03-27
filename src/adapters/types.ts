@@ -32,6 +32,7 @@ export interface SiteAdapter {
   getPageKind(url?: string): PageKind;
   getStatus(): ProviderStatus;
   getUiSpec(): ProviderUiSpec;
+  getComposerText(): string;
   subscribeToUserSubmissions?(onSubmit: (content: string) => void): () => void;
   setComposerText?(content: string): Promise<void> | void;
   submit?(): Promise<void> | void;
