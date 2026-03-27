@@ -408,7 +408,7 @@ body {
   text-transform: uppercase;
 }
 
-.askem-state-healthy {
+.askem-state-online {
   background: rgba(31, 122, 89, 0.12);
   color: var(--askem-ok);
 }
@@ -418,7 +418,7 @@ body {
   color: var(--askem-warn);
 }
 
-.askem-state-missing {
+.askem-state-offline {
   background: rgba(107, 100, 89, 0.1);
   color: var(--askem-muted);
 }

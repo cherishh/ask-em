@@ -125,7 +125,7 @@ export type GetStatusMessage = {
 
 export type WorkspaceSummary = {
   workspace: Workspace;
-  memberStatuses: Partial<Record<Provider, 'healthy' | 'stale' | 'missing' | 'pending'>>;
+  memberStates: Partial<Record<Provider, 'online' | 'stale' | 'offline' | 'pending'>>;
 };
 
 export type StatusResponseMessage = {

@@ -186,7 +186,7 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
     mount.dataset.providerEnabled = 'false';
     mount.dataset.interactive = 'false';
     mount.innerHTML = `
-      <span class="ask-em-pill-label">${adapter.name} solo</span>
+      <span class="ask-em-pill-label">${adapter.name} paused</span>
       <span class="ask-em-pill-toggle" aria-hidden="true"></span>
     `;
     document.body.appendChild(mount);
@@ -205,9 +205,7 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
   };
 
   const getDefaultLabel = () =>
-    context.workspaceId
-      ? `${adapter.name} ${context.providerEnabled ? 'sync' : 'paused'}`
-      : `${adapter.name} solo`;
+    `${adapter.name} ${context.providerEnabled ? 'sync' : 'paused'}`;
 
   mount.addEventListener('click', () => {
     if (mount?.dataset.interactive !== 'true' || mount.dataset.busy === 'true') {

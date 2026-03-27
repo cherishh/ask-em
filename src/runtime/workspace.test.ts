@@ -11,7 +11,7 @@ import {
   lookupWorkspaceBySession,
   setWorkspaceProviderEnabled,
 } from './workspace';
-import { isClaimedTabStale } from './recovery';
+import { countClaimedTabsForWorkspace, isClaimedTabStale, removeClaimedTabsForTabId } from './recovery';
 
 function createEmptyState(): LocalState {
   return {
@@ -224,5 +224,35 @@ describe('workspace state', () => {
 
     expect(state.workspaces.w1.enabledProviders).toEqual(['gemini', 'claude']);
     expect(state.workspaces.w1.members.gemini).toBeDefined();
+  });
+
+  it('removes claimed tabs by tab id and can count remaining tabs per group', () => {
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': {
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 11,
+          currentUrl: 'https://claude.ai/chat/c-1',
+          sessionId: 'c-1',
+          pageState: 'ready',
+          lastSeenAt: 100,
+        },
+        'w1:chatgpt': {
+          provider: 'chatgpt',
+          workspaceId: 'w1',
+          tabId: 12,
+          currentUrl: 'https://chatgpt.com/c/g-1',
+          sessionId: 'g-1',
+          pageState: 'ready',
+          lastSeenAt: 100,
+        },
+      },
+    };
+
+    const result = removeClaimedTabsForTabId(sessionState, 11);
+
+    expect(result.removedClaimedTabs).toHaveLength(1);
+    expect(countClaimedTabsForWorkspace(result.sessionState, 'w1')).toBe(1);
   });
 });

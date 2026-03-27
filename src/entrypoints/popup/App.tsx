@@ -345,7 +345,7 @@ function WorkspaceCard({
   onClearWorkspace: (workspaceId: string) => Promise<void>;
   onClearProvider: (workspaceId: string, provider: Provider) => Promise<void>;
 }) {
-  const { workspace, memberStatuses } = workspaceSummary;
+  const { workspace, memberStates } = workspaceSummary;
 
   return (
     <article className="askem-card">
@@ -371,7 +371,7 @@ function WorkspaceCard({
       <div className="askem-provider-grid">
         {PROVIDERS.map((provider) => {
           const member = workspace.members[provider];
-          const state = memberStatuses[provider] ?? 'missing';
+          const state = memberStates[provider] ?? 'offline';
 
           return (
             <div className="askem-provider-row" key={`${workspace.id}:${provider}`}>

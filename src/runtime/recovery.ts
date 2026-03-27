@@ -57,6 +57,43 @@ export function removeClaimedTabsForWorkspace(
   };
 }
 
+export function removeClaimedTabsForTabId(
+  sessionState: SessionState,
+  tabId: number,
+): {
+  sessionState: SessionState;
+  removedClaimedTabs: ClaimedTab[];
+} {
+  const removedClaimedTabs: ClaimedTab[] = [];
+  const claimedTabs = Object.fromEntries(
+    Object.entries(sessionState.claimedTabs).filter(([, claimedTab]) => {
+      if (claimedTab.tabId === tabId) {
+        removedClaimedTabs.push(claimedTab);
+        return false;
+      }
+
+      return true;
+    }),
+  );
+
+  return {
+    sessionState: {
+      ...sessionState,
+      claimedTabs,
+    },
+    removedClaimedTabs,
+  };
+}
+
+export function countClaimedTabsForWorkspace(
+  sessionState: SessionState,
+  workspaceId: string,
+): number {
+  return Object.values(sessionState.claimedTabs).filter(
+    (claimedTab) => claimedTab.workspaceId === workspaceId,
+  ).length;
+}
+
 export async function pingContentTab(tabId: number): Promise<PingResponseMessage | null> {
   try {
     const response = await chrome.tabs.sendMessage(tabId, { type: 'PING' });

@@ -31,14 +31,64 @@ import {
 } from '../runtime/workspace';
 import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
 import {
+  countClaimedTabsForWorkspace,
   getClaimedTabByTabId,
   isClaimedTabStale,
+  removeClaimedTabsForTabId,
   removeClaimedTabsForWorkspace,
   resolveDeliveryTarget,
 } from '../runtime/recovery';
 
+const AUTO_CLEAR_GROUP_DELAY_MS = 15_000;
+const pendingGroupGcTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 async function logDebug(entry: Omit<DebugLogEntry, 'id' | 'timestamp'> & Partial<Pick<DebugLogEntry, 'id' | 'timestamp'>>) {
   await appendDebugLog(entry);
+}
+
+function cancelScheduledGroupGc(workspaceId: string) {
+  const timeoutId = pendingGroupGcTimers.get(workspaceId);
+  if (timeoutId !== undefined) {
+    clearTimeout(timeoutId);
+    pendingGroupGcTimers.delete(workspaceId);
+  }
+}
+
+async function scheduleGroupGcIfEmpty(workspaceId: string) {
+  cancelScheduledGroupGc(workspaceId);
+
+  const sessionState = await getSessionState();
+  if (countClaimedTabsForWorkspace(sessionState, workspaceId) > 0) {
+    return;
+  }
+
+  const timeoutId = setTimeout(() => {
+    pendingGroupGcTimers.delete(workspaceId);
+
+    void (async () => {
+      const [localState, latestSessionState] = await Promise.all([getLocalState(), getSessionState()]);
+      if (!localState.workspaces[workspaceId]) {
+        return;
+      }
+
+      if (countClaimedTabsForWorkspace(latestSessionState, workspaceId) > 0) {
+        return;
+      }
+
+      await Promise.all([
+        setLocalState(clearWorkspace(localState, workspaceId)),
+        setSessionState(removeClaimedTabsForWorkspace(latestSessionState, workspaceId)),
+      ]);
+      await logDebug({
+        level: 'info',
+        scope: 'background',
+        workspaceId,
+        message: 'Auto-cleared group after all tabs closed',
+      });
+    })();
+  }, AUTO_CLEAR_GROUP_DELAY_MS);
+
+  pendingGroupGcTimers.set(workspaceId, timeoutId);
 }
 
 async function refreshPendingState() {
@@ -78,6 +128,8 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
   if (!workspaceLookup?.workspace) {
     return { ok: true, workspaceId: null, providerEnabled: false };
   }
+
+  cancelScheduledGroupGc(workspaceLookup.workspaceId);
 
   await upsertClaimedTab(workspaceLookup.workspaceId, message.provider, {
     provider: message.provider,
@@ -120,6 +172,8 @@ async function deliverPromptToWorkspaceTargets(
   if (!workspace) {
     return;
   }
+
+  cancelScheduledGroupGc(workspaceId);
 
   const providers = SUPPORTED_SITES.map((site) => site.name).filter((provider) =>
     shouldSyncWorkspaceProvider(message.provider, provider, workspace.enabledProviders),
@@ -202,6 +256,8 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
     return { ok: true, synced: false };
   }
 
+  cancelScheduledGroupGc(workspaceLookup.workspaceId);
+
   if (!isProviderEnabled(workspaceLookup.workspace.enabledProviders, message.provider)) {
     await logDebug({
       level: 'info',
@@ -257,7 +313,7 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
 async function handleGetStatus(_message: GetStatusMessage): Promise<StatusResponseMessage> {
   const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
   const workspaces = getWorkspacesOrdered(localState).map((workspace) => {
-    const memberStatuses = Object.fromEntries(
+    const memberStates = Object.fromEntries(
       SUPPORTED_SITES.map((site) => {
         const member = workspace.members[site.name];
         const claimedTab = sessionState.claimedTabs[`${workspace.id}:${site.name}`];
@@ -267,20 +323,20 @@ async function handleGetStatus(_message: GetStatusMessage): Promise<StatusRespon
         }
 
         if (!member) {
-          return [site.name, 'missing'];
+          return [site.name, 'offline'];
         }
 
         if (!claimedTab) {
-          return [site.name, 'missing'];
+          return [site.name, 'offline'];
         }
 
-        return [site.name, isClaimedTabStale(claimedTab) ? 'stale' : 'healthy'];
+        return [site.name, isClaimedTabStale(claimedTab) ? 'stale' : 'online'];
       }),
     );
 
     return {
       workspace,
-      memberStatuses,
+      memberStates,
     };
   });
 
@@ -405,6 +461,30 @@ async function handleClearDebugLogs() {
 }
 
 export default defineBackground(() => {
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    void (async () => {
+      const sessionState = await getSessionState();
+      const { sessionState: nextSessionState, removedClaimedTabs } = removeClaimedTabsForTabId(sessionState, tabId);
+
+      if (removedClaimedTabs.length === 0) {
+        return;
+      }
+
+      await setSessionState(nextSessionState);
+
+      for (const claimedTab of removedClaimedTabs) {
+        await logDebug({
+          level: 'info',
+          scope: 'background',
+          workspaceId: claimedTab.workspaceId,
+          provider: claimedTab.provider,
+          message: 'Observed provider tab close',
+        });
+        await scheduleGroupGcIfEmpty(claimedTab.workspaceId);
+      }
+    })();
+  });
+
   chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendResponse) => {
     void (async () => {
       switch (message.type) {
