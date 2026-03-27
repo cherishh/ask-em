@@ -8,6 +8,7 @@
     "dev": "wxt",
     "build": "wxt build",
     "compile": "tsc --noEmit",
+    "test": "vitest run",
     "postinstall": "wxt prepare"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "postcss": "^8.5.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.9.3",
+    "vitest": "^4.1.2",
     "wxt": "^0.20.20"
   }
 }
