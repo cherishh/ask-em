@@ -207,7 +207,7 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
     mount.dataset.interactive = 'false';
     mount.dataset.visible = 'false';
     mount.innerHTML = `
-      <span class="ask-em-pill-label">${adapter.name} ready</span>
+      <span class="ask-em-pill-label">ready</span>
       <span class="ask-em-pill-toggle" aria-hidden="true"></span>
     `;
     document.body.appendChild(mount);
@@ -230,8 +230,8 @@ function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Prom
     !context.globalSyncEnabled
       ? 'global paused'
       : context.workspaceId
-      ? `${adapter.name} ${context.providerEnabled ? 'sync' : 'paused'}`
-      : `${adapter.name} ready`;
+      ? context.providerEnabled ? 'sync' : 'paused'
+      : 'ready';
 
   mount.addEventListener('click', () => {
     if (mount?.dataset.interactive !== 'true' || mount.dataset.busy === 'true') {
@@ -359,7 +359,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
 
     lastFingerprint = fingerprint;
     lastFingerprintAt = Date.now();
-    ui.setState('listening', `${adapter.name} armed`);
+    ui.setState('listening', 'sync');
     await logDebug({
       level: 'info',
       message: 'Detected user submit',
@@ -442,14 +442,14 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
           detail: JSON.stringify(snapshot),
           workspaceId: message.workspaceId,
         });
-        ui.setState('blocked', `${adapter.name} blocked`);
+        ui.setState('blocked', 'paused');
         sendResponse({ ok: false, blocked: true, snapshot });
         return;
       }
 
       try {
         suppressSubmissionsUntil = Date.now() + 2_500;
-        ui.setState('syncing', `${adapter.name} sync`);
+        ui.setState('syncing', 'sync');
         await logDebug({
           level: 'info',
           message: 'Starting prompt delivery in content',
@@ -497,7 +497,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
           detail: error instanceof Error ? error.message : String(error),
           workspaceId: message.workspaceId,
         });
-        ui.setState('blocked', `${adapter.name} failed`);
+        ui.setState('blocked', 'paused');
         sendResponse({
           ok: false,
           error: error instanceof Error ? error.message : String(error),
