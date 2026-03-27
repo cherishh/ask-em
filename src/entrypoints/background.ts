@@ -40,7 +40,7 @@ import {
   resolveDeliveryTarget,
 } from '../runtime/recovery';
 
-const AUTO_CLEAR_GROUP_DELAY_MS = 15_000;
+const AUTO_CLEAR_GROUP_DELAY_MS = 7_000;
 const EMPTY_GROUP_DELETE_DELAY_MS = 2_000;
 const pendingGroupGcTimers = new Map<string, ReturnType<typeof setTimeout>>();
 

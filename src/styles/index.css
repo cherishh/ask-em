@@ -155,12 +155,90 @@ body {
   font-weight: 700;
 }
 
-.askem-notice {
-  border-left: 3px solid rgba(37, 87, 214, 0.58);
-  padding-left: 12px;
-  color: var(--askem-muted);
-  font-size: 13px;
-  line-height: 1.45;
+.askem-facts-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(40, 70, 154, 0.12);
+  border-radius: 18px;
+  padding: 14px 16px 15px;
+  background:
+    linear-gradient(180deg, rgba(253, 251, 246, 0.96), rgba(246, 242, 233, 0.92)),
+    radial-gradient(circle at top right, rgba(80, 121, 255, 0.14), transparent 32%);
+  box-shadow:
+    0 16px 30px rgba(55, 35, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.68);
+}
+
+.askem-facts-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(66, 102, 223, 0.14), transparent 26%),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(66, 102, 223, 0.035) 0,
+      rgba(66, 102, 223, 0.035) 10px,
+      transparent 10px,
+      transparent 20px
+    );
+  pointer-events: none;
+}
+
+.askem-facts-top,
+.askem-facts-copy {
+  position: relative;
+}
+
+.askem-facts-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.askem-facts-top .askem-card-label {
+  margin-bottom: 0;
+}
+
+.askem-facts-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.askem-facts-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(66, 102, 223, 0.18);
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.askem-facts-dots span.is-active {
+  background: rgba(37, 87, 214, 0.76);
+  transform: scale(1.15);
+}
+
+.askem-facts-copy {
+  margin: 10px 0 0;
+  max-width: 44ch;
+  color: #454035;
+  font-size: 14px;
+  line-height: 1.52;
+  animation: askem-fact-in 220ms ease;
+}
+
+@keyframes askem-fact-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .askem-warning-card {

@@ -1,5 +1,6 @@
 import { startTransition, useEffect, useState } from 'react';
 import type { DebugLogEntry, Provider, StatusResponseMessage, WorkspaceSummary } from '../../runtime/protocol';
+import { DidYouKnowCard } from './components/DidYouKnowCard';
 
 const PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek'];
 
@@ -84,7 +85,6 @@ export default function App() {
   const workspaceCount = status?.workspaces.length ?? 0;
   const limit = status?.workspaceLimit ?? 3;
   const atLimit = workspaceCount >= limit;
-  const availableSlots = Math.max(0, limit - workspaceCount);
 
   const toggleDefaultProvider = async (provider: Provider) => {
     const nextProviders = selectedProviders.includes(provider)
@@ -167,10 +167,7 @@ export default function App() {
             body="New sends from a fresh chat will not create another group until you clear one below."
           />
         ) : (
-          <section className="askem-notice">
-            {availableSlots} slot{availableSlots === 1 ? '' : 's'} left. Bound chats can continue syncing
-            from any provider tab in the same group.
-          </section>
+          <DidYouKnowCard />
         )}
 
         <section className="askem-card askem-defaults-card">
