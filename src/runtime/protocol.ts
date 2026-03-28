@@ -125,8 +125,10 @@ export type GetStatusMessage = {
 
 export type WorkspaceSummary = {
   workspace: Workspace;
-  memberStates: Partial<Record<Provider, 'active' | 'stale' | 'inactive' | 'pending'>>;
+  memberStates: Partial<Record<Provider, GroupMemberState>>;
 };
+
+export type GroupMemberState = 'active' | 'stale' | 'inactive' | 'pending';
 
 export type StatusResponseMessage = {
   type: 'STATUS_RESPONSE';
@@ -140,6 +142,17 @@ export type StatusResponseMessage = {
 
 export type GetDebugLogsMessage = {
   type: 'GET_DEBUG_LOGS';
+};
+
+export type GetWorkspaceContextMessage = {
+  type: 'GET_WORKSPACE_CONTEXT';
+  workspaceId: string;
+};
+
+export type WorkspaceContextResponseMessage = {
+  type: 'WORKSPACE_CONTEXT_RESPONSE';
+  globalSyncEnabled: boolean;
+  workspaceSummary: WorkspaceSummary | null;
 };
 
 export type DebugLogsResponseMessage = {
@@ -207,6 +220,7 @@ export type RuntimeMessage =
   | PingResponseMessage
   | GetStatusMessage
   | GetDebugLogsMessage
+  | GetWorkspaceContextMessage
   | ClearWorkspaceMessage
   | ClearWorkspaceProviderMessage
   | ClearDebugLogsMessage
@@ -217,6 +231,7 @@ export type RuntimeMessage =
   | DebugLogMessage
   | RefreshContentContextMessage
   | DebugLogsResponseMessage
+  | WorkspaceContextResponseMessage
   | StatusResponseMessage;
 
 export const MAX_WORKSPACES = 3;

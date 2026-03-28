@@ -2,6 +2,7 @@ import { SUPPORTED_SITES } from '../adapters/sites';
 import { createDefaultEnabledProviders, type DebugLogEntry } from '../runtime/protocol';
 import {
   type GetStatusMessage,
+  type GetWorkspaceContextMessage,
   type HeartbeatMessage,
   type HelloMessage,
   type Provider,
@@ -52,6 +53,12 @@ async function notifyTabsToRefreshContext(tabIds: number[]) {
       });
     }),
   );
+}
+
+function getClaimedTabIdsForWorkspace(sessionState: Awaited<ReturnType<typeof getSessionState>>, workspaceId: string) {
+  return Object.values(sessionState.claimedTabs)
+    .filter((claimedTab) => claimedTab.workspaceId === workspaceId)
+    .map((claimedTab) => claimedTab.tabId);
 }
 
 async function notifyAllTabsToRefreshContext() {
@@ -442,33 +449,7 @@ async function handleGetStatus(_message: GetStatusMessage): Promise<StatusRespon
   const visibleWorkspaces = getWorkspacesOrdered(localState).filter(
     (workspace) => workspace.enabledProviders.length > 0 || Object.keys(workspace.members).length > 0,
   );
-  const workspaces = visibleWorkspaces.map((workspace) => {
-    const memberStates = Object.fromEntries(
-      SUPPORTED_SITES.map((site) => {
-        const member = workspace.members[site.name];
-        const claimedTab = sessionState.claimedTabs[`${workspace.id}:${site.name}`];
-
-        if (member?.sessionId === null || workspace.pendingSource === site.name) {
-          return [site.name, 'pending'];
-        }
-
-        if (!member) {
-          return [site.name, 'inactive'];
-        }
-
-        if (!claimedTab) {
-          return [site.name, 'inactive'];
-        }
-
-        return [site.name, isClaimedTabStale(claimedTab) ? 'stale' : 'active'];
-      }),
-    );
-
-    return {
-      workspace,
-      memberStates,
-    };
-  });
+  const workspaces = visibleWorkspaces.map((workspace) => buildWorkspaceSummary(workspace, sessionState));
 
   return {
     type: 'STATUS_RESPONSE',
@@ -478,6 +459,48 @@ async function handleGetStatus(_message: GetStatusMessage): Promise<StatusRespon
     defaultEnabledProviders: localState.defaultEnabledProviders,
     workspaces,
     recentLogs: localState.debugLogs.slice(-20).reverse(),
+  };
+}
+
+function buildWorkspaceSummary(
+  workspace: StatusResponseMessage['workspaces'][number]['workspace'],
+  sessionState: Awaited<ReturnType<typeof getSessionState>>,
+) {
+  const memberStates = Object.fromEntries(
+    SUPPORTED_SITES.map((site) => {
+      const member = workspace.members[site.name];
+      const claimedTab = sessionState.claimedTabs[`${workspace.id}:${site.name}`];
+
+      if (member?.sessionId === null || workspace.pendingSource === site.name) {
+        return [site.name, 'pending'];
+      }
+
+      if (!member) {
+        return [site.name, 'inactive'];
+      }
+
+      if (!claimedTab) {
+        return [site.name, 'inactive'];
+      }
+
+      return [site.name, isClaimedTabStale(claimedTab) ? 'stale' : 'active'];
+    }),
+  );
+
+  return {
+    workspace,
+    memberStates,
+  };
+}
+
+async function handleGetWorkspaceContext(message: GetWorkspaceContextMessage) {
+  const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
+  const workspace = localState.workspaces[message.workspaceId];
+
+  return {
+    type: 'WORKSPACE_CONTEXT_RESPONSE' as const,
+    globalSyncEnabled: localState.globalSyncEnabled,
+    workspaceSummary: workspace ? buildWorkspaceSummary(workspace, sessionState) : null,
   };
 }
 
@@ -560,7 +583,7 @@ async function handleSetDefaultEnabledProviders(
 async function handleSetWorkspaceProviderEnabled(
   message: Extract<RuntimeMessage, { type: 'SET_WORKSPACE_PROVIDER_ENABLED' }>,
 ) {
-  const localState = await getLocalState();
+  const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
   const nextState = setWorkspaceProviderEnabled(
     localState,
     message.workspaceId,
@@ -568,6 +591,7 @@ async function handleSetWorkspaceProviderEnabled(
     message.enabled,
   );
   await setLocalState(nextState);
+  await notifyTabsToRefreshContext(getClaimedTabIdsForWorkspace(sessionState, message.workspaceId));
   await logDebug({
     level: 'info',
     scope: 'background',
@@ -665,6 +689,9 @@ export default defineBackground(() => {
           return;
         case 'GET_STATUS':
           sendResponse(await handleGetStatus(message));
+          return;
+        case 'GET_WORKSPACE_CONTEXT':
+          sendResponse(await handleGetWorkspaceContext(message));
           return;
         case 'GET_DEBUG_LOGS':
           sendResponse(await handleGetDebugLogs());

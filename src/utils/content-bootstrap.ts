@@ -1,5 +1,11 @@
 import type { SiteAdapter } from '../adapters/types';
-import type { DeliverPromptMessage, PingMessage, PingResponseMessage, RuntimeMessage } from '../runtime/protocol';
+import type {
+  DeliverPromptMessage,
+  PingMessage,
+  PingResponseMessage,
+  RuntimeMessage,
+  WorkspaceContextResponseMessage,
+} from '../runtime/protocol';
 import {
   buildHeartbeatMessage,
   buildHelloMessage,
@@ -7,263 +13,11 @@ import {
   observeUrlChanges,
   sendRuntimeMessage,
 } from './content-routing';
-
-type UiState = 'idle' | 'listening' | 'syncing' | 'blocked';
-
-type UiContext = {
-  workspaceId: string | null;
-  providerEnabled: boolean;
-  globalSyncEnabled: boolean;
-};
+import { createContentUi, type UiContext } from './content-ui';
 
 function shouldShowStandaloneIndicator(adapter: SiteAdapter): boolean {
   const status = adapter.getStatus();
   return status.pageKind === 'new-chat' && status.pageState === 'ready';
-}
-
-function ensureUi(adapter: SiteAdapter, onToggle: (nextEnabled: boolean) => Promise<void>) {
-  const { mountId, className } = adapter.getUiSpec();
-
-  if (!document.getElementById('ask-em-content-style')) {
-    const style = document.createElement('style');
-    style.id = 'ask-em-content-style';
-    style.textContent = `
-      .ask-em-sync-pill {
-        position: fixed;
-        right: 18px;
-        bottom: 18px;
-        z-index: 2147483647;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        min-height: 30px;
-        padding: 0 12px;
-        border-radius: 999px;
-        border: 1px solid rgba(15, 23, 42, 0.22);
-        background: rgba(255, 252, 246, 0.96);
-        backdrop-filter: blur(16px) saturate(1.35);
-        box-shadow:
-          0 14px 34px rgba(15, 23, 42, 0.18),
-          inset 0 1px 0 rgba(255, 255, 255, 0.72);
-        color: rgba(15, 23, 42, 0.84);
-        font: 700 11px/1.1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, Consolas, monospace;
-        letter-spacing: 0.11em;
-        text-transform: uppercase;
-        opacity: 0.96;
-        transform: translateY(0);
-        transition:
-          opacity 180ms ease,
-          border-color 180ms ease,
-          color 180ms ease,
-          background 180ms ease,
-          box-shadow 180ms ease;
-        pointer-events: auto;
-        user-select: none;
-        cursor: default;
-      }
-
-      .ask-em-sync-pill[data-visible="false"] {
-        display: none;
-      }
-
-      .ask-em-sync-pill[data-interactive="true"] {
-        cursor: pointer;
-      }
-
-      .ask-em-sync-pill:hover {
-        opacity: 0.98;
-      }
-
-      .ask-em-sync-pill::before {
-        content: "";
-        width: 6px;
-        height: 6px;
-        border-radius: 999px;
-        background: var(--ask-em-accent, rgba(15, 23, 42, 0.45));
-        box-shadow:
-          0 0 0 2px color-mix(in srgb, var(--ask-em-accent, #0f172a) 16%, transparent),
-          0 0 10px color-mix(in srgb, var(--ask-em-accent, #0f172a) 18%, transparent);
-      }
-
-      .ask-em-sync-pill[data-state="idle"] {
-        --ask-em-accent: rgba(22, 163, 74, 0.95);
-        border-color: rgba(22, 163, 74, 0.2);
-      }
-
-      .ask-em-sync-pill[data-state="idle"][data-provider-enabled="true"]::before,
-      .ask-em-sync-pill[data-state="listening"][data-provider-enabled="true"]::before,
-      .ask-em-sync-pill[data-state="syncing"][data-provider-enabled="true"]::before {
-        animation: ask-em-pulse 1.2s ease-in-out infinite;
-      }
-
-      .ask-em-sync-pill[data-state="listening"] {
-        border-color: rgba(22, 163, 74, 0.24);
-        background: rgba(243, 252, 245, 0.97);
-        --ask-em-accent: rgba(22, 163, 74, 0.95);
-      }
-
-      .ask-em-sync-pill[data-state="syncing"] {
-        border-color: rgba(22, 163, 74, 0.26);
-        background: rgba(241, 252, 245, 0.98);
-        color: rgba(15, 23, 42, 0.92);
-        --ask-em-accent: rgba(22, 163, 74, 0.95);
-      }
-
-      .ask-em-sync-pill[data-state="blocked"] {
-        border-color: rgba(217, 119, 6, 0.34);
-        background: rgba(255, 249, 235, 0.98);
-        color: rgba(120, 53, 15, 0.9);
-        --ask-em-accent: rgba(245, 158, 11, 0.96);
-      }
-
-      .ask-em-sync-pill[data-provider-enabled="false"] {
-        border-color: rgba(120, 113, 108, 0.2);
-        background: rgba(246, 244, 241, 0.98);
-        color: rgba(68, 64, 60, 0.88);
-        --ask-em-accent: rgba(120, 113, 108, 0.84);
-      }
-
-      .ask-em-sync-pill[data-global-sync-enabled="false"] {
-        border-color: rgba(120, 113, 108, 0.16);
-        background: rgba(236, 233, 229, 0.72);
-        color: rgba(68, 64, 60, 0.76);
-        box-shadow:
-          0 10px 24px rgba(15, 23, 42, 0.1),
-          inset 0 1px 0 rgba(255, 255, 255, 0.4);
-        opacity: 0.84;
-        --ask-em-accent: rgba(120, 113, 108, 0.7);
-      }
-
-      .ask-em-sync-pill[data-busy="true"] {
-        opacity: 0.94;
-        cursor: progress;
-      }
-
-      .ask-em-pill-label {
-        white-space: nowrap;
-      }
-
-      .ask-em-pill-toggle {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-        width: 26px;
-        height: 14px;
-        border-radius: 999px;
-        background: rgba(148, 163, 184, 0.38);
-        transition: background 180ms ease;
-      }
-
-      .ask-em-pill-toggle::after {
-        content: "";
-        position: absolute;
-        left: 2px;
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.96);
-        box-shadow: 0 1px 6px rgba(15, 23, 42, 0.2);
-        transition: transform 180ms ease;
-      }
-
-      .ask-em-sync-pill[data-provider-enabled="true"] .ask-em-pill-toggle {
-        background: var(--ask-em-accent, rgba(22, 163, 74, 0.95));
-      }
-
-      .ask-em-sync-pill[data-provider-enabled="true"] .ask-em-pill-toggle::after {
-        transform: translateX(12px);
-      }
-
-      @keyframes ask-em-pulse {
-        0%,
-        100% {
-          transform: scale(0.94);
-          box-shadow:
-            0 0 0 2px color-mix(in srgb, var(--ask-em-accent, #16a34a) 18%, transparent),
-            0 0 7px color-mix(in srgb, var(--ask-em-accent, #16a34a) 14%, transparent);
-        }
-
-        50% {
-          transform: scale(1.04);
-          box-shadow:
-            0 0 0 4px color-mix(in srgb, var(--ask-em-accent, #16a34a) 20%, transparent),
-            0 0 11px color-mix(in srgb, var(--ask-em-accent, #16a34a) 20%, transparent);
-        }
-      }
-    `;
-    document.documentElement.appendChild(style);
-  }
-
-  let mount = document.getElementById(mountId) as HTMLButtonElement | null;
-  if (!mount) {
-    mount = document.createElement('button');
-    mount.type = 'button';
-    mount.id = mountId;
-    mount.className = className;
-    mount.classList.add('ask-em-sync-pill');
-    mount.dataset.state = 'idle';
-    mount.dataset.providerEnabled = 'true';
-    mount.dataset.globalSyncEnabled = 'true';
-    mount.dataset.interactive = 'false';
-    mount.dataset.visible = 'false';
-    mount.innerHTML = `
-      <span class="ask-em-pill-label">ready</span>
-      <span class="ask-em-pill-toggle" aria-hidden="true"></span>
-    `;
-    document.body.appendChild(mount);
-  }
-
-  const label = mount.querySelector('.ask-em-pill-label');
-  const context: UiContext = {
-    workspaceId: null,
-    providerEnabled: true,
-    globalSyncEnabled: true,
-  };
-
-  const updateLabel = (text: string) => {
-    if (label) {
-      label.textContent = text;
-    }
-  };
-
-  const getDefaultLabel = () =>
-    !context.globalSyncEnabled
-      ? 'global paused'
-      : context.workspaceId
-      ? context.providerEnabled ? 'sync' : 'paused'
-      : 'ready';
-
-  mount.addEventListener('click', () => {
-    if (mount?.dataset.interactive !== 'true' || mount.dataset.busy === 'true') {
-      return;
-    }
-
-    mount.dataset.busy = 'true';
-    void onToggle(!context.providerEnabled).finally(() => {
-      if (mount) {
-        mount.dataset.busy = 'false';
-      }
-    });
-  });
-
-  return {
-    setVisible(visible: boolean) {
-      mount.dataset.visible = String(visible);
-    },
-    setState(state: UiState, labelText?: string) {
-      mount.dataset.state = state;
-      updateLabel(labelText ?? getDefaultLabel());
-    },
-    setContext(nextContext: UiContext) {
-      context.workspaceId = nextContext.workspaceId;
-      context.providerEnabled = nextContext.providerEnabled;
-      context.globalSyncEnabled = nextContext.globalSyncEnabled;
-      mount.dataset.providerEnabled = String(nextContext.providerEnabled);
-      mount.dataset.globalSyncEnabled = String(nextContext.globalSyncEnabled);
-      mount.dataset.interactive = String(Boolean(nextContext.workspaceId));
-      updateLabel(getDefaultLabel());
-    },
-  };
 }
 
 export function bootstrapContentScript(adapter: SiteAdapter): void {
@@ -272,27 +26,6 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     providerEnabled: true,
     globalSyncEnabled: true,
   };
-
-  const ui = ensureUi(adapter, async (nextEnabled) => {
-    if (!uiContext.workspaceId) {
-      return;
-    }
-
-    await sendRuntimeMessage({
-      type: 'SET_WORKSPACE_PROVIDER_ENABLED',
-      workspaceId: uiContext.workspaceId,
-      provider: adapter.name,
-      enabled: nextEnabled,
-    });
-
-    uiContext = {
-      ...uiContext,
-        providerEnabled: nextEnabled,
-        globalSyncEnabled: uiContext.globalSyncEnabled,
-    };
-    ui.setContext(uiContext);
-    ui.setState('idle');
-  });
 
   let suppressSubmissionsUntil = 0;
   let lastFingerprint = '';
@@ -319,12 +52,16 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     const status = adapter.getStatus();
     const response =
       kind === 'HELLO'
-        ? await sendRuntimeMessage<{ workspaceId?: string | null; providerEnabled?: boolean; globalSyncEnabled?: boolean }>(
-            buildHelloMessage(adapter),
-          )
-        : await sendRuntimeMessage<{ workspaceId?: string | null; providerEnabled?: boolean; globalSyncEnabled?: boolean }>(
-            buildHeartbeatMessage(adapter),
-          );
+        ? await sendRuntimeMessage<{
+            workspaceId?: string | null;
+            providerEnabled?: boolean;
+            globalSyncEnabled?: boolean;
+          }>(buildHelloMessage(adapter))
+        : await sendRuntimeMessage<{
+            workspaceId?: string | null;
+            providerEnabled?: boolean;
+            globalSyncEnabled?: boolean;
+          }>(buildHeartbeatMessage(adapter));
 
     const standaloneVisible = shouldShowStandaloneIndicator(adapter);
     uiContext = {
@@ -343,6 +80,39 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
       ui.setState('idle');
     }
   };
+
+  const ui = createContentUi(adapter, {
+    async onWorkspaceProviderToggle(provider, nextEnabled) {
+      if (!uiContext.workspaceId) {
+        return;
+      }
+
+      await sendRuntimeMessage({
+        type: 'SET_WORKSPACE_PROVIDER_ENABLED',
+        workspaceId: uiContext.workspaceId,
+        provider,
+        enabled: nextEnabled,
+      });
+
+      if (provider === adapter.name) {
+        uiContext = {
+          ...uiContext,
+          providerEnabled: nextEnabled,
+        };
+        ui.setContext(uiContext);
+        ui.setState('idle');
+      }
+    },
+    async loadWorkspaceContext(workspaceId) {
+      return await sendRuntimeMessage<WorkspaceContextResponseMessage>({
+        type: 'GET_WORKSPACE_CONTEXT',
+        workspaceId,
+      });
+    },
+    async onRefreshContext() {
+      await reportPresence('HELLO');
+    },
+  });
 
   const reportUserSubmit = async (rawContent: string) => {
     const content = rawContent.trim();
@@ -371,9 +141,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
       synced?: boolean;
       providerEnabled?: boolean;
       globalSyncEnabled?: boolean;
-    }>(
-      buildUserSubmitMessage(status, content),
-    );
+    }>(buildUserSubmitMessage(status, content));
 
     uiContext = {
       workspaceId: response?.workspaceId ?? null,
