@@ -13,6 +13,8 @@ export type DeliveryTarget = {
   tabId: number;
   expectedSessionId: string | null;
   expectedUrl: string | null;
+  resolution: 'reuse-claimed-tab' | 'navigate-claimed-tab' | 'open-new-tab';
+  reason: string;
 };
 
 export function getClaimedTab(
@@ -173,7 +175,8 @@ export async function resolveDeliveryTarget(
   const desiredUrl = member?.url ?? getSiteInfoByProvider(provider).origin;
   const expectedSessionId = member?.sessionId ?? null;
 
-  if (claimedTab && !isClaimedTabStale(claimedTab)) {
+  if (claimedTab) {
+    const stale = isClaimedTabStale(claimedTab);
     const ping = await pingContentTab(claimedTab.tabId);
 
     if (
@@ -185,6 +188,10 @@ export async function resolveDeliveryTarget(
         tabId: claimedTab.tabId,
         expectedSessionId,
         expectedUrl: member?.url ?? null,
+        resolution: 'reuse-claimed-tab',
+        reason: ping.sessionId
+          ? `${stale ? 'stale ' : ''}claimed tab responded ready with matching session ${ping.sessionId}`
+          : `${stale ? 'stale ' : ''}claimed tab responded ready without a bound session yet`,
       };
     }
 
@@ -198,6 +205,10 @@ export async function resolveDeliveryTarget(
           tabId: updatedTab.id,
           expectedSessionId,
           expectedUrl: member.url,
+          resolution: 'navigate-claimed-tab',
+          reason: ping
+            ? `${stale ? 'stale ' : ''}claimed tab ping mismatch or not-ready (pageState=${ping.pageState}, sessionId=${ping.sessionId ?? 'null'})`
+            : `${stale ? 'stale ' : ''}claimed tab did not respond to ping; navigated claimed tab back to bound URL`,
         };
       }
     }
@@ -216,5 +227,13 @@ export async function resolveDeliveryTarget(
     tabId: createdTab.id,
     expectedSessionId,
     expectedUrl: member?.url ?? null,
+    resolution: 'open-new-tab',
+    reason: claimedTab
+      ? isClaimedTabStale(claimedTab)
+        ? `claimed tab ${claimedTab.tabId} considered stale`
+        : member?.url
+          ? `claimed tab ${claimedTab.tabId} could not be recovered via navigation`
+          : `claimed tab ${claimedTab.tabId} was unsuitable and no bound URL was available`
+      : 'no claimed tab was available for this provider',
   };
 }

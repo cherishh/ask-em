@@ -238,7 +238,7 @@ export const MAX_WORKSPACES = 3;
 
 export const PENDING_WORKSPACE_TIMEOUT_MS = 30_000;
 
-export const HEARTBEAT_STALE_MS = 45_000;
+export const HEARTBEAT_STALE_MS = 240_000;
 
 export const STORAGE_KEYS = {
   local: 'ask-em-local-state',

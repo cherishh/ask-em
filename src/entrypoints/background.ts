@@ -266,6 +266,15 @@ async function deliverPromptToWorkspaceTargets(
         scope: 'background',
         provider,
         workspaceId,
+        message: 'Resolved delivery target',
+        detail: `${target.resolution}: ${target.reason}`,
+      });
+
+      await logDebug({
+        level: 'info',
+        scope: 'background',
+        provider,
+        workspaceId,
         message: 'Delivering prompt',
         detail: `${message.provider} -> ${provider} @ ${target.expectedSessionId ?? 'new-chat'}`,
       });
