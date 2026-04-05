@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SessionState, Workspace } from './protocol';
-import { resolveDeliveryTarget } from './recovery';
+import { reconcileClaimedTabsWithBrowser, resolveDeliveryTarget } from './recovery';
 
 describe('recovery', () => {
   afterEach(() => {
@@ -61,5 +61,35 @@ describe('recovery', () => {
       resolution: 'reuse-claimed-tab',
     });
     expect(target.reason).toContain('stale claimed tab responded ready');
+  });
+
+  it('removes claimed tabs whose browser tabs no longer exist', async () => {
+    const get = vi.fn().mockRejectedValue(new Error('No tab with id: 9'));
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get,
+      },
+    });
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:deepseek': {
+          provider: 'deepseek',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://chat.deepseek.com/a/chat/s/d-1',
+          sessionId: 'd-1',
+          pageState: 'ready',
+          lastSeenAt: Date.now(),
+        },
+      },
+    };
+
+    const result = await reconcileClaimedTabsWithBrowser(sessionState);
+
+    expect(get).toHaveBeenCalledWith(9);
+    expect(result.removedClaimedTabs).toHaveLength(1);
+    expect(result.sessionState.claimedTabs).toEqual({});
   });
 });

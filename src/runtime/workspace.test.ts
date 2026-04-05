@@ -9,6 +9,7 @@ import {
   enforceWorkspaceLimit,
   getDefaultEnabledProviderList,
   lookupWorkspaceBySession,
+  rebuildWorkspaceIndex,
   setWorkspaceProviderEnabled,
 } from './workspace';
 import { countClaimedTabsForWorkspace, isClaimedTabStale, removeClaimedTabsForTabId } from './recovery';
@@ -101,6 +102,58 @@ describe('workspace state', () => {
 
     expect(lookupWorkspaceBySession(state, 'gemini', 'g-1')?.workspaceId).toBe('w1');
     expect(lookupWorkspaceBySession(state, 'gemini', 'g-2')?.workspaceId).toBe('w2');
+  });
+
+  it('removes the old session index when rebinding a provider to a new session', () => {
+    let state = createPendingWorkspace(createEmptyState(), {
+      sourceProvider: 'claude',
+      sourceUrl: 'https://claude.ai/new',
+      workspaceId: 'w1',
+    });
+    state = bindWorkspaceMember(state, {
+      workspaceId: 'w1',
+      member: {
+        provider: 'claude',
+        sessionId: 'c-1',
+        url: 'https://claude.ai/chat/c-1',
+      },
+    });
+
+    state = bindWorkspaceMember(state, {
+      workspaceId: 'w1',
+      member: {
+        provider: 'claude',
+        sessionId: 'c-2',
+        url: 'https://claude.ai/chat/c-2',
+      },
+    });
+
+    expect(state.workspaceIndex['claude:c-1']).toBeUndefined();
+    expect(state.workspaceIndex['claude:c-2']).toBe('w1');
+    expect(lookupWorkspaceBySession(state, 'claude', 'c-1')).toBeNull();
+    expect(lookupWorkspaceBySession(state, 'claude', 'c-2')?.workspaceId).toBe('w1');
+  });
+
+  it('rebuilds the workspace index from the current workspace members', () => {
+    let state = createPendingWorkspace(createEmptyState(), {
+      sourceProvider: 'chatgpt',
+      sourceUrl: 'https://chatgpt.com/',
+      workspaceId: 'w1',
+    });
+    state = bindWorkspaceMember(state, {
+      workspaceId: 'w1',
+      member: {
+        provider: 'chatgpt',
+        sessionId: 'gpt-1',
+        url: 'https://chatgpt.com/c/gpt-1',
+      },
+    });
+
+    const rebuilt = rebuildWorkspaceIndex(state.workspaces);
+
+    expect(rebuilt).toEqual({
+      'chatgpt:gpt-1': 'w1',
+    });
   });
 
   it('clears a single provider binding without deleting the workspace', () => {

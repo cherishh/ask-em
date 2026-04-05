@@ -87,6 +87,36 @@ export function removeClaimedTabsForTabId(
   };
 }
 
+export async function reconcileClaimedTabsWithBrowser(
+  sessionState: SessionState,
+): Promise<{
+  sessionState: SessionState;
+  removedClaimedTabs: ClaimedTab[];
+}> {
+  const removedClaimedTabs: ClaimedTab[] = [];
+  const claimedTabs = Object.fromEntries(
+    await Promise.all(
+      Object.entries(sessionState.claimedTabs).map(async ([key, claimedTab]) => {
+        try {
+          await chrome.tabs.get(claimedTab.tabId);
+          return [key, claimedTab] as const;
+        } catch {
+          removedClaimedTabs.push(claimedTab);
+          return null;
+        }
+      }),
+    ).then((entries) => entries.filter((entry): entry is readonly [string, ClaimedTab] => entry !== null)),
+  );
+
+  return {
+    sessionState: {
+      ...sessionState,
+      claimedTabs,
+    },
+    removedClaimedTabs,
+  };
+}
+
 export function countClaimedTabsForWorkspace(
   sessionState: SessionState,
   workspaceId: string,

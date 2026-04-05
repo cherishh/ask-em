@@ -36,6 +36,7 @@ import {
   countClaimedTabsForWorkspace,
   getClaimedTabByTabId,
   isClaimedTabStale,
+  reconcileClaimedTabsWithBrowser,
   removeClaimedTabsForTabId,
   removeClaimedTabsForWorkspace,
   resolveDeliveryTarget,
@@ -154,8 +155,24 @@ async function scheduleEmptyGroupDeletion(workspaceId: string) {
 }
 
 async function refreshPendingState() {
-  const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
-  const cleanupResult = cleanupPendingWorkspaces(localState, sessionState);
+  const [localState, rawSessionState] = await Promise.all([getLocalState(), getSessionState()]);
+  const reconciliation = await reconcileClaimedTabsWithBrowser(rawSessionState);
+  const cleanupResult = cleanupPendingWorkspaces(localState, reconciliation.sessionState);
+
+  if (reconciliation.removedClaimedTabs.length > 0) {
+    await setSessionState(reconciliation.sessionState);
+
+    for (const claimedTab of reconciliation.removedClaimedTabs) {
+      await logDebug({
+        level: 'info',
+        scope: 'background',
+        workspaceId: claimedTab.workspaceId,
+        provider: claimedTab.provider,
+        message: 'Reconciled missing claimed tab',
+      });
+      await scheduleGroupGcIfEmpty(claimedTab.workspaceId);
+    }
+  }
 
   if (cleanupResult.removedWorkspaceIds.length > 0) {
     await setLocalState(cleanupResult.localState);
@@ -163,7 +180,7 @@ async function refreshPendingState() {
 
   return {
     localState: cleanupResult.localState,
-    sessionState,
+    sessionState: reconciliation.sessionState,
   };
 }
 
@@ -454,7 +471,7 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
 }
 
 async function handleGetStatus(_message: GetStatusMessage): Promise<StatusResponseMessage> {
-  const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
+  const { localState, sessionState } = await refreshPendingState();
   const visibleWorkspaces = getWorkspacesOrdered(localState).filter(
     (workspace) => workspace.enabledProviders.length > 0 || Object.keys(workspace.members).length > 0,
   );
@@ -503,7 +520,7 @@ function buildWorkspaceSummary(
 }
 
 async function handleGetWorkspaceContext(message: GetWorkspaceContextMessage) {
-  const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
+  const { localState, sessionState } = await refreshPendingState();
   const workspace = localState.workspaces[message.workspaceId];
 
   return {

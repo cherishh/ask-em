@@ -8,6 +8,7 @@ import {
   type SessionState,
 } from './protocol';
 import { toClaimedTabKey } from './protocol';
+import { rebuildWorkspaceIndex } from './workspace';
 
 export const DEFAULT_LOCAL_STATE: LocalState = {
   globalSyncEnabled: true,
@@ -37,12 +38,43 @@ async function writeState<T>(area: StorageArea, key: string, value: T): Promise<
   return value;
 }
 
+function isWorkspaceIndexEqual(left: LocalState['workspaceIndex'], right: LocalState['workspaceIndex']): boolean {
+  const leftEntries = Object.entries(left);
+  const rightEntries = Object.entries(right);
+
+  if (leftEntries.length !== rightEntries.length) {
+    return false;
+  }
+
+  return leftEntries.every(([key, value]) => right[key] === value);
+}
+
+function normalizeLocalState(state: LocalState): LocalState {
+  const workspaceIndex = rebuildWorkspaceIndex(state.workspaces);
+
+  if (isWorkspaceIndexEqual(state.workspaceIndex, workspaceIndex)) {
+    return state;
+  }
+
+  return {
+    ...state,
+    workspaceIndex,
+  };
+}
+
 export async function getLocalState(): Promise<LocalState> {
-  return readState(chrome.storage.local, STORAGE_KEYS.local, DEFAULT_LOCAL_STATE);
+  const state = await readState(chrome.storage.local, STORAGE_KEYS.local, DEFAULT_LOCAL_STATE);
+  const normalized = normalizeLocalState(state);
+
+  if (normalized !== state) {
+    await writeState(chrome.storage.local, STORAGE_KEYS.local, normalized);
+  }
+
+  return normalized;
 }
 
 export async function setLocalState(state: LocalState): Promise<LocalState> {
-  return writeState(chrome.storage.local, STORAGE_KEYS.local, state);
+  return writeState(chrome.storage.local, STORAGE_KEYS.local, normalizeLocalState(state));
 }
 
 export async function updateLocalState(

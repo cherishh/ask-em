@@ -8,6 +8,7 @@ import {
   type Provider,
   type SessionState,
   type Workspace,
+  type WorkspaceIndex,
 } from './protocol';
 
 export type CreatePendingWorkspaceInput = {
@@ -105,6 +106,11 @@ export function bindWorkspaceMember(
         : workspace.pendingSource,
   };
   const nextWorkspaceIndex = { ...state.workspaceIndex };
+  const previousMember = workspace.members[input.member.provider];
+
+  if (previousMember?.sessionId && previousMember.sessionId !== input.member.sessionId) {
+    delete nextWorkspaceIndex[toWorkspaceIndexKey(input.member.provider, previousMember.sessionId)];
+  }
 
   if (input.member.sessionId) {
     nextWorkspaceIndex[toWorkspaceIndexKey(input.member.provider, input.member.sessionId)] =
@@ -119,6 +125,22 @@ export function bindWorkspaceMember(
     },
     workspaceIndex: nextWorkspaceIndex,
   };
+}
+
+export function rebuildWorkspaceIndex(workspaces: Record<string, Workspace>): WorkspaceIndex {
+  const workspaceIndex: WorkspaceIndex = {};
+
+  for (const workspace of Object.values(workspaces)) {
+    for (const member of Object.values(workspace.members)) {
+      if (!member?.sessionId) {
+        continue;
+      }
+
+      workspaceIndex[toWorkspaceIndexKey(member.provider, member.sessionId)] = workspace.id;
+    }
+  }
+
+  return workspaceIndex;
 }
 
 export function lookupWorkspaceBySession(

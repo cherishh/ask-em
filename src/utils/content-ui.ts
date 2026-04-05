@@ -149,37 +149,6 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         white-space: nowrap;
       }
 
-      .ask-em-pill-toggle {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-        width: 26px;
-        height: 14px;
-        border-radius: 999px;
-        background: rgba(148, 163, 184, 0.38);
-        transition: background 180ms ease;
-      }
-
-      .ask-em-pill-toggle::after {
-        content: "";
-        position: absolute;
-        left: 2px;
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.96);
-        box-shadow: 0 1px 6px rgba(15, 23, 42, 0.2);
-        transition: transform 180ms ease;
-      }
-
-      .ask-em-sync-pill[data-provider-enabled="true"] .ask-em-pill-toggle {
-        background: var(--ask-em-accent, rgba(22, 163, 74, 0.95));
-      }
-
-      .ask-em-sync-pill[data-provider-enabled="true"] .ask-em-pill-toggle::after {
-        transform: translateX(12px);
-      }
-
       .ask-em-sync-panel {
         position: relative;
         width: 252px;
@@ -437,10 +406,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     mount.dataset.globalSyncEnabled = 'true';
     mount.dataset.interactive = 'false';
     mount.dataset.visible = 'false';
-    mount.innerHTML = `
-      <span class="ask-em-pill-label">ready</span>
-      <span class="ask-em-pill-toggle" aria-hidden="true"></span>
-    `;
+    mount.innerHTML = `<span class="ask-em-pill-label">ready</span>`;
     shell.appendChild(mount);
   } else if (mount.parentElement !== shell) {
     shell.appendChild(mount);
@@ -591,25 +557,12 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
   };
 
   mount.addEventListener('click', (event) => {
-    if (mount.dataset.interactive !== 'true' || mount.dataset.busy === 'true') {
+    if (mount.dataset.interactive !== 'true') {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-
-    const target = event.target as HTMLElement | null;
-    if (target?.closest('.ask-em-pill-toggle')) {
-      mount.dataset.busy = 'true';
-      void handlers.onWorkspaceProviderToggle(adapter.name, !context.providerEnabled).then(() => {
-        context.providerEnabled = !context.providerEnabled;
-        mount.dataset.providerEnabled = String(context.providerEnabled);
-        updateLabel(getDefaultLabel());
-      }).finally(() => {
-        mount.dataset.busy = 'false';
-      });
-      return;
-    }
 
     if (panelPinned) {
       panelPinned = false;
@@ -622,12 +575,6 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
 
   mount.addEventListener('mousemove', (event) => {
     if (panelPinned || !context.workspaceId) {
-      return;
-    }
-
-    const target = event.target as HTMLElement | null;
-    if (target?.closest('.ask-em-pill-toggle')) {
-      setPanelVisible(false);
       return;
     }
 
