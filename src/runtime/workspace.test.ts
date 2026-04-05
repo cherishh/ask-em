@@ -8,6 +8,7 @@ import {
   createPendingWorkspace,
   enforceWorkspaceLimit,
   getDefaultEnabledProviderList,
+  getWorkspacesOrdered,
   lookupWorkspaceBySession,
   rebuildWorkspaceIndex,
   setWorkspaceProviderEnabled,
@@ -154,6 +155,30 @@ describe('workspace state', () => {
     expect(rebuilt).toEqual({
       'chatgpt:gpt-1': 'w1',
     });
+  });
+
+  it('orders workspaces by created time descending instead of last update time', () => {
+    const state: LocalState = {
+      ...createEmptyState(),
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {},
+          enabledProviders: [],
+          createdAt: 10,
+          updatedAt: 200,
+        },
+        w2: {
+          id: 'w2',
+          members: {},
+          enabledProviders: [],
+          createdAt: 20,
+          updatedAt: 100,
+        },
+      },
+    };
+
+    expect(getWorkspacesOrdered(state).map((workspace) => workspace.id)).toEqual(['w2', 'w1']);
   });
 
   it('clears a single provider binding without deleting the workspace', () => {

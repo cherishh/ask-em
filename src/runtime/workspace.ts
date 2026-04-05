@@ -316,5 +316,7 @@ export function cleanupPendingWorkspaces(
 }
 
 export function getWorkspacesOrdered(state: LocalState): Workspace[] {
-  return Object.values(state.workspaces).sort((left, right) => right.updatedAt - left.updatedAt);
+  return Object.values(state.workspaces).sort(
+    (left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id),
+  );
 }

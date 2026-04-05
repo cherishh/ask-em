@@ -1,5 +1,11 @@
 import { startTransition, useEffect, useState } from 'react';
-import type { DebugLogEntry, Provider, StatusResponseMessage, WorkspaceSummary } from '../../runtime/protocol';
+import type {
+  DebugLogEntry,
+  GroupMemberState,
+  Provider,
+  StatusResponseMessage,
+  WorkspaceSummary,
+} from '../../runtime/protocol';
 
 const PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek'];
 
@@ -10,6 +16,10 @@ function formatTime(timestamp: number): string {
     month: 'short',
     day: 'numeric',
   }).format(timestamp);
+}
+
+function getDisplayMemberState(state: GroupMemberState): Exclude<GroupMemberState, 'stale'> {
+  return state === 'stale' ? 'active' : state;
 }
 
 async function requestStatus(): Promise<StatusResponseMessage | null> {
@@ -388,7 +398,7 @@ function WorkspaceCard({
       <div className="askem-provider-grid">
         {visibleProviders.map((provider) => {
           const member = workspace.members[provider];
-          const state = memberStates[provider] ?? 'inactive';
+          const state = getDisplayMemberState(memberStates[provider] ?? 'inactive');
           const sessionLabel = member?.sessionId ? member.sessionId.slice(0, 8) : 'not connected';
 
           return (

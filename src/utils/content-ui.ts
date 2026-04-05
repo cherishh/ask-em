@@ -20,6 +20,11 @@ export type UiHandlers = {
   onRefreshContext: () => Promise<void>;
 };
 
+// 用户不需要知道 stale 状态，直接显示为 active。stale 仅用于 debug，不承担功能性职责
+function getDisplayMemberState(state: GroupMemberState): Exclude<GroupMemberState, 'stale'> {
+  return state === 'stale' ? 'active' : state;
+}
+
 export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
   const { mountId, className } = adapter.getUiSpec();
   const shellId = `${mountId}-shell`;
@@ -452,9 +457,10 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     workspaceSummary: WorkspaceSummary,
     memberState: GroupMemberState,
   ) => {
+    const displayState = getDisplayMemberState(memberState);
     const member = workspaceSummary.workspace.members[provider];
 
-    if (memberState === 'pending') {
+    if (displayState === 'pending') {
       return 'pending';
     }
 
@@ -462,7 +468,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       return 'not connected';
     }
 
-    return memberState;
+    return displayState;
   };
 
   const renderPanel = (response: WorkspaceContextResponseMessage | null) => {
@@ -492,7 +498,9 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       <div class="ask-em-panel-list">
         ${visibleProviders
           .map((provider) => {
-            const memberState = workspaceSummary.memberStates[provider] ?? 'inactive';
+            const memberState = getDisplayMemberState(
+              workspaceSummary.memberStates[provider] ?? 'inactive',
+            );
             const enabled = workspaceSummary.workspace.enabledProviders.includes(provider);
             const meta = getProviderMeta(provider, workspaceSummary, memberState);
             const isCurrent = provider === adapter.name;
@@ -573,7 +581,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     void openPanel(true);
   });
 
-  mount.addEventListener('mousemove', (event) => {
+  mount.addEventListener('mousemove', () => {
     if (panelPinned || !context.workspaceId) {
       return;
     }

@@ -1,11 +1,9 @@
 import { SUPPORTED_SITES } from '../adapters/sites';
 import { createDefaultEnabledProviders, type DebugLogEntry } from '../runtime/protocol';
 import {
-  type GetStatusMessage,
   type GetWorkspaceContextMessage,
   type HeartbeatMessage,
   type HelloMessage,
-  type Provider,
   type RuntimeMessage,
   type StatusResponseMessage,
   type UserSubmitMessage,
@@ -63,7 +61,7 @@ function getClaimedTabIdsForWorkspace(sessionState: Awaited<ReturnType<typeof ge
 }
 
 async function notifyAllTabsToRefreshContext() {
-  const tabs = await chrome.tabs.query({});
+  const tabs: chrome.tabs.Tab[] = await chrome.tabs.query({});
   await notifyTabsToRefreshContext(
     tabs.map((tab) => tab.id).filter((tabId): tabId is number => typeof tabId === 'number'),
   );
@@ -190,7 +188,9 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
     return { ok: false };
   }
 
-  let { localState, sessionState } = await refreshPendingState();
+  const refreshedState = await refreshPendingState();
+  let localState = refreshedState.localState;
+  const sessionState = refreshedState.sessionState;
   let workspaceLookup = lookupWorkspaceBySession(localState, message.provider, message.sessionId);
 
   if (!workspaceLookup) {
@@ -470,7 +470,7 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
   };
 }
 
-async function handleGetStatus(_message: GetStatusMessage): Promise<StatusResponseMessage> {
+async function handleGetStatus(): Promise<StatusResponseMessage> {
   const { localState, sessionState } = await refreshPendingState();
   const visibleWorkspaces = getWorkspacesOrdered(localState).filter(
     (workspace) => workspace.enabledProviders.length > 0 || Object.keys(workspace.members).length > 0,
@@ -714,7 +714,7 @@ export default defineBackground(() => {
           sendResponse(await handleUserSubmit(message, sender));
           return;
         case 'GET_STATUS':
-          sendResponse(await handleGetStatus(message));
+          sendResponse(await handleGetStatus());
           return;
         case 'GET_WORKSPACE_CONTEXT':
           sendResponse(await handleGetWorkspaceContext(message));
