@@ -4,6 +4,7 @@ import {
   type GetWorkspaceContextMessage,
   type HeartbeatMessage,
   type HelloMessage,
+  type Provider,
   type RuntimeMessage,
   type StatusResponseMessage,
   type UserSubmitMessage,
@@ -182,6 +183,46 @@ async function refreshPendingState() {
   };
 }
 
+async function detachClaimedTabForNewChat(
+  localState: Awaited<ReturnType<typeof getLocalState>>,
+  sessionState: Awaited<ReturnType<typeof getSessionState>>,
+  tabId: number,
+  provider: Provider,
+  logMessage: string,
+) {
+  const claimedTab = getClaimedTabByTabId(sessionState, tabId, provider);
+  const claimedWorkspace = claimedTab ? localState.workspaces[claimedTab.workspaceId] : null;
+  const isPendingSourceBinding = Boolean(
+    claimedWorkspace &&
+    claimedWorkspace.pendingSource === provider &&
+    claimedWorkspace.members[provider]?.sessionId === null,
+  );
+
+  if (!claimedTab || !claimedWorkspace || isPendingSourceBinding) {
+    return {
+      sessionState,
+      detachedWorkspaceId: null,
+    };
+  }
+
+  const nextSessionState = await clearClaimedTab(claimedTab.workspaceId, provider);
+
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    workspaceId: claimedTab.workspaceId,
+    provider,
+    message: logMessage,
+  });
+
+  await scheduleGroupGcIfEmpty(claimedTab.workspaceId);
+
+  return {
+    sessionState: nextSessionState,
+    detachedWorkspaceId: claimedTab.workspaceId,
+  };
+}
+
 async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, sender: chrome.runtime.MessageSender) {
   const tabId = sender.tab?.id;
   if (!tabId) {
@@ -190,7 +231,19 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
 
   const refreshedState = await refreshPendingState();
   let localState = refreshedState.localState;
-  const sessionState = refreshedState.sessionState;
+  let sessionState = refreshedState.sessionState;
+
+  if (message.pageKind === 'new-chat' && message.sessionId === null) {
+    const detachResult = await detachClaimedTabForNewChat(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      'Detached claimed tab from previous group on new-chat navigation',
+    );
+    sessionState = detachResult.sessionState;
+  }
+
   let workspaceLookup = lookupWorkspaceBySession(localState, message.provider, message.sessionId);
 
   if (!workspaceLookup) {
@@ -327,37 +380,14 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
   let workspaceLookup = lookupWorkspaceBySession(localState, message.provider, message.sessionId);
 
   if (!workspaceLookup && tabId && message.pageKind === 'new-chat' && message.sessionId === null) {
-    const claimedTab = getClaimedTabByTabId(sessionState, tabId, message.provider);
-    const claimedWorkspace = claimedTab ? localState.workspaces[claimedTab.workspaceId] : null;
-    const isPendingSourceBinding = Boolean(
-      claimedWorkspace &&
-      claimedWorkspace.pendingSource === message.provider &&
-      claimedWorkspace.members[message.provider]?.sessionId === null,
+    const detachResult = await detachClaimedTabForNewChat(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      'Detached claimed tab from previous group on new-chat submit',
     );
-
-    if (claimedTab && claimedWorkspace && !isPendingSourceBinding) {
-      localState = clearWorkspaceProvider(localState, claimedTab.workspaceId, message.provider);
-      sessionState = await clearClaimedTab(claimedTab.workspaceId, message.provider);
-
-      const nextWorkspace = localState.workspaces[claimedTab.workspaceId];
-      const isEmptyGroup =
-        nextWorkspace &&
-        nextWorkspace.enabledProviders.length === 0 &&
-        Object.keys(nextWorkspace.members).length === 0;
-
-      await setLocalState(localState);
-      await logDebug({
-        level: 'info',
-        scope: 'background',
-        workspaceId: claimedTab.workspaceId,
-        provider: message.provider,
-        message: 'Detached provider from previous group on new-chat submit',
-      });
-
-      if (isEmptyGroup) {
-        await scheduleEmptyGroupDeletion(claimedTab.workspaceId);
-      }
-    }
+    sessionState = detachResult.sessionState;
   }
 
   if (!workspaceLookup && canCreateWorkspaceFromSubmit(localState, message)) {
