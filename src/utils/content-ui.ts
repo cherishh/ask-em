@@ -295,11 +295,6 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
       }
 
-      .ask-em-panel-status-dot[data-state="stale"] {
-        background: rgba(245, 158, 11, 0.94);
-        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
-      }
-
       .ask-em-panel-provider {
         display: inline-flex;
         align-items: center;

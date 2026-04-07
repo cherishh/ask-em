@@ -30,7 +30,6 @@ export function buildHeartbeatMessage(adapter: SiteAdapter): HeartbeatMessage {
     sessionId: status.sessionId,
     pageState: status.pageState,
     pageKind: status.pageKind,
-    visibilityState: document.visibilityState,
     timestamp: Date.now(),
   };
 }

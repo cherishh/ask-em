@@ -1,5 +1,4 @@
 import { MAX_WORKSPACES, type LocalState, type Provider, type UserSubmitMessage } from './protocol';
-import type { AdapterSnapshot } from '../adapters/types';
 
 export function canCreateWorkspaceFromSubmit(
   state: LocalState,
@@ -24,22 +23,4 @@ export function shouldSyncWorkspaceProvider(
 
 export function isProviderEnabled(enabledProviders: Provider[], provider: Provider): boolean {
   return enabledProviders.includes(provider);
-}
-
-export function matchesExpectedTarget(
-  snapshot: AdapterSnapshot,
-  expected: {
-    expectedSessionId: string | null;
-    expectedUrl: string | null;
-  },
-): boolean {
-  if (expected.expectedSessionId) {
-    return snapshot.sessionId === expected.expectedSessionId;
-  }
-
-  if (expected.expectedUrl) {
-    return snapshot.currentUrl === expected.expectedUrl;
-  }
-
-  return snapshot.pageKind === 'new-chat';
 }

@@ -1,10 +1,9 @@
 import { getSiteInfoByProvider } from './sites';
 import type { AdapterSnapshot, SiteAdapter } from './types';
-import type { DeliverPromptMessage, PageKind, ProviderStatus } from '../runtime/protocol';
+import type { DeliverPromptMessage, ProviderStatus } from '../runtime/protocol';
 import {
   detectLoginRequired,
   dispatchEnterKey,
-  findClickableByText,
   getEditableText,
   isElementWithin,
   queryVisible,
@@ -25,10 +24,6 @@ function findSendButton(): HTMLElement | null {
   return queryVisible(['button.send-button[aria-label="Send message"]']);
 }
 
-function findNewChatButton(): HTMLElement | null {
-  return queryVisible(['a[aria-label="New chat"]']) ?? findClickableByText('New chat');
-}
-
 function getStatus(): ProviderStatus {
   const currentUrl = window.location.href;
   const isReady = Boolean(findComposer());
@@ -44,7 +39,6 @@ function getStatus(): ProviderStatus {
     sessionId: site.extractSessionId(currentUrl),
     pageKind: site.isBlankChatUrl(currentUrl) ? 'new-chat' : 'existing-session',
     pageState,
-    mounted: true,
   };
 }
 
@@ -62,33 +56,15 @@ function canDeliverPrompt(message: DeliverPromptMessage, snapshot: AdapterSnapsh
 
 export const geminiAdapter: SiteAdapter = {
   name: 'gemini',
-  matches: site.matches,
   getCurrentUrl() {
     return window.location.href;
-  },
-  extractSessionId(url) {
-    return site.extractSessionId(url);
-  },
-  isBlankChatUrl(url) {
-    return site.isBlankChatUrl(url);
-  },
-  detectPageState() {
-    return getStatus().pageState;
-  },
-  getPageKind(url?: string): PageKind {
-    const currentUrl = url ?? window.location.href;
-    return site.isBlankChatUrl(currentUrl) ? 'new-chat' : 'existing-session';
   },
   getStatus,
   getUiSpec() {
     return {
-      tone: 'minimal',
       mountId: 'ask-em-gemini-ui',
       className: 'ask-em-provider-ui ask-em-provider-ui-gemini',
     };
-  },
-  getComposerText() {
-    return getEditableText(findComposer());
   },
   subscribeToUserSubmissions(onSubmit) {
     const handleKeydown = (event: KeyboardEvent) => {
@@ -137,15 +113,6 @@ export const geminiAdapter: SiteAdapter = {
     if (composer) {
       dispatchEnterKey(composer);
     }
-  },
-  async openNewChat() {
-    const newChatButton = findNewChatButton();
-    if (newChatButton) {
-      newChatButton.click();
-      return;
-    }
-
-    window.location.href = site.origin + '/app';
   },
   waitForSessionRefUpdate(baselineUrl) {
     return waitForUrlChange(site.extractSessionId, baselineUrl);

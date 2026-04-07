@@ -512,11 +512,6 @@ body {
   color: var(--askem-ok);
 }
 
-.askem-state-stale {
-  background: rgba(156, 107, 0, 0.14);
-  color: var(--askem-warn);
-}
-
 .askem-state-inactive {
   background: rgba(107, 100, 89, 0.1);
   color: var(--askem-muted);

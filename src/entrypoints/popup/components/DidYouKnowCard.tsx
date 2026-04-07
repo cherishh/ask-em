@@ -6,6 +6,7 @@ const DID_YOU_KNOW_TIPS = [
   'Found a bug? Turn on Trace Capture and send the exported log file over.',
 ] as const;
 
+// Planned: keep this card dormant until we bring back the popup tip carousel.
 export function DidYouKnowCard() {
   const [tipIndex, setTipIndex] = useState(0);
   const [paused, setPaused] = useState(false);

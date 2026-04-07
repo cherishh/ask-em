@@ -17,26 +17,18 @@ export interface AdapterSnapshot {
 }
 
 export interface ProviderUiSpec {
-  tone: 'minimal' | 'neutral';
   mountId: string;
   className: string;
 }
 
 export interface SiteAdapter {
   name: Provider;
-  matches: string[];
   getCurrentUrl(): string;
-  extractSessionId(url: string): string | null;
-  isBlankChatUrl(url: string): boolean;
-  detectPageState(): PageState;
-  getPageKind(url?: string): PageKind;
   getStatus(): ProviderStatus;
   getUiSpec(): ProviderUiSpec;
-  getComposerText(): string;
   subscribeToUserSubmissions?(onSubmit: (content: string) => void): () => void;
   setComposerText?(content: string): Promise<void> | void;
   submit?(): Promise<void> | void;
-  openNewChat?(): Promise<void> | void;
   waitForSessionRefUpdate?(
     baselineUrl: string,
   ): Promise<{ sessionId: string | null; url: string }>;

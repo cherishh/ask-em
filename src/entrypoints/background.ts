@@ -183,7 +183,7 @@ async function refreshPendingState() {
   };
 }
 
-async function detachClaimedTabForNewChat(
+export async function detachClaimedTabForNewChat(
   localState: Awaited<ReturnType<typeof getLocalState>>,
   sessionState: Awaited<ReturnType<typeof getSessionState>>,
   tabId: number,

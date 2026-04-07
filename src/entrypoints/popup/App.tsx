@@ -336,6 +336,7 @@ export function WarningCard({
   );
 }
 
+// Planned: reserve this card for future premium or announcement surfaces in the popup.
 export function PremiumCard({
   eyebrow,
   title,

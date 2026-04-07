@@ -10,7 +10,6 @@ export type ProviderStatus = {
   sessionId: string | null;
   pageKind: PageKind;
   pageState: PageState;
-  mounted: boolean;
 };
 
 export type ConversationRef = {
@@ -82,7 +81,6 @@ export type HeartbeatMessage = {
   sessionId: string | null;
   pageState: PageState;
   pageKind: PageKind;
-  visibilityState: DocumentVisibilityState;
   timestamp: number;
 };
 
