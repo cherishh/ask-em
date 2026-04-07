@@ -1,10 +1,3 @@
-import { chatgptAdapter } from '../adapters/chatgpt';
-import { bootstrapContentScript } from '../utils/content-bootstrap';
+import { createProviderContentScript } from '../utils/provider-content-script';
 
-export default defineContentScript({
-  matches: ['*://chatgpt.com/*'],
-  runAt: 'document_idle',
-  main() {
-    bootstrapContentScript(chatgptAdapter);
-  },
-});
+export default createProviderContentScript('chatgpt');

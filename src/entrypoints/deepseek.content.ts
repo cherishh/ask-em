@@ -1,10 +1,3 @@
-import { bootstrapContentScript } from '../utils/content-bootstrap';
-import { deepseekAdapter } from '../adapters/deepseek';
+import { createProviderContentScript } from '../utils/provider-content-script';
 
-export default defineContentScript({
-  matches: ['*://chat.deepseek.com/*'],
-  runAt: 'document_idle',
-  main() {
-    bootstrapContentScript(deepseekAdapter);
-  },
-});
+export default createProviderContentScript('deepseek');

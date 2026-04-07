@@ -1,10 +1,3 @@
-import { geminiAdapter } from '../adapters/gemini';
-import { bootstrapContentScript } from '../utils/content-bootstrap';
+import { createProviderContentScript } from '../utils/provider-content-script';
 
-export default defineContentScript({
-  matches: ['*://gemini.google.com/*'],
-  runAt: 'document_idle',
-  main() {
-    bootstrapContentScript(geminiAdapter);
-  },
-});
+export default createProviderContentScript('gemini');

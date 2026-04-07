@@ -1,10 +1,3 @@
-import { bootstrapContentScript } from '../utils/content-bootstrap';
-import { claudeAdapter } from '../adapters/claude';
+import { createProviderContentScript } from '../utils/provider-content-script';
 
-export default defineContentScript({
-  matches: ['*://claude.ai/*'],
-  runAt: 'document_idle',
-  main() {
-    bootstrapContentScript(claudeAdapter);
-  },
-});
+export default createProviderContentScript('claude');

@@ -1,4 +1,5 @@
 import { startTransition, useEffect, useState } from 'react';
+import { ALL_PROVIDERS as PROVIDERS } from '../../runtime/protocol';
 import type {
   DebugLogEntry,
   GroupMemberState,
@@ -6,8 +7,7 @@ import type {
   StatusResponseMessage,
   WorkspaceSummary,
 } from '../../runtime/protocol';
-
-const PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek'];
+import { getVisibleWorkspaceProviders } from '../../runtime/workspace';
 
 function formatTime(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -367,13 +367,7 @@ function WorkspaceCard({
   onClearProvider: (workspaceId: string, provider: Provider) => Promise<void>;
 }) {
   const { workspace, memberStates } = workspaceSummary;
-  const visibleProviders = Array.from(
-    new Set([
-      ...workspace.enabledProviders,
-      ...(Object.keys(workspace.members) as Provider[]),
-      ...(workspace.pendingSource ? [workspace.pendingSource] : []),
-    ]),
-  );
+  const visibleProviders = getVisibleWorkspaceProviders(workspace);
 
   return (
     <article className="askem-card">

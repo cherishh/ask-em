@@ -1,6 +1,6 @@
-import { SUPPORTED_SITES } from '../adapters/sites';
-import { createDefaultEnabledProviders, type DebugLogEntry } from '../runtime/protocol';
+import { MAX_WORKSPACES, createDefaultEnabledProviders, type DebugLogEntry } from '../runtime/protocol';
 import {
+  ALL_PROVIDERS,
   type GetWorkspaceContextMessage,
   type HeartbeatMessage,
   type HelloMessage,
@@ -314,7 +314,7 @@ async function deliverPromptToWorkspaceTargets(
 
   cancelScheduledGroupGc(workspaceId);
 
-  const providers = SUPPORTED_SITES.map((site) => site.name).filter((provider) =>
+  const providers = ALL_PROVIDERS.filter((provider) =>
     shouldSyncWorkspaceProvider(message.provider, provider, workspace.enabledProviders),
   );
 
@@ -511,7 +511,7 @@ async function handleGetStatus(): Promise<StatusResponseMessage> {
     type: 'STATUS_RESPONSE',
     globalSyncEnabled: localState.globalSyncEnabled,
     debugLoggingEnabled: localState.debugLoggingEnabled,
-    workspaceLimit: 3,
+    workspaceLimit: MAX_WORKSPACES,
     defaultEnabledProviders: localState.defaultEnabledProviders,
     workspaces,
     recentLogs: localState.debugLogs.slice(-20).reverse(),
@@ -523,23 +523,23 @@ function buildWorkspaceSummary(
   sessionState: Awaited<ReturnType<typeof getSessionState>>,
 ) {
   const memberStates = Object.fromEntries(
-    SUPPORTED_SITES.map((site) => {
-      const member = workspace.members[site.name];
-      const claimedTab = sessionState.claimedTabs[`${workspace.id}:${site.name}`];
+    ALL_PROVIDERS.map((provider) => {
+      const member = workspace.members[provider];
+      const claimedTab = sessionState.claimedTabs[`${workspace.id}:${provider}`];
 
-      if (member?.sessionId === null || workspace.pendingSource === site.name) {
-        return [site.name, 'pending'];
+      if (member?.sessionId === null || workspace.pendingSource === provider) {
+        return [provider, 'pending'];
       }
 
       if (!member) {
-        return [site.name, 'inactive'];
+        return [provider, 'inactive'];
       }
 
       if (!claimedTab) {
-        return [site.name, 'inactive'];
+        return [provider, 'inactive'];
       }
 
-      return [site.name, isClaimedTabStale(claimedTab) ? 'stale' : 'active'];
+      return [provider, isClaimedTabStale(claimedTab) ? 'stale' : 'active'];
     }),
   );
 

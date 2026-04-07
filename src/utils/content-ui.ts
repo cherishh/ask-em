@@ -5,6 +5,7 @@ import type {
   WorkspaceContextResponseMessage,
   WorkspaceSummary,
 } from '../runtime/protocol';
+import { getVisibleWorkspaceProviders } from '../runtime/workspace';
 
 export type UiState = 'idle' | 'listening' | 'syncing' | 'blocked';
 
@@ -438,15 +439,6 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     panel.dataset.visible = String(visible && Boolean(context.workspaceId));
   };
 
-  const getVisibleProviders = (workspaceSummary: WorkspaceSummary): Provider[] =>
-    Array.from(
-      new Set([
-        ...workspaceSummary.workspace.enabledProviders,
-        ...(Object.keys(workspaceSummary.workspace.members) as Provider[]),
-        ...(workspaceSummary.workspace.pendingSource ? [workspaceSummary.workspace.pendingSource] : []),
-      ]),
-    );
-
   const getProviderMeta = (
     provider: Provider,
     workspaceSummary: WorkspaceSummary,
@@ -474,7 +466,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       return;
     }
 
-    const visibleProviders = getVisibleProviders(workspaceSummary);
+    const visibleProviders = getVisibleWorkspaceProviders(workspaceSummary.workspace);
     const badgeClass = response.globalSyncEnabled ? 'ask-em-panel-badge' : 'ask-em-panel-badge is-paused';
     const badgeLabel = response.globalSyncEnabled ? 'Live Group' : 'Global Pause';
     const globalNote = response.globalSyncEnabled

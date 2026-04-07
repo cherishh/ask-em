@@ -1,4 +1,5 @@
 import {
+  ALL_PROVIDERS,
   MAX_WORKSPACES,
   PENDING_WORKSPACE_TIMEOUT_MS,
   toClaimedTabKey,
@@ -319,4 +320,14 @@ export function getWorkspacesOrdered(state: LocalState): Workspace[] {
   return Object.values(state.workspaces).sort(
     (left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id),
   );
+}
+
+export function getVisibleWorkspaceProviders(workspace: Workspace): Provider[] {
+  const visibleProviders = new Set<Provider>([
+    ...workspace.enabledProviders,
+    ...(Object.keys(workspace.members) as Provider[]),
+    ...(workspace.pendingSource ? [workspace.pendingSource] : []),
+  ]);
+
+  return ALL_PROVIDERS.filter((provider) => visibleProviders.has(provider));
 }
