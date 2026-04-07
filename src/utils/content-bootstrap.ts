@@ -15,6 +15,9 @@ import {
 } from './content-routing';
 import { createContentUi, type UiContext } from './content-ui';
 
+const STARTUP_PRESENCE_POLL_MS = 1_000;
+const STARTUP_PRESENCE_DURATION_MS = 10_000;
+
 function shouldShowStandaloneIndicator(adapter: SiteAdapter): boolean {
   const status = adapter.getStatus();
   return status.pageKind === 'new-chat' && status.pageState === 'ready';
@@ -30,6 +33,34 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
   let suppressSubmissionsUntil = 0;
   let lastFingerprint = '';
   let lastFingerprintAt = 0;
+  let startupPresenceInterval: number | null = null;
+  let startupPresenceDeadline = 0;
+
+  const stopStartupPresencePolling = () => {
+    if (startupPresenceInterval !== null) {
+      window.clearInterval(startupPresenceInterval);
+      startupPresenceInterval = null;
+    }
+  };
+
+  const shouldContinueStartupPresencePolling = () =>
+    Date.now() < startupPresenceDeadline &&
+    !uiContext.workspaceId &&
+    !shouldShowStandaloneIndicator(adapter);
+
+  const startStartupPresencePolling = () => {
+    stopStartupPresencePolling();
+
+    startupPresenceDeadline = Date.now() + STARTUP_PRESENCE_DURATION_MS;
+    startupPresenceInterval = window.setInterval(() => {
+      if (!shouldContinueStartupPresencePolling()) {
+        stopStartupPresencePolling();
+        return;
+      }
+
+      void reportPresence('HEARTBEAT');
+    }, STARTUP_PRESENCE_POLL_MS);
+  };
 
   const logDebug = async (entry: {
     level: 'info' | 'warn' | 'error';
@@ -71,6 +102,10 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     };
     ui.setContext(uiContext);
     ui.setVisible(Boolean(response?.workspaceId) || standaloneVisible);
+
+    if (!shouldContinueStartupPresencePolling()) {
+      stopStartupPresencePolling();
+    }
 
     if (!response?.workspaceId && !standaloneVisible) {
       return;
@@ -276,11 +311,13 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     return true;
   });
 
+  startStartupPresencePolling();
   void reportPresence('HELLO');
 
   window.addEventListener('beforeunload', () => {
     unsubscribe?.();
     stopObservingUrl();
+    stopStartupPresencePolling();
     window.clearInterval(heartbeatInterval);
   });
 }

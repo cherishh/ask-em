@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LocalState, SessionState } from '../runtime/protocol';
+import type { LocalState, SessionState } from './protocol';
 
 const storageMocks = vi.hoisted(() => ({
   appendDebugLog: vi.fn().mockResolvedValue(undefined),
@@ -12,7 +12,7 @@ const storageMocks = vi.hoisted(() => ({
   upsertClaimedTab: vi.fn(),
 }));
 
-vi.mock('../runtime/storage', () => storageMocks);
+vi.mock('./storage', () => storageMocks);
 
 function createLocalState(): LocalState {
   return {
@@ -102,12 +102,13 @@ describe('background new-chat detachment', () => {
     storageMocks.clearClaimedTab.mockResolvedValue(nextSessionState);
     storageMocks.getSessionState.mockResolvedValue(nextSessionState);
 
-    const { detachClaimedTabForNewChat } = await import('./background');
+    const { detachClaimedTabForNewChat } = await import('../entrypoints/background');
     const result = await detachClaimedTabForNewChat(
       localState,
       sessionState,
       9,
       'claude',
+      'https://claude.ai/new',
       'Detached claimed tab from previous group on new-chat navigation',
     );
 
@@ -162,12 +163,73 @@ describe('background new-chat detachment', () => {
       },
     };
 
-    const { detachClaimedTabForNewChat } = await import('./background');
+    const { detachClaimedTabForNewChat } = await import('../entrypoints/background');
     const result = await detachClaimedTabForNewChat(
       localState,
       sessionState,
       9,
       'claude',
+      'https://claude.ai/new',
+      'Detached claimed tab from previous group on new-chat navigation',
+    );
+
+    expect(storageMocks.clearClaimedTab).not.toHaveBeenCalled();
+    expect(storageMocks.appendDebugLog).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      sessionState,
+      detachedWorkspaceId: null,
+    });
+  });
+
+  it('does not detach a target tab that has not bound a session yet', async () => {
+    const localState: LocalState = {
+      ...createLocalState(),
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {
+            claude: {
+              provider: 'claude',
+              sessionId: 'c-1',
+              url: 'https://claude.ai/chat/c-1',
+            },
+            gemini: {
+              provider: 'gemini',
+              sessionId: null,
+              url: 'https://gemini.google.com/app',
+            },
+          },
+          enabledProviders: ['claude', 'gemini'],
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:gemini': {
+          provider: 'gemini',
+          workspaceId: 'w1',
+          tabId: 12,
+          currentUrl: 'https://gemini.google.com/app',
+          sessionId: null,
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+      },
+    };
+
+    const { detachClaimedTabForNewChat } = await import('../entrypoints/background');
+    const result = await detachClaimedTabForNewChat(
+      localState,
+      sessionState,
+      12,
+      'gemini',
+      'https://gemini.google.com/app',
       'Detached claimed tab from previous group on new-chat navigation',
     );
 

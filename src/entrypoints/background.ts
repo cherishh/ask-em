@@ -188,17 +188,27 @@ export async function detachClaimedTabForNewChat(
   sessionState: Awaited<ReturnType<typeof getSessionState>>,
   tabId: number,
   provider: Provider,
+  currentUrl: string,
   logMessage: string,
 ) {
   const claimedTab = getClaimedTabByTabId(sessionState, tabId, provider);
   const claimedWorkspace = claimedTab ? localState.workspaces[claimedTab.workspaceId] : null;
+  const member = claimedWorkspace?.members[provider];
   const isPendingSourceBinding = Boolean(
     claimedWorkspace &&
     claimedWorkspace.pendingSource === provider &&
     claimedWorkspace.members[provider]?.sessionId === null,
   );
+  const hasBoundMemberSession = Boolean(member?.sessionId);
+  const isStillOnBoundUrl = Boolean(member?.url && currentUrl === member.url);
 
-  if (!claimedTab || !claimedWorkspace || isPendingSourceBinding) {
+  if (
+    !claimedTab ||
+    !claimedWorkspace ||
+    isPendingSourceBinding ||
+    !hasBoundMemberSession ||
+    isStillOnBoundUrl
+  ) {
     return {
       sessionState,
       detachedWorkspaceId: null,
@@ -239,6 +249,7 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
       sessionState,
       tabId,
       message.provider,
+      message.currentUrl,
       'Detached claimed tab from previous group on new-chat navigation',
     );
     sessionState = detachResult.sessionState;
@@ -385,6 +396,7 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
       sessionState,
       tabId,
       message.provider,
+      message.currentUrl,
       'Detached claimed tab from previous group on new-chat submit',
     );
     sessionState = detachResult.sessionState;
