@@ -28,6 +28,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     workspaceId: null,
     providerEnabled: true,
     globalSyncEnabled: true,
+    standaloneReady: false,
   };
 
   let suppressSubmissionsUntil = 0;
@@ -99,6 +100,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
       workspaceId: response?.workspaceId ?? null,
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? false) : true,
       globalSyncEnabled: response?.globalSyncEnabled ?? true,
+      standaloneReady: standaloneVisible,
     };
     ui.setContext(uiContext);
     ui.setVisible(Boolean(response?.workspaceId) || standaloneVisible);
@@ -137,6 +139,19 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
         ui.setContext(uiContext);
         ui.setState('idle');
       }
+    },
+    async onGlobalSyncToggle(nextEnabled) {
+      await sendRuntimeMessage({
+        type: 'SET_GLOBAL_SYNC_ENABLED',
+        enabled: nextEnabled,
+      });
+
+      uiContext = {
+        ...uiContext,
+        globalSyncEnabled: nextEnabled,
+      };
+      ui.setContext(uiContext);
+      ui.setState('idle');
     },
     async loadWorkspaceContext(workspaceId) {
       return await sendRuntimeMessage<WorkspaceContextResponseMessage>({
@@ -182,6 +197,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
       workspaceId: response?.workspaceId ?? null,
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? true) : true,
       globalSyncEnabled: response?.globalSyncEnabled ?? uiContext.globalSyncEnabled,
+      standaloneReady: shouldShowStandaloneIndicator(adapter),
     };
     ui.setContext(uiContext);
     ui.setVisible(Boolean(uiContext.workspaceId) || shouldShowStandaloneIndicator(adapter));

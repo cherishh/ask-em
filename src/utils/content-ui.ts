@@ -13,13 +13,44 @@ export type UiContext = {
   workspaceId: string | null;
   providerEnabled: boolean;
   globalSyncEnabled: boolean;
+  standaloneReady: boolean;
 };
 
 export type UiHandlers = {
   onWorkspaceProviderToggle: (provider: Provider, nextEnabled: boolean) => Promise<void>;
+  onGlobalSyncToggle: (nextEnabled: boolean) => Promise<void>;
   loadWorkspaceContext: (workspaceId: string) => Promise<WorkspaceContextResponseMessage | null>;
   onRefreshContext: () => Promise<void>;
 };
+
+const TOGGLE_SHORTCUT_KEY = '.';
+
+function isApplePlatform(): boolean {
+  return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+}
+
+function getToggleShortcutKeys(): string[] {
+  return isApplePlatform() ? ['Cmd', '.'] : ['Ctrl', '.'];
+}
+
+function getGlobalToggleShortcutKeys(): string[] {
+  return isApplePlatform() ? ['Cmd', 'Shift', '.'] : ['Ctrl', 'Shift', '.'];
+}
+
+function renderShortcutKeysHtml(keys: string[]): string {
+  return `
+    <span class="ask-em-panel-shortcut-keys" aria-hidden="true">
+      ${keys
+        .map(
+          (key, index) => `
+            ${index > 0 ? '<span class="ask-em-panel-shortcut-plus">+</span>' : ''}
+            <kbd>${key}</kbd>
+          `,
+        )
+        .join('')}
+    </span>
+  `;
+}
 
 // 用户不需要知道 stale 状态，直接显示为 active。stale 仅用于 debug，不承担功能性职责
 function getDisplayMemberState(state: GroupMemberState): Exclude<GroupMemberState, 'stale'> {
@@ -250,6 +281,57 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         font: 600 11px/1.45 "Avenir Next", "Segoe UI", sans-serif;
       }
 
+      .ask-em-panel-shortcut {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(15, 23, 42, 0.08);
+        color: rgba(82, 77, 72, 0.8);
+        font: 600 10px/1.35 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .ask-em-panel-shortcut.is-standalone {
+        margin-top: 10px;
+        padding-top: 0;
+        border-top: 0;
+      }
+
+      .ask-em-panel-shortcut-keys {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .ask-em-panel-shortcut-plus {
+        color: rgba(107, 100, 89, 0.62);
+        font: inherit;
+      }
+
+      .ask-em-panel-shortcut kbd {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 20px;
+        min-width: 20px;
+        padding: 0 7px;
+        border-radius: 7px;
+        border: 1px solid rgba(15, 23, 42, 0.14);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 240, 233, 0.92));
+        box-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.92),
+          0 2px 6px rgba(15, 23, 42, 0.08),
+          inset 0 -1px 0 rgba(15, 23, 42, 0.06);
+        color: rgba(15, 23, 42, 0.86);
+        font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        letter-spacing: 0.02em;
+        text-transform: none;
+      }
+
       .ask-em-panel-list {
         display: grid;
         gap: 8px;
@@ -418,9 +500,13 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     workspaceId: null,
     providerEnabled: true,
     globalSyncEnabled: true,
+    standaloneReady: false,
   };
+  const toggleShortcutKeys = getToggleShortcutKeys();
+  const globalToggleShortcutKeys = getGlobalToggleShortcutKeys();
 
   let panelPinned = false;
+  let currentProviderToggleBusy = false;
 
   const updateLabel = (text: string) => {
     if (label) {
@@ -436,7 +522,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       : 'ready';
 
   const setPanelVisible = (visible: boolean) => {
-    panel.dataset.visible = String(visible && Boolean(context.workspaceId));
+    panel.dataset.visible = String(visible && Boolean(context.workspaceId || context.standaloneReady));
   };
 
   const getProviderMeta = (
@@ -461,6 +547,29 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
   const renderPanel = (response: WorkspaceContextResponseMessage | null) => {
     const workspaceSummary = response?.workspaceSummary;
     if (!workspaceSummary || !context.workspaceId) {
+      if (context.standaloneReady && !context.workspaceId) {
+        const badgeClass = context.globalSyncEnabled
+          ? 'ask-em-panel-badge'
+          : 'ask-em-panel-badge is-paused';
+        const badgeLabel = context.globalSyncEnabled ? 'Global Sync On' : 'Global Sync Off';
+        const note = context.globalSyncEnabled
+          ? 'New sends can create or fan out to groups.'
+          : 'New sends stay local and will not create or fan out to groups.';
+
+        panel.innerHTML = `
+          <div class="ask-em-panel-top">
+            <span class="${badgeClass}">${badgeLabel}</span>
+          </div>
+          <p class="ask-em-panel-note">${note}</p>
+          <div class="ask-em-panel-shortcut is-standalone">
+            <span>Toggle global sync</span>
+            ${renderShortcutKeysHtml(globalToggleShortcutKeys)}
+          </div>
+        `;
+        setPanelVisible(true);
+        return;
+      }
+
       panel.innerHTML = '';
       setPanelVisible(false);
       return;
@@ -516,7 +625,60 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
           })
           .join('')}
       </div>
+      <div class="ask-em-panel-shortcut">
+        <span>Pause/restart sync for this tab</span>
+        ${renderShortcutKeysHtml(toggleShortcutKeys)}
+      </div>
     `;
+  };
+
+  const setCurrentProviderToggleBusy = (busy: boolean) => {
+    currentProviderToggleBusy = busy;
+    mount.dataset.busy = String(busy);
+    const currentToggle = panel.querySelector<HTMLButtonElement>(
+      `.ask-em-panel-switch[data-provider="${adapter.name}"]`,
+    );
+
+    if (currentToggle) {
+      currentToggle.dataset.busy = String(busy);
+    }
+  };
+
+  const toggleCurrentProvider = async () => {
+    if (!context.workspaceId || currentProviderToggleBusy) {
+      return;
+    }
+
+    const nextEnabled = !context.providerEnabled;
+    setCurrentProviderToggleBusy(true);
+
+    try {
+      await handlers.onWorkspaceProviderToggle(adapter.name, nextEnabled);
+      context.providerEnabled = nextEnabled;
+      mount.dataset.providerEnabled = String(nextEnabled);
+      updateLabel(getDefaultLabel());
+      await refreshPanel();
+    } finally {
+      setCurrentProviderToggleBusy(false);
+    }
+  };
+
+  const toggleGlobalSync = async () => {
+    if (currentProviderToggleBusy) {
+      return;
+    }
+
+    const nextEnabled = !context.globalSyncEnabled;
+    setCurrentProviderToggleBusy(true);
+
+    try {
+      await handlers.onGlobalSyncToggle(nextEnabled);
+      context.globalSyncEnabled = nextEnabled;
+      mount.dataset.globalSyncEnabled = String(nextEnabled);
+      updateLabel(getDefaultLabel());
+    } finally {
+      setCurrentProviderToggleBusy(false);
+    }
   };
 
   const refreshPanel = async () => {
@@ -539,7 +701,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
   };
 
   const openPanel = async (pin = false) => {
-    if (!context.workspaceId) {
+    if (!context.workspaceId && !context.standaloneReady) {
       return;
     }
 
@@ -559,6 +721,11 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     event.preventDefault();
     event.stopPropagation();
 
+    if (!context.workspaceId && context.standaloneReady) {
+      void toggleGlobalSync();
+      return;
+    }
+
     if (panelPinned) {
       panelPinned = false;
       setPanelVisible(false);
@@ -569,7 +736,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
   });
 
   mount.addEventListener('mousemove', () => {
-    if (panelPinned || !context.workspaceId) {
+    if (panelPinned || (!context.workspaceId && !context.standaloneReady)) {
       return;
     }
 
@@ -627,6 +794,32 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     }
   });
 
+  document.addEventListener('keydown', (event) => {
+    const providerShortcutPressed =
+      event.key.toLowerCase() === TOGGLE_SHORTCUT_KEY &&
+      (event.metaKey || event.ctrlKey) &&
+      !event.altKey &&
+      !event.shiftKey;
+    const globalShortcutPressed =
+      event.key.toLowerCase() === TOGGLE_SHORTCUT_KEY &&
+      (event.metaKey || event.ctrlKey) &&
+      !event.altKey &&
+      event.shiftKey;
+
+    if (providerShortcutPressed && context.workspaceId) {
+      event.preventDefault();
+      event.stopPropagation();
+      void toggleCurrentProvider();
+      return;
+    }
+
+    if (globalShortcutPressed) {
+      event.preventDefault();
+      event.stopPropagation();
+      void toggleGlobalSync();
+    }
+  });
+
   return {
     setVisible(visible: boolean) {
       mount.dataset.visible = String(visible);
@@ -643,11 +836,12 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       context.workspaceId = nextContext.workspaceId;
       context.providerEnabled = nextContext.providerEnabled;
       context.globalSyncEnabled = nextContext.globalSyncEnabled;
+      context.standaloneReady = nextContext.standaloneReady;
       mount.dataset.providerEnabled = String(nextContext.providerEnabled);
       mount.dataset.globalSyncEnabled = String(nextContext.globalSyncEnabled);
-      mount.dataset.interactive = String(Boolean(nextContext.workspaceId));
+      mount.dataset.interactive = String(Boolean(nextContext.workspaceId || nextContext.standaloneReady));
 
-      if (!nextContext.workspaceId) {
+      if (!nextContext.workspaceId && !nextContext.standaloneReady) {
         panelPinned = false;
         renderPanel(null);
       }
