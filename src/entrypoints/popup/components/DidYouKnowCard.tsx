@@ -1,12 +1,14 @@
 import { startTransition, useEffect, useState } from 'react';
 
 const DID_YOU_KNOW_TIPS = [
-  'You can run up to three groups at a time.',
-  'Closed a synced tab by mistake? Bring it back within 7 seconds and the group can keep its place.',
-  'Found a bug? Turn on Trace Capture and send the exported log file over.',
+  'Use Cmd/Ctrl + . to pause or restart sync for the current tab, and Cmd/Ctrl + Shift + . to toggle global sync.',
+  'Closed a provider in a group by mistake? The next prompt can reopen it automatically, so you can keep moving.',
+  'Global Sync Off keeps prompts local and stops new group fan-out until you turn it back on.',
+  'Click the standalone indicator on a fresh chat to toggle global sync instantly without opening the popup.',
+  'Inactive means a provider still belongs to the group, but no live tab is attached right now.',
+  'Turn on Trace Capture only when debugging, then export the JSON log file when you need to report a bug.',
 ] as const;
 
-// Planned: keep this card dormant until we bring back the popup tip carousel.
 export function DidYouKnowCard() {
   const [tipIndex, setTipIndex] = useState(0);
   const [paused, setPaused] = useState(false);

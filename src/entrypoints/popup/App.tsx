@@ -1,4 +1,5 @@
 import { startTransition, useEffect, useState } from 'react';
+import { DidYouKnowCard } from './components/DidYouKnowCard';
 import { ALL_PROVIDERS as PROVIDERS } from '../../runtime/protocol';
 import type {
   DebugLogEntry,
@@ -92,7 +93,7 @@ export default function App() {
   };
 
   const workspaceCount = status?.workspaces.length ?? 0;
-  const limit = status?.workspaceLimit ?? 3;
+  const limit = status?.workspaceLimit ?? 2;
   const atLimit = workspaceCount >= limit;
 
   const toggleDefaultProvider = async (provider: Provider) => {
@@ -191,17 +192,17 @@ export default function App() {
           />
         ) : null}
 
+        <DidYouKnowCard />
+
         <section className="askem-card askem-defaults-card">
-          <div className="askem-card-top">
-            <div>
+          <div className="askem-defaults-heading">
+            <div className="askem-defaults-copy">
               <p className="askem-card-label">Default Targets</p>
-              <h2>New Group Fan-out</h2>
+              <p className="askem-defaults-title">New groups fan out to the selected providers.</p>
             </div>
+            <span className="askem-defaults-meta">{selectedProviders.length} selected</span>
           </div>
-          <p className="askem-card-copy">
-            Choose which providers should join when a group is first created. The source provider
-            is always kept in.
-          </p>
+          <p className="askem-defaults-note">Source tab is always included.</p>
           <div className="askem-default-provider-list">
             {PROVIDERS.map((provider) => {
               const active = selectedProviders.includes(provider);
@@ -213,8 +214,8 @@ export default function App() {
                   onClick={() => void toggleDefaultProvider(provider)}
                   disabled={loading}
                 >
+                  <span className="askem-provider-chip-dot" aria-hidden="true" />
                   <span>{provider}</span>
-                  <span>{active ? 'on' : 'off'}</span>
                 </button>
               );
             })}

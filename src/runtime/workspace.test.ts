@@ -248,7 +248,7 @@ describe('workspace state', () => {
     expect(nextState.workspaceIndex['claude:c-1']).toBeUndefined();
   });
 
-  it('enforces the workspace limit of three', () => {
+  it('enforces the workspace limit of two', () => {
     const state: LocalState = {
       globalSyncEnabled: true,
       debugLoggingEnabled: false,
@@ -256,7 +256,6 @@ describe('workspace state', () => {
       workspaces: {
         w1: { id: 'w1', members: {}, enabledProviders: [], createdAt: 1, updatedAt: 1 },
         w2: { id: 'w2', members: {}, enabledProviders: [], createdAt: 2, updatedAt: 2 },
-        w3: { id: 'w3', members: {}, enabledProviders: [], createdAt: 3, updatedAt: 3 },
       },
       workspaceIndex: {},
       debugLogs: [],

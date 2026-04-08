@@ -232,7 +232,7 @@ export type RuntimeMessage =
   | WorkspaceContextResponseMessage
   | StatusResponseMessage;
 
-export const MAX_WORKSPACES = 3;
+export const MAX_WORKSPACES = 2;
 
 export const PENDING_WORKSPACE_TIMEOUT_MS = 30_000;
 

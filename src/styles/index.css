@@ -16,7 +16,7 @@
 body {
   margin: 0;
   min-width: 396px;
-  min-height: 560px;
+  min-height: 720px;
   background:
     radial-gradient(circle at top left, rgba(255, 212, 160, 0.26), transparent 38%),
     radial-gradient(circle at bottom right, rgba(92, 132, 255, 0.18), transparent 34%),
@@ -55,7 +55,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  min-height: 100vh;
+  min-height: 720px;
   padding: 20px;
 }
 
@@ -249,10 +249,10 @@ body {
 
 .askem-facts-copy {
   margin: 10px 0 0;
-  max-width: 44ch;
+  max-width: 48ch;
   color: #454035;
-  font-size: 14px;
-  line-height: 1.52;
+  font-size: 13px;
+  line-height: 1.56;
   animation: askem-fact-in 220ms ease;
 }
 
@@ -449,26 +449,72 @@ body {
   gap: 8px;
 }
 
-.askem-default-provider-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 14px;
+.askem-defaults-card {
+  padding: 13px 14px;
 }
 
-.askem-provider-chip {
+.askem-default-provider-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.askem-defaults-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+  width: 100%;
+}
+
+.askem-defaults-copy {
+  min-width: 0;
+}
+
+.askem-defaults-copy .askem-card-label {
+  margin-bottom: 5px;
+}
+
+.askem-defaults-title {
+  margin: 0;
+  color: var(--askem-ink);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.askem-defaults-meta {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: rgba(37, 87, 214, 0.08);
+  color: var(--askem-accent);
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.askem-defaults-note {
+  margin: 8px 0 0;
+  color: var(--askem-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.askem-provider-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
   border: 1px solid rgba(35, 25, 8, 0.12);
-  border-radius: 16px;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
-  padding: 10px 12px;
+  padding: 8px 10px;
   color: var(--askem-ink);
   cursor: pointer;
-  font: 700 11px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
-  letter-spacing: 0.12em;
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   transition: border-color 140ms ease, background 140ms ease;
 }
@@ -477,6 +523,19 @@ body {
   border-color: rgba(37, 87, 214, 0.28);
   background: rgba(246, 249, 255, 0.94);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.askem-provider-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(107, 100, 89, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(35, 25, 8, 0.08);
+}
+
+.askem-provider-chip.is-active .askem-provider-chip-dot {
+  background: var(--askem-accent);
+  box-shadow: 0 0 0 3px rgba(37, 87, 214, 0.12);
 }
 
 .askem-provider-row {
