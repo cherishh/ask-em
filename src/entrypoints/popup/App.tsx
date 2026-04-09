@@ -44,18 +44,20 @@ function getDisplayMemberStateTone(
   state: GroupMemberState,
   enabled: boolean,
 ): 'active' | 'inactive' | 'pending' | 'sync-paused' {
+  const displayState = getDisplayMemberState(state);
+
+  if (displayState === 'inactive' || displayState === 'pending') {
+    return displayState;
+  }
+
   if (!enabled) {
     return 'sync-paused';
   }
 
-  return getDisplayMemberState(state);
+  return displayState;
 }
 
 function getDisplayMemberStateLabel(state: GroupMemberState, enabled: boolean): string {
-  if (!enabled) {
-    return 'Sync Paused';
-  }
-
   const displayState = getDisplayMemberState(state);
 
   if (displayState === 'inactive') {
@@ -66,22 +68,30 @@ function getDisplayMemberStateLabel(state: GroupMemberState, enabled: boolean): 
     return 'Connecting';
   }
 
+  if (!enabled) {
+    return 'Sync Paused';
+  }
+
   return 'Active';
 }
 
 function getMemberOutcomeCopy(state: GroupMemberState, enabled: boolean): string {
-  if (!enabled) {
-    return 'Next prompt will stay out of sync';
-  }
-
   const displayState = getDisplayMemberState(state);
 
   if (displayState === 'inactive') {
+    if (!enabled) {
+      return 'This model has no open tab, and sync is paused, so it will not reopen on the next prompt.';
+    }
+
     return 'Reopens on the next synced prompt';
   }
 
   if (displayState === 'pending') {
     return 'Waiting for this model to connect';
+  }
+
+  if (!enabled) {
+    return 'Sync is paused for this model, so the next prompt will not be sent here.';
   }
 
   return 'Next prompt will be synced';
@@ -477,16 +487,16 @@ export default function App() {
                 </p>
               )}
             </section>
+
+            <footer className="askem-footer">
+              <span>by </span>
+              <a href="https://tuxi.dev/" target="_blank" rel="noreferrer">
+                Tuxi
+              </a>
+              <span> · one77r@gmail.com</span>
+            </footer>
           </>
         )}
-
-        <footer className="askem-footer">
-          <span>by </span>
-          <a href="https://tuxi.dev/" target="_blank" rel="noreferrer">
-            Tuxi
-          </a>
-          <span> · one77r@gmail.com</span>
-        </footer>
       </section>
 
       {requestModalOpen ? (

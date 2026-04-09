@@ -14,6 +14,7 @@ export type UiContext = {
   providerEnabled: boolean;
   globalSyncEnabled: boolean;
   standaloneReady: boolean;
+  canStartNewSet: boolean;
 };
 
 export type UiHandlers = {
@@ -562,6 +563,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     providerEnabled: true,
     globalSyncEnabled: true,
     standaloneReady: false,
+    canStartNewSet: true,
   };
   const toggleShortcutKeys = getToggleShortcutKeys();
   const globalToggleShortcutKeys = getGlobalToggleShortcutKeys();
@@ -579,7 +581,15 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
 
   const getDefaultLabel = () => {
     if (!context.workspaceId) {
-      return context.globalSyncEnabled ? 'ready' : 'off';
+      if (!context.globalSyncEnabled) {
+        return 'sync off';
+      }
+
+      if (!context.canStartNewSet) {
+        return 'set limit reached';
+      }
+
+      return 'sync ready';
     }
 
     if (!context.globalSyncEnabled || !context.providerEnabled) {
@@ -941,6 +951,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       context.providerEnabled = nextContext.providerEnabled;
       context.globalSyncEnabled = nextContext.globalSyncEnabled;
       context.standaloneReady = nextContext.standaloneReady;
+      context.canStartNewSet = nextContext.canStartNewSet;
       mount.dataset.providerEnabled = String(nextContext.providerEnabled);
       mount.dataset.globalSyncEnabled = String(nextContext.globalSyncEnabled);
       mount.dataset.interactive = String(Boolean(nextContext.workspaceId || nextContext.standaloneReady));
