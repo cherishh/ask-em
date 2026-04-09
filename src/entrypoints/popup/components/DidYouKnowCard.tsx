@@ -2,10 +2,10 @@ import { startTransition, useEffect, useState } from 'react';
 
 const DID_YOU_KNOW_TIPS = [
   'Use Cmd/Ctrl + . to pause or restart sync for the current tab, and Cmd/Ctrl + Shift + . to toggle global sync.',
-  'Closed a provider in a group by mistake? The next prompt can reopen it automatically, so you can keep moving.',
-  'Global Sync Off keeps prompts local and stops new group fan-out until you turn it back on.',
+  'Closed a provider in a set by mistake? The next prompt can reopen it automatically, so you can keep moving.',
+  'Global Sync Off keeps prompts local and stops new set fan-out until you turn it back on.',
   'Click the standalone indicator on a fresh chat to toggle global sync instantly without opening the popup.',
-  'Inactive means a provider still belongs to the group, but no live tab is attached right now.',
+  'No Live Tab means a provider still belongs to the set, but no live tab is attached right now.',
   'Turn on Trace Capture only when debugging, then export the JSON log file when you need to report a bug.',
 ] as const;
 

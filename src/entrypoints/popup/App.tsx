@@ -10,6 +10,8 @@ import type {
 } from '../../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../../runtime/workspace';
 
+type PopupView = 'home' | 'settings';
+
 function formatTime(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
@@ -21,6 +23,34 @@ function formatTime(timestamp: number): string {
 
 function getDisplayMemberState(state: GroupMemberState): Exclude<GroupMemberState, 'stale'> {
   return state === 'stale' ? 'active' : state;
+}
+
+function getDisplayMemberStateLabel(state: GroupMemberState): string {
+  const displayState = getDisplayMemberState(state);
+
+  if (displayState === 'inactive') {
+    return 'No Live Tab';
+  }
+
+  if (displayState === 'pending') {
+    return 'Connecting';
+  }
+
+  return 'Active';
+}
+
+function getMemberOutcomeCopy(state: GroupMemberState): string {
+  const displayState = getDisplayMemberState(state);
+
+  if (displayState === 'inactive') {
+    return 'Will reopen on the next synced prompt';
+  }
+
+  if (displayState === 'pending') {
+    return 'Waiting for this model to attach';
+  }
+
+  return 'Next prompt will be synced';
 }
 
 async function requestStatus(): Promise<StatusResponseMessage | null> {
@@ -46,6 +76,7 @@ function downloadJsonFile(filename: string, payload: string) {
 }
 
 export default function App() {
+  const [activeView, setActiveView] = useState<PopupView>('home');
   const [status, setStatus] = useState<StatusResponseMessage | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -95,6 +126,7 @@ export default function App() {
   const workspaceCount = status?.workspaces.length ?? 0;
   const limit = status?.workspaceLimit ?? 2;
   const atLimit = workspaceCount >= limit;
+  const globalSyncEnabled = status?.globalSyncEnabled ?? true;
 
   const toggleDefaultProvider = async (provider: Provider) => {
     const nextProviders = selectedProviders.includes(provider)
@@ -156,139 +188,166 @@ export default function App() {
       <div className="askem-popup-backdrop" />
       <section className="askem-panel">
         <header className="askem-hero">
-          <div>
-            <p className="askem-eyebrow">Parallel Prompt Control</p>
+          <div className="askem-brand-block">
             <h1>ask&apos;em</h1>
+            <p className="askem-slogan">Send one prompt across official model chats.</p>
           </div>
-          <button className="askem-refresh" onClick={() => void refresh()} disabled={loading}>
-            {loading ? 'Syncing' : 'Refresh'}
-          </button>
+          <div className="askem-hero-actions">
+            <button
+              className={`askem-sync-pill ${globalSyncEnabled ? 'is-active' : 'is-paused'}`}
+              onClick={() => void toggleGlobalSync()}
+              disabled={loading}
+              type="button"
+            >
+              <span className="askem-sync-pill-label">Sync New Prompts</span>
+              <strong>{globalSyncEnabled ? 'On' : 'Off'}</strong>
+            </button>
+            <button className="askem-refresh askem-refresh-subtle" onClick={() => void refresh()} disabled={loading}>
+              {loading ? 'Syncing' : 'Refresh'}
+            </button>
+          </div>
         </header>
 
-        <section className="askem-summary">
-          <div>
-            <span className="askem-summary-label">Groups</span>
-            <strong>{workspaceCount}</strong>
-          </div>
-          <div>
-            <span className="askem-summary-label">Limit</span>
-            <strong>{limit}</strong>
-          </div>
+        <nav className="askem-view-tabs" aria-label="Popup sections">
           <button
-            className={`askem-summary-toggle ${status?.globalSyncEnabled ? 'is-active' : 'is-paused'}`}
-            onClick={() => void toggleGlobalSync()}
-            disabled={loading}
+            className={`askem-view-tab ${activeView === 'home' ? 'is-active' : ''}`}
+            onClick={() => setActiveView('home')}
+            type="button"
           >
-            <span className="askem-summary-label">Global Sync</span>
-            <strong>{status?.globalSyncEnabled ? 'On' : 'Off'}</strong>
+            Home
           </button>
-        </section>
+          <button
+            className={`askem-view-tab ${activeView === 'settings' ? 'is-active' : ''}`}
+            onClick={() => setActiveView('settings')}
+            type="button"
+          >
+            Advanced
+          </button>
+        </nav>
 
-        {atLimit ? (
-          <WarningCard
-            eyebrow="Warning"
-            title="You reached your group limit."
-            body="New sends from a fresh chat will not create another group until you clear one below."
-          />
-        ) : null}
-
-        <DidYouKnowCard />
-
-        <section className="askem-card askem-defaults-card">
-          <div className="askem-defaults-heading">
-            <div className="askem-defaults-copy">
-              <p className="askem-card-label">Default Targets</p>
-              <p className="askem-defaults-title">New groups fan out to the selected providers.</p>
-            </div>
-            <span className="askem-defaults-meta">{selectedProviders.length} selected</span>
-          </div>
-          <p className="askem-defaults-note">Source tab is always included.</p>
-          <div className="askem-default-provider-list">
-            {PROVIDERS.map((provider) => {
-              const active = selectedProviders.includes(provider);
-
-              return (
-                <button
-                  key={provider}
-                  className={`askem-provider-chip ${active ? 'is-active' : ''}`}
-                  onClick={() => void toggleDefaultProvider(provider)}
-                  disabled={loading}
-                >
-                  <span className="askem-provider-chip-dot" aria-hidden="true" />
-                  <span>{provider}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="askem-workspaces">
-          {status?.workspaces.length ? (
-            status.workspaces.map((workspaceSummary) => (
-              <WorkspaceCard
-                key={workspaceSummary.workspace.id}
-                workspaceSummary={workspaceSummary}
-                busyKey={busyKey}
-                onClearWorkspace={clearWorkspace}
-                onClearProvider={clearProvider}
+        {activeView === 'home' ? (
+          <>
+            {atLimit ? (
+              <WarningCard
+                eyebrow="Warning"
+                title="You reached your set limit."
+                body="New sends from a fresh chat will not create another set until you clear one below."
               />
-            ))
-          ) : (
-            <div className="askem-empty">
-              <p>No active groups.</p>
-              <span>Create one by sending the first prompt from a new-chat page.</span>
-            </div>
-          )}
-        </section>
+            ) : null}
 
-        <section className="askem-card askem-logs-card">
-          <div className="askem-debug-top">
-            <div className="askem-debug-copy">
-              <p className="askem-card-label">Debug Mode</p>
-              <h2>Trace Capture</h2>
-              <p className="askem-card-copy">
-                Logging is off by default. Turn it on only when you need a bug report trail, then
-                export the JSON file and send it over.
-              </p>
-            </div>
-            <div className="askem-log-actions">
-              <button
-                className={`askem-provider-chip askem-log-toggle ${status?.debugLoggingEnabled ? 'is-active' : ''}`}
-                onClick={() => void toggleDebugLogging()}
-                disabled={logActionBusy}
-              >
-                <span>Logging</span>
-                <span>{status?.debugLoggingEnabled ? 'on' : 'off'}</span>
-              </button>
-              {status?.debugLoggingEnabled ? (
-                <>
-                  <button className="askem-provider-clear" onClick={() => void copyLogs()} disabled={logActionBusy}>
-                    Copy Logs
-                  </button>
-                  <button className="askem-provider-clear" onClick={() => void downloadLogs()} disabled={logActionBusy}>
-                    Download Logs
-                  </button>
-                  <button className="askem-provider-clear" onClick={() => void clearLogs()} disabled={logActionBusy}>
-                    Clear Logs
-                  </button>
-                </>
-              ) : null}
-            </div>
-          </div>
-          <div className="askem-logs-panel">
-            <div className="askem-logs-list">
-            {status?.debugLoggingEnabled ? (
-              status?.recentLogs.length ? (
-                status.recentLogs.map((log) => <LogRow key={log.id} log={log} />)
+            <section className="askem-section-heading">
+              <div>
+                <p className="askem-card-label">Live Overview</p>
+                <h2>Running Sets</h2>
+              </div>
+              <span className="askem-section-meta">{workspaceCount}</span>
+            </section>
+
+            <section className="askem-workspaces">
+              {status?.workspaces.length ? (
+                status.workspaces.map((workspaceSummary) => (
+                  <WorkspaceCard
+                    key={workspaceSummary.workspace.id}
+                    workspaceSummary={workspaceSummary}
+                    busyKey={busyKey}
+                    onClearWorkspace={clearWorkspace}
+                    onClearProvider={clearProvider}
+                  />
+                ))
               ) : (
-                <p className="askem-logs-empty">Logging is enabled, but no events have been captured yet.</p>
-              )
-            ) : (
-              <p className="askem-logs-empty">Logging is currently off.</p>
-            )}
-            </div>
-          </div>
-        </section>
+                <div className="askem-empty">
+                  <p>No running sets yet.</p>
+                  <span>Open a fresh chat on Claude, ChatGPT, Gemini, or DeepSeek.</span>
+                  <strong>Send your first prompt and ask&apos;em will start a set automatically.</strong>
+                </div>
+              )}
+            </section>
+          </>
+        ) : (
+          <>
+            <section className="askem-card askem-settings-section">
+              <div className="askem-defaults-heading">
+                <div className="askem-defaults-copy">
+                  <p className="askem-card-label">Auto-include Models</p>
+                  <p className="askem-defaults-title">Used when a brand-new set starts.</p>
+                </div>
+                <span className="askem-defaults-meta">{selectedProviders.length} selected</span>
+              </div>
+              <p className="askem-defaults-note">The source tab always stays included.</p>
+              <div className="askem-default-provider-list">
+                {PROVIDERS.map((provider) => {
+                  const active = selectedProviders.includes(provider);
+
+                  return (
+                    <button
+                      key={provider}
+                      className={`askem-provider-chip ${active ? 'is-active' : ''}`}
+                      onClick={() => void toggleDefaultProvider(provider)}
+                      disabled={loading}
+                    >
+                      <span className="askem-provider-chip-dot" aria-hidden="true" />
+                      <span>{provider}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <DidYouKnowCard />
+
+            <section className="askem-card askem-logs-card">
+              <div className="askem-debug-top">
+                <div className="askem-debug-copy">
+                  <p className="askem-card-label">Debug Mode</p>
+                  <h2>Trace Capture</h2>
+                  <p className="askem-card-copy">
+                    Keep this off unless you need a bug report trail.
+                  </p>
+                </div>
+                <div className="askem-log-actions">
+                  <button
+                    className={`askem-provider-chip askem-log-toggle ${status?.debugLoggingEnabled ? 'is-active' : ''}`}
+                    onClick={() => void toggleDebugLogging()}
+                    disabled={logActionBusy}
+                  >
+                    <span>Logging</span>
+                    <span>{status?.debugLoggingEnabled ? 'on' : 'off'}</span>
+                  </button>
+                  {status?.debugLoggingEnabled ? (
+                    <>
+                      <button className="askem-provider-clear" onClick={() => void copyLogs()} disabled={logActionBusy}>
+                        Copy Logs
+                      </button>
+                      <button className="askem-provider-clear" onClick={() => void downloadLogs()} disabled={logActionBusy}>
+                        Download Logs
+                      </button>
+                      <button className="askem-provider-clear" onClick={() => void clearLogs()} disabled={logActionBusy}>
+                        Clear Logs
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+              {status?.debugLoggingEnabled ? (
+                <div className="askem-logs-panel">
+                  <div className="askem-logs-list">
+                    {status?.recentLogs.length ? (
+                      status.recentLogs.map((log) => <LogRow key={log.id} log={log} />)
+                    ) : (
+                      <p className="askem-logs-empty">
+                        Logging is enabled, but no events have been captured yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="askem-settings-note">
+                  Turn it on only when something breaks, then export the JSON file and send it over.
+                </p>
+              )}
+            </section>
+          </>
+        )}
 
         <footer className="askem-footer">
           <span>by </span>
@@ -369,20 +428,25 @@ function WorkspaceCard({
 }) {
   const { workspace, memberStates } = workspaceSummary;
   const visibleProviders = getVisibleWorkspaceProviders(workspace);
+  const allProvidersInactive =
+    visibleProviders.length > 0 &&
+    visibleProviders.every(
+      (provider) => getDisplayMemberState(memberStates[provider] ?? 'inactive') === 'inactive',
+    );
 
   return (
-    <article className="askem-card">
+    <article className="askem-card askem-set-card">
       <div className="askem-card-top">
         <div>
-          <p className="askem-card-label">Group</p>
-          <h2>#{workspace.id.slice(0, 8)}</h2>
+          <p className="askem-card-label">Set</p>
+          <h2>Set #{workspace.id.slice(0, 8)}</h2>
         </div>
         <button
           className="askem-clear-workspace"
           onClick={() => void onClearWorkspace(workspace.id)}
           disabled={busyKey === workspace.id}
         >
-          Delete Group
+          Delete Set
         </button>
       </div>
 
@@ -391,17 +455,28 @@ function WorkspaceCard({
         <span>Updated {formatTime(workspace.updatedAt)}</span>
       </div>
 
+      {allProvidersInactive ? (
+        <p className="askem-set-lifecycle-note">
+          No live tabs are attached. This set will be auto-cleared soon.
+        </p>
+      ) : null}
+
       <div className="askem-provider-grid">
         {visibleProviders.map((provider) => {
           const member = workspace.members[provider];
           const state = getDisplayMemberState(memberStates[provider] ?? 'inactive');
-          const sessionLabel = member?.sessionId ? member.sessionId.slice(0, 8) : 'not connected';
+          const stateLabel = getDisplayMemberStateLabel(memberStates[provider] ?? 'inactive');
+          const outcomeCopy = getMemberOutcomeCopy(memberStates[provider] ?? 'inactive');
+          const sessionLabel = member?.sessionId ? member.sessionId.slice(0, 8) : 'waiting';
 
           return (
             <div className="askem-provider-row" key={`${workspace.id}:${provider}`}>
-              <div>
+              <div className="askem-provider-main">
                 <span className="askem-provider-name">{provider}</span>
-                <span className={`askem-state askem-state-${state}`}>{state}</span>
+                <div className="askem-provider-statusline">
+                  <span className={`askem-state askem-state-${state}`}>{stateLabel}</span>
+                  <span className="askem-provider-subcopy">{outcomeCopy}</span>
+                </div>
               </div>
               <div className="askem-provider-actions">
                 <code>{sessionLabel}</code>
@@ -410,7 +485,7 @@ function WorkspaceCard({
                   onClick={() => void onClearProvider(workspace.id, provider)}
                   disabled={busyKey === `${workspace.id}:${provider}`}
                 >
-                  Remove
+                  Remove from Set
                 </button>
               </div>
             </div>

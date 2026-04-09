@@ -59,6 +59,37 @@ body {
   padding: 20px;
 }
 
+.askem-view-tabs {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-self: flex-start;
+  padding: 5px;
+  border: 1px solid rgba(35, 25, 8, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 251, 245, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.askem-view-tab {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 8px 14px;
+  color: var(--askem-muted);
+  cursor: pointer;
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+.askem-view-tab.is-active {
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--askem-ink);
+  box-shadow: 0 6px 18px rgba(55, 35, 0, 0.08);
+}
+
 .askem-hero {
   display: flex;
   align-items: flex-start;
@@ -66,12 +97,15 @@ body {
   gap: 16px;
 }
 
-.askem-eyebrow {
-  margin: 0 0 6px;
-  color: var(--askem-muted);
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+.askem-brand-block {
+  min-width: 0;
+}
+
+.askem-hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
 
 .askem-hero h1 {
@@ -81,6 +115,14 @@ body {
   line-height: 0.95;
   font-weight: 700;
   letter-spacing: -0.04em;
+}
+
+.askem-slogan {
+  margin: 10px 0 0;
+  max-width: 26ch;
+  color: var(--askem-muted);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .askem-refresh,
@@ -115,48 +157,81 @@ body {
   text-transform: uppercase;
 }
 
-.askem-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+.askem-refresh-subtle {
+  position: relative;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--askem-muted);
+  box-shadow: none;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  transition:
+    color 140ms ease,
+    letter-spacing 140ms ease;
 }
 
-.askem-summary > div,
-.askem-summary-toggle,
+.askem-refresh-subtle::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1px;
+  background: rgba(23, 23, 23, 0.22);
+  transform: scaleX(0.24);
+  transform-origin: right center;
+  opacity: 0;
+  transition:
+    transform 140ms ease,
+    opacity 140ms ease,
+    background 140ms ease;
+}
+
+.askem-refresh-subtle:hover {
+  color: var(--askem-ink);
+  letter-spacing: 0.2em;
+}
+
+.askem-refresh-subtle:hover::after {
+  background: rgba(23, 23, 23, 0.48);
+  transform: scaleX(1);
+  opacity: 1;
+}
+
 .askem-card {
   border: 1px solid var(--askem-line);
   background: var(--askem-panel);
   backdrop-filter: blur(12px);
 }
 
-.askem-summary > div,
-.askem-summary-toggle {
-  border-radius: 18px;
-  padding: 12px 13px;
-  box-shadow: 0 3px 8px rgba(55, 35, 0, 0.035);
-}
-
-.askem-summary-toggle {
-  display: block;
-  width: 100%;
-  text-align: left;
+.askem-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(35, 25, 8, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 9px 11px;
   color: inherit;
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+  box-shadow: 0 10px 24px rgba(55, 35, 0, 0.08);
 }
 
-.askem-summary-toggle:hover {
+.askem-sync-pill:hover {
   border-color: rgba(35, 25, 8, 0.18);
   background: rgba(255, 255, 255, 0.96);
 }
 
-.askem-summary-toggle.is-paused {
+.askem-sync-pill.is-paused {
   border-color: rgba(184, 78, 24, 0.18);
   background:
     linear-gradient(180deg, rgba(255, 249, 244, 0.94), rgba(255, 242, 232, 0.92));
 }
 
-.askem-summary-toggle:disabled {
+.askem-sync-pill:disabled {
   cursor: default;
   opacity: 0.72;
 }
@@ -165,7 +240,6 @@ body {
   box-shadow: 0 18px 35px var(--askem-shadow);
 }
 
-.askem-summary-label,
 .askem-card-label {
   display: block;
   margin-bottom: 8px;
@@ -175,11 +249,23 @@ body {
   text-transform: uppercase;
 }
 
-.askem-summary strong,
 .askem-card h2 {
   font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
   font-size: 20px;
   font-weight: 700;
+}
+
+.askem-sync-pill-label {
+  color: var(--askem-muted);
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.askem-sync-pill strong {
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .askem-facts-card {
@@ -194,6 +280,10 @@ body {
   box-shadow:
     0 16px 30px rgba(55, 35, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.68);
+}
+
+.askem-settings-section {
+  padding: 14px;
 }
 
 .askem-facts-card::before {
@@ -400,6 +490,33 @@ body {
   gap: 12px;
 }
 
+.askem-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.askem-section-heading h2 {
+  margin: 0;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-size: 28px;
+  line-height: 0.98;
+}
+
+.askem-section-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid rgba(35, 25, 8, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--askem-ink);
+  font: 700 12px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+}
+
 .askem-card {
   border-radius: 22px;
   padding: 15px;
@@ -426,6 +543,10 @@ body {
   font-size: 26px;
 }
 
+.askem-set-card {
+  padding: 16px;
+}
+
 .askem-clear-workspace,
 .askem-provider-clear {
   border-radius: 999px;
@@ -439,9 +560,32 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 12px 0 14px;
-  color: var(--askem-muted);
-  font-size: 12px;
+  margin: 10px 0 14px;
+  color: rgba(107, 100, 89, 0.84);
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.86;
+}
+
+.askem-set-lifecycle-note {
+  position: relative;
+  margin: -2px 0 14px;
+  padding-left: 12px;
+  color: #8a5a00;
+  font: 700 10px/1.45 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.askem-set-lifecycle-note::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(156, 107, 0, 0.72), rgba(156, 107, 0, 0.18));
 }
 
 .askem-provider-grid {
@@ -540,7 +684,7 @@ body {
 
 .askem-provider-row {
   border-top: 1px solid rgba(35, 25, 8, 0.08);
-  padding-top: 8px;
+  padding-top: 10px;
 }
 
 .askem-provider-row:first-child {
@@ -550,10 +694,21 @@ body {
 
 .askem-provider-name {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
   font: 700 12px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.askem-provider-main {
+  min-width: 0;
+}
+
+.askem-provider-statusline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .askem-state {
@@ -586,15 +741,25 @@ body {
   font: 600 11px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
 }
 
+.askem-provider-subcopy {
+  color: var(--askem-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.askem-provider-actions .askem-provider-clear {
+  white-space: nowrap;
+}
+
 .askem-empty {
   display: grid;
   place-items: center;
-  gap: 8px;
-  min-height: 180px;
+  gap: 10px;
+  min-height: 210px;
   border: 1px dashed rgba(35, 25, 8, 0.18);
   border-radius: 22px;
   background: rgba(255, 252, 246, 0.52);
-  padding: 18px;
+  padding: 22px 24px;
   text-align: center;
 }
 
@@ -608,6 +773,15 @@ body {
   color: var(--askem-muted);
   font-size: 13px;
   line-height: 1.5;
+  max-width: 34ch;
+}
+
+.askem-empty strong {
+  color: #3f3a31;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 600;
+  max-width: 34ch;
 }
 
 .askem-logs-card {
@@ -626,8 +800,8 @@ body {
 }
 
 .askem-debug-copy .askem-card-copy {
-  max-width: 38ch;
-  margin-top: 12px;
+  max-width: 32ch;
+  margin-top: 8px;
 }
 
 .askem-logs-panel {
@@ -730,6 +904,13 @@ body {
 
 .askem-logs-empty {
   margin: 0;
+}
+
+.askem-settings-note {
+  margin: 14px 0 0;
+  color: var(--askem-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 @media (max-width: 440px) {
