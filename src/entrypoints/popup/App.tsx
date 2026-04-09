@@ -652,7 +652,7 @@ function WorkspaceCard({
           const state = getDisplayMemberState(memberStates[provider] ?? 'inactive');
           const stateLabel = getDisplayMemberStateLabel(memberStates[provider] ?? 'inactive');
           const outcomeCopy = getMemberOutcomeCopy(memberStates[provider] ?? 'inactive');
-          const sessionLabel = member?.sessionId ? member.sessionId.slice(0, 8) : 'starting';
+          const sessionLabel = member?.sessionId ? member.sessionId.slice(0, 8) : 'not connected';
 
           return (
             <div className="askem-provider-row" key={`${workspace.id}:${provider}`}>
