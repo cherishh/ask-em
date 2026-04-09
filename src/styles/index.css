@@ -787,6 +787,11 @@ body {
   color: var(--askem-accent);
 }
 
+.askem-state-sync-paused {
+  background: rgba(156, 107, 0, 0.12);
+  color: var(--askem-warn);
+}
+
 .askem-provider-actions code {
   color: var(--askem-muted);
   font: 600 11px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;

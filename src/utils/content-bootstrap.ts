@@ -29,6 +29,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     providerEnabled: true,
     globalSyncEnabled: true,
     standaloneReady: false,
+    canStartNewSet: true,
   };
 
   let suppressSubmissionsUntil = 0;
@@ -80,6 +81,18 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     });
   };
 
+  const getStandaloneUiState = (context: UiContext): 'idle' | 'blocked' => {
+    if (!context.standaloneReady || context.workspaceId) {
+      return 'idle';
+    }
+
+    if (!context.globalSyncEnabled || !context.canStartNewSet) {
+      return 'blocked';
+    }
+
+    return 'idle';
+  };
+
   const reportPresence = async (kind: 'HELLO' | 'HEARTBEAT') => {
     const status = adapter.getStatus();
     const response =
@@ -88,11 +101,13 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
             workspaceId?: string | null;
             providerEnabled?: boolean;
             globalSyncEnabled?: boolean;
+            canStartNewSet?: boolean;
           }>(buildHelloMessage(adapter))
         : await sendRuntimeMessage<{
             workspaceId?: string | null;
             providerEnabled?: boolean;
             globalSyncEnabled?: boolean;
+            canStartNewSet?: boolean;
           }>(buildHeartbeatMessage(adapter));
 
     const standaloneVisible = shouldShowStandaloneIndicator(adapter);
@@ -101,6 +116,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? false) : true,
       globalSyncEnabled: response?.globalSyncEnabled ?? true,
       standaloneReady: standaloneVisible,
+      canStartNewSet: response?.canStartNewSet ?? true,
     };
     ui.setContext(uiContext);
     ui.setVisible(Boolean(response?.workspaceId) || standaloneVisible);
@@ -114,7 +130,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     }
 
     if (!response?.workspaceId && status.pageKind === 'new-chat') {
-      ui.setState('idle');
+      ui.setState(getStandaloneUiState(uiContext));
     }
   };
 
@@ -151,7 +167,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
         globalSyncEnabled: nextEnabled,
       };
       ui.setContext(uiContext);
-      ui.setState('idle');
+      ui.setState(getStandaloneUiState(uiContext));
     },
     async loadWorkspaceContext(workspaceId) {
       return await sendRuntimeMessage<WorkspaceContextResponseMessage>({
@@ -191,6 +207,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
       synced?: boolean;
       providerEnabled?: boolean;
       globalSyncEnabled?: boolean;
+      canStartNewSet?: boolean;
     }>(buildUserSubmitMessage(status, content));
 
     uiContext = {
@@ -198,12 +215,23 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? true) : true,
       globalSyncEnabled: response?.globalSyncEnabled ?? uiContext.globalSyncEnabled,
       standaloneReady: shouldShowStandaloneIndicator(adapter),
+      canStartNewSet: response?.canStartNewSet ?? uiContext.canStartNewSet,
     };
     ui.setContext(uiContext);
     ui.setVisible(Boolean(uiContext.workspaceId) || shouldShowStandaloneIndicator(adapter));
-    ui.setState('idle');
+    ui.setState(getStandaloneUiState(uiContext));
 
-    window.setTimeout(() => ui.setState(uiContext.providerEnabled ? 'idle' : 'blocked'), 1_500);
+    window.setTimeout(
+      () =>
+        ui.setState(
+          uiContext.workspaceId
+            ? uiContext.providerEnabled
+              ? 'idle'
+              : 'blocked'
+            : getStandaloneUiState(uiContext),
+        ),
+      1_500,
+    );
   };
 
   const unsubscribe = adapter.subscribeToUserSubmissions?.((content) => {

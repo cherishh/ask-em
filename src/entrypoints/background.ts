@@ -275,6 +275,7 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
       workspaceId: null,
       providerEnabled: false,
       globalSyncEnabled: localState.globalSyncEnabled,
+      canStartNewSet: canStartNewSet(localState),
     };
   }
 
@@ -308,6 +309,7 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
     workspaceId: workspaceLookup.workspaceId,
     providerEnabled: isProviderEnabled(workspaceLookup.workspace.enabledProviders, message.provider),
     globalSyncEnabled: localState.globalSyncEnabled,
+    canStartNewSet: canStartNewSet(localState),
     enabledProviders: workspaceLookup.workspace.enabledProviders,
   };
 }
@@ -429,6 +431,7 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
       synced: false,
       workspaceId: null,
       globalSyncEnabled: localState.globalSyncEnabled,
+      canStartNewSet: canStartNewSet(localState),
     };
   }
 
@@ -448,6 +451,7 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
       workspaceId: workspaceLookup.workspaceId,
       providerEnabled: false,
       globalSyncEnabled: localState.globalSyncEnabled,
+      canStartNewSet: canStartNewSet(localState),
     };
   }
 
@@ -498,6 +502,7 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
       workspaceId: workspaceLookup.workspaceId,
       providerEnabled: true,
       globalSyncEnabled: false,
+      canStartNewSet: canStartNewSet(localState),
     };
   }
 
@@ -509,6 +514,7 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
     workspaceId: workspaceLookup.workspaceId,
     providerEnabled: true,
     globalSyncEnabled: true,
+    canStartNewSet: canStartNewSet(localState),
   };
 }
 
@@ -559,6 +565,10 @@ function buildWorkspaceSummary(
     workspace,
     memberStates,
   };
+}
+
+function canStartNewSet(localState: Awaited<ReturnType<typeof getLocalState>>): boolean {
+  return getWorkspacesOrdered(localState).length < MAX_WORKSPACES;
 }
 
 async function handleGetWorkspaceContext(message: GetWorkspaceContextMessage) {

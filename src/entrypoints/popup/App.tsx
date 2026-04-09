@@ -1,5 +1,4 @@
 import { startTransition, useEffect, useState } from 'react';
-import { DidYouKnowCard } from './components/DidYouKnowCard';
 import { ALL_PROVIDERS as PROVIDERS } from '../../runtime/protocol';
 import type {
   DebugLogEntry,
@@ -41,7 +40,24 @@ function getDisplayMemberState(state: GroupMemberState): Exclude<GroupMemberStat
   return state === 'stale' ? 'active' : state;
 }
 
-function getDisplayMemberStateLabel(state: GroupMemberState): string {
+function getDisplayMemberStateTone(
+  state: GroupMemberState,
+  enabled: boolean,
+): 'active' | 'inactive' | 'pending' | 'sync-paused' {
+  const displayState = getDisplayMemberState(state);
+
+  if (displayState === 'inactive' || displayState === 'pending') {
+    return displayState;
+  }
+
+  if (!enabled) {
+    return 'sync-paused';
+  }
+
+  return displayState;
+}
+
+function getDisplayMemberStateLabel(state: GroupMemberState, enabled: boolean): string {
   const displayState = getDisplayMemberState(state);
 
   if (displayState === 'inactive') {
@@ -52,18 +68,30 @@ function getDisplayMemberStateLabel(state: GroupMemberState): string {
     return 'Connecting';
   }
 
+  if (!enabled) {
+    return 'Sync Paused';
+  }
+
   return 'Active';
 }
 
-function getMemberOutcomeCopy(state: GroupMemberState): string {
+function getMemberOutcomeCopy(state: GroupMemberState, enabled: boolean): string {
   const displayState = getDisplayMemberState(state);
 
   if (displayState === 'inactive') {
+    if (!enabled) {
+      return 'This model has no open tab, and sync is paused, so it will not reopen on the next prompt.';
+    }
+
     return 'Reopens on the next synced prompt';
   }
 
   if (displayState === 'pending') {
     return 'Waiting for this model to connect';
+  }
+
+  if (!enabled) {
+    return 'Sync is paused for this model, so the next prompt will not be sent here.';
   }
 
   return 'Next prompt will be synced';
@@ -410,8 +438,6 @@ export default function App() {
               </button>
             </section>
 
-            <DidYouKnowCard />
-
             <section className="askem-card askem-logs-card">
               <div className="askem-debug-top">
                 <div className="askem-debug-copy">
@@ -461,16 +487,16 @@ export default function App() {
                 </p>
               )}
             </section>
+
+            <footer className="askem-footer">
+              <span>by </span>
+              <a href="https://tuxi.dev/" target="_blank" rel="noreferrer">
+                Tuxi
+              </a>
+              <span> · one77r@gmail.com</span>
+            </footer>
           </>
         )}
-
-        <footer className="askem-footer">
-          <span>by </span>
-          <a href="https://tuxi.dev/" target="_blank" rel="noreferrer">
-            Tuxi
-          </a>
-          <span> · one77r@gmail.com</span>
-        </footer>
       </section>
 
       {requestModalOpen ? (
@@ -623,7 +649,6 @@ function WorkspaceCard({
     <article className="askem-card askem-set-card">
       <div className="askem-card-top">
         <div>
-          <p className="askem-card-label">Set</p>
           <h2>Set #{workspace.id.slice(0, 8)}</h2>
         </div>
         <button
@@ -649,9 +674,10 @@ function WorkspaceCard({
       <div className="askem-provider-grid">
         {visibleProviders.map((provider) => {
           const member = workspace.members[provider];
-          const state = getDisplayMemberState(memberStates[provider] ?? 'inactive');
-          const stateLabel = getDisplayMemberStateLabel(memberStates[provider] ?? 'inactive');
-          const outcomeCopy = getMemberOutcomeCopy(memberStates[provider] ?? 'inactive');
+          const enabled = workspace.enabledProviders.includes(provider);
+          const stateTone = getDisplayMemberStateTone(memberStates[provider] ?? 'inactive', enabled);
+          const stateLabel = getDisplayMemberStateLabel(memberStates[provider] ?? 'inactive', enabled);
+          const outcomeCopy = getMemberOutcomeCopy(memberStates[provider] ?? 'inactive', enabled);
           const sessionLabel = member?.sessionId ? member.sessionId.slice(0, 8) : 'not connected';
 
           return (
@@ -659,7 +685,7 @@ function WorkspaceCard({
               <div className="askem-provider-main">
                 <span className="askem-provider-name">{provider}</span>
                 <div className="askem-provider-statusline">
-                  <span className={`askem-state askem-state-${state}`}>{stateLabel}</span>
+                  <span className={`askem-state askem-state-${stateTone}`}>{stateLabel}</span>
                   <span className="askem-provider-subcopy">{outcomeCopy}</span>
                 </div>
               </div>

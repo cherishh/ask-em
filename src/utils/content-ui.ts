@@ -14,6 +14,7 @@ export type UiContext = {
   providerEnabled: boolean;
   globalSyncEnabled: boolean;
   standaloneReady: boolean;
+  canStartNewSet: boolean;
 };
 
 export type UiHandlers = {
@@ -213,6 +214,19 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         pointer-events: auto;
       }
 
+      .ask-em-sync-panel[data-mode="tooltip"] {
+        width: auto;
+        max-width: 240px;
+        padding: 10px 12px 11px;
+        border-radius: 14px;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        background: rgba(255, 252, 246, 0.98);
+        box-shadow:
+          0 12px 26px rgba(15, 23, 42, 0.1),
+          0 2px 8px rgba(15, 23, 42, 0.04);
+        backdrop-filter: blur(10px) saturate(1.08);
+      }
+
       .ask-em-sync-panel::before {
         content: "";
         position: absolute;
@@ -231,6 +245,10 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
 
       .ask-em-sync-panel > * {
         position: relative;
+      }
+
+      .ask-em-sync-panel[data-mode="tooltip"]::before {
+        display: none;
       }
 
       .ask-em-panel-top {
@@ -281,6 +299,13 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         font: 600 11px/1.45 "Avenir Next", "Segoe UI", sans-serif;
       }
 
+      .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-note {
+        margin: 0;
+        color: rgba(53, 49, 44, 0.88);
+        font: 600 13px/1.3 "Avenir Next", "Segoe UI", sans-serif;
+        letter-spacing: -0.01em;
+      }
+
       .ask-em-panel-shortcut {
         display: flex;
         align-items: center;
@@ -299,6 +324,43 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         margin-top: 10px;
         padding-top: 0;
         border-top: 0;
+      }
+
+      .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut {
+        justify-content: flex-start;
+        gap: 8px;
+        margin-top: 8px;
+        padding-top: 0;
+        border-top: 0;
+        color: rgba(107, 100, 89, 0.72);
+        font: 600 10px/1.2 "Avenir Next", "Segoe UI", sans-serif;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut-label {
+        white-space: nowrap;
+      }
+
+      .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut-keys {
+        gap: 4px;
+      }
+
+      .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut-plus {
+        color: rgba(120, 113, 108, 0.54);
+      }
+
+      .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut kbd {
+        min-width: 18px;
+        min-height: 18px;
+        padding: 0 6px;
+        border-radius: 6px;
+        border-color: rgba(15, 23, 42, 0.1);
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.9),
+          0 2px 4px rgba(15, 23, 42, 0.06);
+        font-size: 10px;
       }
 
       .ask-em-panel-shortcut-keys {
@@ -501,12 +563,15 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     providerEnabled: true,
     globalSyncEnabled: true,
     standaloneReady: false,
+    canStartNewSet: true,
   };
   const toggleShortcutKeys = getToggleShortcutKeys();
   const globalToggleShortcutKeys = getGlobalToggleShortcutKeys();
 
   let panelPinned = false;
   let currentProviderToggleBusy = false;
+  let transientLabel: string | null = null;
+  let transientLabelTimeout: number | null = null;
 
   const updateLabel = (text: string) => {
     if (label) {
@@ -514,15 +579,63 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     }
   };
 
-  const getDefaultLabel = () =>
-    !context.globalSyncEnabled
-      ? 'global paused'
-      : context.workspaceId
-      ? context.providerEnabled ? 'sync' : 'paused'
-      : 'ready';
+  const getDefaultLabel = () => {
+    if (!context.workspaceId) {
+      if (!context.globalSyncEnabled) {
+        return 'sync off';
+      }
+
+      if (!context.canStartNewSet) {
+        return 'set limit reached';
+      }
+
+      return 'sync ready';
+    }
+
+    if (!context.globalSyncEnabled || !context.providerEnabled) {
+      return 'current model sync paused';
+    }
+
+    return 'current model is in sync';
+  };
+
+  const syncLabel = (nextLabel?: string) => {
+    updateLabel(transientLabel ?? nextLabel ?? getDefaultLabel());
+  };
+
+  const setTransientLabel = (nextLabel: string, durationMs = 1_500) => {
+    transientLabel = nextLabel;
+    updateLabel(nextLabel);
+
+    if (transientLabelTimeout !== null) {
+      window.clearTimeout(transientLabelTimeout);
+    }
+
+    transientLabelTimeout = window.setTimeout(() => {
+      transientLabel = null;
+      transientLabelTimeout = null;
+      syncLabel();
+    }, durationMs);
+  };
 
   const setPanelVisible = (visible: boolean) => {
     panel.dataset.visible = String(visible && Boolean(context.workspaceId || context.standaloneReady));
+  };
+
+  const renderTooltip = (message: string, shortcutKeys?: string[]) => {
+    panel.dataset.mode = 'tooltip';
+    panel.innerHTML = `
+      <p class="ask-em-panel-note">${message}</p>
+      ${
+        shortcutKeys
+          ? `<div class="ask-em-panel-shortcut is-standalone">
+              <span class="ask-em-panel-shortcut-label">Shortcut</span>
+              ${renderShortcutKeysHtml(shortcutKeys)}
+            </div>`
+          : ''
+      }
+    `;
+    setPanelVisible(true);
   };
 
   const getProviderMeta = (
@@ -548,33 +661,17 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     const workspaceSummary = response?.workspaceSummary;
     if (!workspaceSummary || !context.workspaceId) {
       if (context.standaloneReady && !context.workspaceId) {
-        const badgeClass = context.globalSyncEnabled
-          ? 'ask-em-panel-badge'
-          : 'ask-em-panel-badge is-paused';
-        const badgeLabel = context.globalSyncEnabled ? 'Global Sync On' : 'Global Sync Off';
-        const note = context.globalSyncEnabled
-          ? 'New sends can create or fan out to groups.'
-          : 'New sends stay local and will not create or fan out to groups.';
-
-        panel.innerHTML = `
-          <div class="ask-em-panel-top">
-            <span class="${badgeClass}">${badgeLabel}</span>
-          </div>
-          <p class="ask-em-panel-note">${note}</p>
-          <div class="ask-em-panel-shortcut is-standalone">
-            <span>Toggle global sync</span>
-            ${renderShortcutKeysHtml(globalToggleShortcutKeys)}
-          </div>
-        `;
-        setPanelVisible(true);
+        renderTooltip('Click to toggle global sync.', globalToggleShortcutKeys);
         return;
       }
 
       panel.innerHTML = '';
+      panel.dataset.mode = '';
       setPanelVisible(false);
       return;
     }
 
+    panel.dataset.mode = '';
     const visibleProviders = getVisibleWorkspaceProviders(workspaceSummary.workspace);
     const badgeClass = response.globalSyncEnabled ? 'ask-em-panel-badge' : 'ask-em-panel-badge is-paused';
     const badgeLabel = response.globalSyncEnabled ? 'Live Group' : 'Global Pause';
@@ -656,8 +753,8 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       await handlers.onWorkspaceProviderToggle(adapter.name, nextEnabled);
       context.providerEnabled = nextEnabled;
       mount.dataset.providerEnabled = String(nextEnabled);
-      updateLabel(getDefaultLabel());
       await refreshPanel();
+      setTransientLabel(nextEnabled ? 'current model sync resumed' : 'current model sync paused', 2_000);
     } finally {
       setCurrentProviderToggleBusy(false);
     }
@@ -675,7 +772,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       await handlers.onGlobalSyncToggle(nextEnabled);
       context.globalSyncEnabled = nextEnabled;
       mount.dataset.globalSyncEnabled = String(nextEnabled);
-      updateLabel(getDefaultLabel());
+      setTransientLabel(nextEnabled ? 'global sync ready' : 'global sync off');
     } finally {
       setCurrentProviderToggleBusy(false);
     }
@@ -696,12 +793,12 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
 
     context.globalSyncEnabled = response.globalSyncEnabled;
     mount.dataset.globalSyncEnabled = String(context.globalSyncEnabled);
-    updateLabel(getDefaultLabel());
+    syncLabel();
     renderPanel(response);
   };
 
   const openPanel = async (pin = false) => {
-    if (!context.workspaceId && !context.standaloneReady) {
+    if (!context.workspaceId) {
       return;
     }
 
@@ -740,7 +837,12 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       return;
     }
 
-    void openPanel(false);
+    if (context.workspaceId) {
+      renderTooltip('Click to manage set.');
+      return;
+    }
+
+    renderTooltip('Click to toggle global sync.', globalToggleShortcutKeys);
   });
 
   shell.addEventListener('mouseleave', () => {
@@ -774,9 +876,11 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         if (provider === adapter.name) {
           context.providerEnabled = nextEnabled;
           mount.dataset.providerEnabled = String(nextEnabled);
-          updateLabel(getDefaultLabel());
         }
         await refreshPanel();
+        if (provider === adapter.name) {
+          setTransientLabel(nextEnabled ? 'current model sync resumed' : 'current model sync paused', 2_000);
+        }
       })
       .finally(() => {
         toggle.dataset.busy = 'false';
@@ -830,13 +934,24 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     },
     setState(state: UiState, labelText?: string) {
       mount.dataset.state = state;
-      updateLabel(labelText ?? getDefaultLabel());
+      if (labelText) {
+        transientLabel = null;
+        if (transientLabelTimeout !== null) {
+          window.clearTimeout(transientLabelTimeout);
+          transientLabelTimeout = null;
+        }
+        updateLabel(labelText);
+        return;
+      }
+
+      syncLabel();
     },
     setContext(nextContext: UiContext) {
       context.workspaceId = nextContext.workspaceId;
       context.providerEnabled = nextContext.providerEnabled;
       context.globalSyncEnabled = nextContext.globalSyncEnabled;
       context.standaloneReady = nextContext.standaloneReady;
+      context.canStartNewSet = nextContext.canStartNewSet;
       mount.dataset.providerEnabled = String(nextContext.providerEnabled);
       mount.dataset.globalSyncEnabled = String(nextContext.globalSyncEnabled);
       mount.dataset.interactive = String(Boolean(nextContext.workspaceId || nextContext.standaloneReady));
@@ -846,7 +961,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         renderPanel(null);
       }
 
-      updateLabel(getDefaultLabel());
+      syncLabel();
     },
   };
 }
