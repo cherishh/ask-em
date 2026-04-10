@@ -145,7 +145,7 @@ src/
 - [ ] 实现 `lookupWorkspaceBySession`
 - [ ] 实现 `clearWorkspace`
 - [ ] 实现 `clearWorkspaceProvider`
-- [ ] 实现 `enforceWorkspaceLimit(3)`
+- [ ] 实现 `enforceWorkspaceLimit(2)`
 - [ ] 实现 pending workspace 清理逻辑
 
 完成标准：
@@ -255,7 +255,7 @@ src/
 任务：
 
 - [ ] 展示当前 workspace 数量
-- [ ] 展示是否已达 3 个上限
+- [ ] 展示是否已达 2 个上限
 - [ ] 展示每个 workspace 绑定了哪些 provider
 - [ ] 展示 provider 状态：正常 / stale / 缺失 / 待恢复
 - [ ] 支持清空整个 workspace
@@ -369,7 +369,7 @@ provider URL 规则变化，导致 `extractSessionId` 失效。
 - [ ] 多 workspace 下同一 provider 不串写
 - [ ] 目标 tab 丢失后可恢复或重绑定
 - [ ] 恢复失败时只同步当前消息
-- [ ] workspace 上限为 3，超限时 popup 提示
+- [ ] workspace 上限为 2，超限时 popup 提示
 - [ ] 支持清空整个 workspace
 - [ ] 支持清空单个 provider 绑定
 - [ ] `pnpm compile` 通过

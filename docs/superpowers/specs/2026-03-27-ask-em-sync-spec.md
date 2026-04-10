@@ -66,7 +66,7 @@ workspace 内会记录每个 provider 当前绑定的 conversation。
 
 1. 当前页面被 adapter 判定为 `new-chat`
 2. 当前页面还没有真实 `sessionId`
-3. 当前 workspace 总数少于 3
+3. 当前 workspace 总数少于 2
 
 如果用户在一个【已有 session】中发送消息，且该 session 不属于任何 workspace：
 
@@ -101,14 +101,14 @@ workspace 内会记录每个 provider 当前绑定的 conversation。
 - 不补历史
 - 后续从新的会话继续同步
 
-### 2.6 最多保留 3 个 workspace
+### 2.6 最多保留 2 个 workspace
 
-系统最多只保留最近 3 个 workspace。
+系统最多只保留最近 2 个 workspace。
 
-当数量达到 3 时：
+当数量达到 2 时：
 
 - 不自动淘汰旧 workspace
-- 不自动创建第 4 个 workspace
+- 不自动创建第 3 个 workspace
 - popup 必须明确提示用户先清理旧 workspace
 
 ### 2.7 支持手动清理
@@ -625,7 +625,7 @@ stale 判定建议：
 popup 至少必须展示：
 
 1. 当前 workspace 数量
-2. 是否已达到 3 个上限
+2. 是否已达到 2 个上限
 3. 每个 workspace 当前绑定了哪些 provider
 4. 每个 provider 绑定是否正常、stale、缺失或需要重建
 
@@ -679,5 +679,5 @@ adapter 不负责：
 4. 不会误写入用户无关对话
 5. 多个 workspace 下，同一 provider 不会串写
 6. 恢复失败时只同步当前消息，不补历史
-7. workspace 最多保留 3 个，超限时明确提示用户
+7. workspace 最多保留 2 个，超限时明确提示用户
 8. 支持手动清空整个 workspace 或单个 provider 绑定

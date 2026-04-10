@@ -335,54 +335,65 @@ async function deliverPromptToWorkspaceTargets(
 
   await Promise.allSettled(
     providers.map(async (provider) => {
-      const target = await resolveDeliveryTarget(workspace, provider, sessionState);
-      await upsertClaimedTab(workspaceId, provider, {
-        provider,
-        workspaceId,
-        tabId: target.tabId,
-        lastSeenAt: Date.now(),
-        pageState: 'not-ready',
-        currentUrl: target.expectedUrl ?? '',
-        sessionId: target.expectedSessionId,
-      });
+      try {
+        const target = await resolveDeliveryTarget(workspace, provider, sessionState);
+        await upsertClaimedTab(workspaceId, provider, {
+          provider,
+          workspaceId,
+          tabId: target.tabId,
+          lastSeenAt: Date.now(),
+          pageState: 'not-ready',
+          currentUrl: target.expectedUrl ?? '',
+          sessionId: target.expectedSessionId,
+        });
 
-      await logDebug({
-        level: 'info',
-        scope: 'background',
-        provider,
-        workspaceId,
-        message: 'Resolved delivery target',
-        detail: `${target.resolution}: ${target.reason}`,
-      });
-
-      await logDebug({
-        level: 'info',
-        scope: 'background',
-        provider,
-        workspaceId,
-        message: 'Delivering prompt',
-        detail: `${message.provider} -> ${provider} @ ${target.expectedSessionId ?? 'new-chat'}`,
-      });
-
-      const response = await chrome.tabs.sendMessage(target.tabId, {
-        type: 'DELIVER_PROMPT',
-        workspaceId,
-        provider,
-        content: message.content,
-        expectedSessionId: target.expectedSessionId,
-        expectedUrl: target.expectedUrl,
-        timestamp: Date.now(),
-      });
-
-      const payload = response as { ok?: boolean; blocked?: boolean; error?: string } | undefined;
-      if (!payload?.ok) {
         await logDebug({
-          level: payload?.blocked ? 'warn' : 'error',
+          level: 'info',
           scope: 'background',
           provider,
           workspaceId,
-          message: payload?.blocked ? 'Prompt delivery blocked' : 'Prompt delivery failed',
-          detail: payload?.error,
+          message: 'Resolved delivery target',
+          detail: `${target.resolution}: ${target.reason}`,
+        });
+
+        await logDebug({
+          level: 'info',
+          scope: 'background',
+          provider,
+          workspaceId,
+          message: 'Delivering prompt',
+          detail: `${message.provider} -> ${provider} @ ${target.expectedSessionId ?? 'new-chat'}`,
+        });
+
+        const response = await chrome.tabs.sendMessage(target.tabId, {
+          type: 'DELIVER_PROMPT',
+          workspaceId,
+          provider,
+          content: message.content,
+          expectedSessionId: target.expectedSessionId,
+          expectedUrl: target.expectedUrl,
+          timestamp: Date.now(),
+        });
+
+        const payload = response as { ok?: boolean; blocked?: boolean; error?: string } | undefined;
+        if (!payload?.ok) {
+          await logDebug({
+            level: payload?.blocked ? 'warn' : 'error',
+            scope: 'background',
+            provider,
+            workspaceId,
+            message: payload?.blocked ? 'Prompt delivery blocked' : 'Prompt delivery failed',
+            detail: payload?.error,
+          });
+        }
+      } catch (error) {
+        await logDebug({
+          level: 'error',
+          scope: 'background',
+          provider,
+          workspaceId,
+          message: 'Prompt delivery threw',
+          detail: error instanceof Error ? error.message : String(error),
         });
       }
     }),
