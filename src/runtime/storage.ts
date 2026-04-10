@@ -1,5 +1,6 @@
 import {
   createDefaultEnabledProviders,
+  DEFAULT_SHORTCUTS,
   type DebugLogEntry,
   STORAGE_KEYS,
   type ClaimedTab,
@@ -14,6 +15,7 @@ export const DEFAULT_LOCAL_STATE: LocalState = {
   globalSyncEnabled: true,
   debugLoggingEnabled: false,
   defaultEnabledProviders: createDefaultEnabledProviders(),
+  shortcuts: DEFAULT_SHORTCUTS,
   workspaces: {},
   workspaceIndex: {},
   debugLogs: [],
@@ -50,16 +52,19 @@ function isWorkspaceIndexEqual(left: LocalState['workspaceIndex'], right: LocalS
 }
 
 function normalizeLocalState(state: LocalState): LocalState {
-  const workspaceIndex = rebuildWorkspaceIndex(state.workspaces);
+  let normalized = state;
 
-  if (isWorkspaceIndexEqual(state.workspaceIndex, workspaceIndex)) {
-    return state;
+  if (!normalized.shortcuts) {
+    normalized = { ...normalized, shortcuts: DEFAULT_SHORTCUTS };
   }
 
-  return {
-    ...state,
-    workspaceIndex,
-  };
+  const workspaceIndex = rebuildWorkspaceIndex(normalized.workspaces);
+
+  if (!isWorkspaceIndexEqual(normalized.workspaceIndex, workspaceIndex)) {
+    normalized = { ...normalized, workspaceIndex };
+  }
+
+  return normalized;
 }
 
 export async function getLocalState(): Promise<LocalState> {

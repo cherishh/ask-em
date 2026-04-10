@@ -276,6 +276,7 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
       providerEnabled: false,
       globalSyncEnabled: localState.globalSyncEnabled,
       canStartNewSet: canStartNewSet(localState),
+      shortcuts: localState.shortcuts,
     };
   }
 
@@ -311,6 +312,7 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
     globalSyncEnabled: localState.globalSyncEnabled,
     canStartNewSet: canStartNewSet(localState),
     enabledProviders: workspaceLookup.workspace.enabledProviders,
+    shortcuts: localState.shortcuts,
   };
 }
 
@@ -417,10 +419,12 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
 
   if (!workspaceLookup && canCreateWorkspaceFromSubmit(localState, message)) {
     const enabledProviders = getDefaultEnabledProviderList(localState, message.provider);
+    const label = message.content.trim().slice(0, 80) || undefined;
     localState = createPendingWorkspace(localState, {
       sourceProvider: message.provider,
       sourceUrl: message.currentUrl,
       enabledProviders,
+      label,
     });
 
     const workspace = getWorkspacesOrdered(localState)[0];
@@ -542,6 +546,7 @@ async function handleGetStatus(): Promise<StatusResponseMessage> {
     debugLoggingEnabled: localState.debugLoggingEnabled,
     workspaceLimit: MAX_WORKSPACES,
     defaultEnabledProviders: localState.defaultEnabledProviders,
+    shortcuts: localState.shortcuts,
     workspaces,
     recentLogs: localState.debugLogs.slice(-20).reverse(),
   };
@@ -691,6 +696,18 @@ async function handleSetWorkspaceProviderEnabled(
   return { ok: true };
 }
 
+async function handleSetShortcuts(
+  message: Extract<RuntimeMessage, { type: 'SET_SHORTCUTS' }>,
+) {
+  const localState = await getLocalState();
+  await setLocalState({
+    ...localState,
+    shortcuts: message.shortcuts,
+  });
+  await notifyAllTabsToRefreshContext();
+  return { ok: true };
+}
+
 async function handleSetGlobalSyncEnabled(
   message: Extract<RuntimeMessage, { type: 'SET_GLOBAL_SYNC_ENABLED' }>,
 ) {
@@ -793,6 +810,9 @@ export default defineBackground(() => {
           return;
         case 'SET_GLOBAL_SYNC_ENABLED':
           sendResponse(await handleSetGlobalSyncEnabled(message));
+          return;
+        case 'SET_SHORTCUTS':
+          sendResponse(await handleSetShortcuts(message));
           return;
         case 'SET_DEBUG_LOGGING_ENABLED':
           sendResponse(await handleSetDebugLoggingEnabled(message));

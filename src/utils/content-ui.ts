@@ -2,9 +2,12 @@ import type { ProviderAdapter } from '../adapters/types';
 import type {
   GroupMemberState,
   Provider,
+  ShortcutBinding,
+  ShortcutConfig,
   WorkspaceContextResponseMessage,
   WorkspaceSummary,
 } from '../runtime/protocol';
+import { DEFAULT_SHORTCUTS } from '../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../runtime/workspace';
 
 export type UiState = 'idle' | 'listening' | 'syncing' | 'blocked';
@@ -15,6 +18,7 @@ export type UiContext = {
   globalSyncEnabled: boolean;
   standaloneReady: boolean;
   canStartNewSet: boolean;
+  shortcuts: ShortcutConfig;
 };
 
 export type UiHandlers = {
@@ -24,18 +28,50 @@ export type UiHandlers = {
   onRefreshContext: () => Promise<void>;
 };
 
-const TOGGLE_SHORTCUT_KEY = '.';
-
 function isApplePlatform(): boolean {
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 }
 
-function getToggleShortcutKeys(): string[] {
-  return isApplePlatform() ? ['Cmd', '.'] : ['Ctrl', '.'];
+function matchesShortcut(event: KeyboardEvent, binding: ShortcutBinding): boolean {
+  const apple = isApplePlatform();
+  let modifierMatch: boolean;
+  if (apple) {
+    // On Apple: if binding has meta or ctrl (but not both), treat it as "primary modifier" = Cmd
+    // If binding explicitly has ctrl only (recorded via physical Ctrl), match Ctrl exactly
+    if (binding.meta && !binding.ctrl) {
+      modifierMatch = event.metaKey && !event.ctrlKey;
+    } else if (binding.ctrl && !binding.meta) {
+      // Default shortcuts use ctrl=true for cross-platform compat → map to Cmd on Apple
+      modifierMatch = event.metaKey && !event.ctrlKey;
+    } else {
+      modifierMatch = event.metaKey === binding.meta && event.ctrlKey === binding.ctrl;
+    }
+  } else {
+    // On non-Apple: if binding has meta or ctrl, treat as Ctrl
+    if (binding.meta && !binding.ctrl) {
+      modifierMatch = event.ctrlKey && !event.metaKey;
+    } else if (binding.ctrl && !binding.meta) {
+      modifierMatch = event.ctrlKey && !event.metaKey;
+    } else {
+      modifierMatch = event.ctrlKey === binding.ctrl && event.metaKey === binding.meta;
+    }
+  }
+  return (
+    event.key.toLowerCase() === binding.key.toLowerCase() &&
+    modifierMatch &&
+    event.shiftKey === binding.shift &&
+    event.altKey === binding.alt
+  );
 }
 
-function getGlobalToggleShortcutKeys(): string[] {
-  return isApplePlatform() ? ['Cmd', 'Shift', '.'] : ['Ctrl', 'Shift', '.'];
+function formatBindingKeys(binding: ShortcutBinding): string[] {
+  const apple = isApplePlatform();
+  const keys: string[] = [];
+  if (binding.ctrl || binding.meta) keys.push(apple ? 'Cmd' : 'Ctrl');
+  if (binding.alt) keys.push(apple ? 'Opt' : 'Alt');
+  if (binding.shift) keys.push('Shift');
+  keys.push(binding.key === ' ' ? 'Space' : binding.key.length === 1 ? binding.key.toUpperCase() : binding.key);
+  return keys;
 }
 
 function renderShortcutKeysHtml(keys: string[]): string {
@@ -268,10 +304,17 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
       .ask-em-panel-title {
         margin: 0;
-        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
-        font-size: 21px;
-        line-height: 1;
-        letter-spacing: -0.04em;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.3;
+        letter-spacing: -0.01em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        word-break: break-word;
       }
 
       .ask-em-panel-badge {
@@ -564,9 +607,8 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     globalSyncEnabled: true,
     standaloneReady: false,
     canStartNewSet: true,
+    shortcuts: DEFAULT_SHORTCUTS,
   };
-  const toggleShortcutKeys = getToggleShortcutKeys();
-  const globalToggleShortcutKeys = getGlobalToggleShortcutKeys();
 
   let panelPinned = false;
   let currentProviderToggleBusy = false;
@@ -661,7 +703,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     const workspaceSummary = response?.workspaceSummary;
     if (!workspaceSummary || !context.workspaceId) {
       if (context.standaloneReady && !context.workspaceId) {
-        renderTooltip('Click to toggle global sync.', globalToggleShortcutKeys);
+        renderTooltip('Click to toggle global sync.', formatBindingKeys(context.shortcuts.toggleGlobalSync));
         return;
       }
 
@@ -683,7 +725,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       <div class="ask-em-panel-top">
         <div>
           <p class="ask-em-panel-kicker">Current Group</p>
-          <h3 class="ask-em-panel-title">#${workspaceSummary.workspace.id.slice(0, 8)}</h3>
+          <h3 class="ask-em-panel-title"></h3>
         </div>
         <span class="${badgeClass}">${badgeLabel}</span>
       </div>
@@ -724,9 +766,17 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       </div>
       <div class="ask-em-panel-shortcut">
         <span>Pause/restart sync for this tab</span>
-        ${renderShortcutKeysHtml(toggleShortcutKeys)}
+        ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.toggleProviderSync))}
       </div>
     `;
+
+    const titleEl = panel.querySelector('.ask-em-panel-title');
+    if (titleEl) {
+      const label = workspaceSummary.workspace.label;
+      titleEl.textContent = label
+        ? label.length > 40 ? label.slice(0, 40) + '…' : label
+        : '#' + workspaceSummary.workspace.id.slice(0, 8);
+    }
   };
 
   const setCurrentProviderToggleBusy = (busy: boolean) => {
@@ -842,7 +892,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       return;
     }
 
-    renderTooltip('Click to toggle global sync.', globalToggleShortcutKeys);
+    renderTooltip('Click to toggle global sync.', formatBindingKeys(context.shortcuts.toggleGlobalSync));
   });
 
   shell.addEventListener('mouseleave', () => {
@@ -899,25 +949,14 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   });
 
   document.addEventListener('keydown', (event) => {
-    const providerShortcutPressed =
-      event.key.toLowerCase() === TOGGLE_SHORTCUT_KEY &&
-      (event.metaKey || event.ctrlKey) &&
-      !event.altKey &&
-      !event.shiftKey;
-    const globalShortcutPressed =
-      event.key.toLowerCase() === TOGGLE_SHORTCUT_KEY &&
-      (event.metaKey || event.ctrlKey) &&
-      !event.altKey &&
-      event.shiftKey;
-
-    if (providerShortcutPressed && context.workspaceId) {
+    if (matchesShortcut(event, context.shortcuts.toggleProviderSync) && context.workspaceId) {
       event.preventDefault();
       event.stopPropagation();
       void toggleCurrentProvider();
       return;
     }
 
-    if (globalShortcutPressed) {
+    if (matchesShortcut(event, context.shortcuts.toggleGlobalSync)) {
       event.preventDefault();
       event.stopPropagation();
       void toggleGlobalSync();
@@ -952,6 +991,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       context.globalSyncEnabled = nextContext.globalSyncEnabled;
       context.standaloneReady = nextContext.standaloneReady;
       context.canStartNewSet = nextContext.canStartNewSet;
+      context.shortcuts = nextContext.shortcuts;
       mount.dataset.providerEnabled = String(nextContext.providerEnabled);
       mount.dataset.globalSyncEnabled = String(nextContext.globalSyncEnabled);
       mount.dataset.interactive = String(Boolean(nextContext.workspaceId || nextContext.standaloneReady));

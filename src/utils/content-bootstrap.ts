@@ -4,8 +4,10 @@ import type {
   PingMessage,
   PingResponseMessage,
   RuntimeMessage,
+  ShortcutConfig,
   WorkspaceContextResponseMessage,
 } from '../runtime/protocol';
+import { DEFAULT_SHORTCUTS } from '../runtime/protocol';
 import {
   buildHeartbeatMessage,
   buildHelloMessage,
@@ -30,6 +32,7 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
     globalSyncEnabled: true,
     standaloneReady: false,
     canStartNewSet: true,
+    shortcuts: DEFAULT_SHORTCUTS,
   };
 
   let suppressSubmissionsUntil = 0;
@@ -102,12 +105,14 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
             providerEnabled?: boolean;
             globalSyncEnabled?: boolean;
             canStartNewSet?: boolean;
+            shortcuts?: ShortcutConfig;
           }>(buildHelloMessage(adapter))
         : await sendRuntimeMessage<{
             workspaceId?: string | null;
             providerEnabled?: boolean;
             globalSyncEnabled?: boolean;
             canStartNewSet?: boolean;
+            shortcuts?: ShortcutConfig;
           }>(buildHeartbeatMessage(adapter));
 
     const standaloneVisible = shouldShowStandaloneIndicator(adapter);
@@ -117,6 +122,7 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
       globalSyncEnabled: response?.globalSyncEnabled ?? true,
       standaloneReady: standaloneVisible,
       canStartNewSet: response?.canStartNewSet ?? true,
+      shortcuts: response?.shortcuts ?? uiContext.shortcuts,
     };
     ui.setContext(uiContext);
     ui.setVisible(Boolean(response?.workspaceId) || standaloneVisible);
@@ -216,6 +222,7 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
       globalSyncEnabled: response?.globalSyncEnabled ?? uiContext.globalSyncEnabled,
       standaloneReady: shouldShowStandaloneIndicator(adapter),
       canStartNewSet: response?.canStartNewSet ?? uiContext.canStartNewSet,
+      shortcuts: uiContext.shortcuts,
     };
     ui.setContext(uiContext);
     ui.setVisible(Boolean(uiContext.workspaceId) || shouldShowStandaloneIndicator(adapter));

@@ -1,15 +1,20 @@
-import { startTransition, useEffect, useState } from 'react';
-import { ALL_PROVIDERS as PROVIDERS } from '../../runtime/protocol';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { ALL_PROVIDERS as PROVIDERS, DEFAULT_SHORTCUTS, formatShortcutDisplay } from '../../runtime/protocol';
 import type {
   DebugLogEntry,
   GroupMemberState,
   Provider,
+  ShortcutBinding,
+  ShortcutConfig,
+  ShortcutId,
   StatusResponseMessage,
   WorkspaceSummary,
 } from '../../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../../runtime/workspace';
+import { SUPPORTED_SITES } from '../../adapters/sites';
 
-type PopupView = 'home' | 'settings';
+type PopupView = 'home' | 'settings' | 'legal';
+type LegalPage = 'terms' | 'privacy';
 
 const MORE_PROVIDER_REQUEST_OPTIONS = [
   'Perplexity',
@@ -178,6 +183,8 @@ export default function App() {
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [requestSubmitted, setRequestSubmitted] = useState(false);
   const [requestCooldownUntil, setRequestCooldownUntil] = useState<number | null>(null);
+  const [activeLegalPage, setActiveLegalPage] = useState<LegalPage>('terms');
+  const [shortcuts, setShortcuts] = useState<ShortcutConfig>(DEFAULT_SHORTCUTS);
 
   const refresh = async () => {
     setLoading(true);
@@ -188,6 +195,7 @@ export default function App() {
         setSelectedProviders(
           PROVIDERS.filter((provider) => nextStatus.defaultEnabledProviders[provider]),
         );
+        setShortcuts(nextStatus.shortcuts ?? DEFAULT_SHORTCUTS);
       }
       setLoading(false);
     });
@@ -245,6 +253,17 @@ export default function App() {
       enabled: nextEnabled,
     });
     await refresh();
+  };
+
+  const updateShortcut = async (id: ShortcutId, binding: ShortcutBinding) => {
+    const next = { ...shortcuts, [id]: binding };
+    setShortcuts(next);
+    await chrome.runtime.sendMessage({ type: 'SET_SHORTCUTS', shortcuts: next });
+  };
+
+  const resetShortcuts = async () => {
+    setShortcuts(DEFAULT_SHORTCUTS);
+    await chrome.runtime.sendMessage({ type: 'SET_SHORTCUTS', shortcuts: DEFAULT_SHORTCUTS });
   };
 
   const copyLogs = async () => {
@@ -326,7 +345,7 @@ export default function App() {
         <header className="askem-hero">
           <div className="askem-brand-block">
             <h1>ask&apos;em</h1>
-            <p className="askem-slogan">Send one prompt to official model chats at once.</p>
+            <p className="askem-slogan">One prompt, every official AI chat — full features, zero compromise.</p>
           </div>
           <div className="askem-hero-actions">
             <button
@@ -353,7 +372,7 @@ export default function App() {
             Home
           </button>
           <button
-            className={`askem-view-tab ${activeView === 'settings' ? 'is-active' : ''}`}
+            className={`askem-view-tab ${activeView === 'settings' || activeView === 'legal' ? 'is-active' : ''}`}
             onClick={() => setActiveView('settings')}
             type="button"
           >
@@ -361,13 +380,18 @@ export default function App() {
           </button>
         </nav>
 
-        {activeView === 'home' ? (
+        {activeView === 'legal' ? (
+          <LegalContent
+            page={activeLegalPage}
+            onBack={() => setActiveView('settings')}
+          />
+        ) : activeView === 'home' ? (
           <>
             {atLimit ? (
               <WarningCard
-                eyebrow="Warning"
-                title="You reached your set limit."
-                body="Start another set after you clear one below."
+                eyebrow="Heads up"
+                title="Both set slots are in use."
+                body="Clear a finished set below to free up a slot for your next comparison."
               />
             ) : null}
 
@@ -390,13 +414,7 @@ export default function App() {
                   />
                 ))
               ) : (
-                <div className="askem-empty">
-                  <p>No running sets yet.</p>
-                  <span>
-                    Open a fresh chat on Claude, ChatGPT, Gemini, or DeepSeek, then send your
-                    first prompt to start a set automatically.
-                  </span>
-                </div>
+                <OnboardingCard />
               )}
             </section>
           </>
@@ -437,6 +455,12 @@ export default function App() {
                 Request more providers
               </button>
             </section>
+
+            <ShortcutsCard
+              shortcuts={shortcuts}
+              onUpdateShortcut={updateShortcut}
+              onResetShortcuts={resetShortcuts}
+            />
 
             <section className="askem-card askem-logs-card">
               <div className="askem-debug-top">
@@ -494,6 +518,15 @@ export default function App() {
                 Tuxi
               </a>
               <span> · one77r@gmail.com</span>
+              <div className="askem-legal-links">
+                <button type="button" className="askem-legal-link" onClick={() => { setActiveLegalPage('terms'); setActiveView('legal'); }}>
+                  Terms of Service
+                </button>
+                <span className="askem-legal-sep">·</span>
+                <button type="button" className="askem-legal-link" onClick={() => { setActiveLegalPage('privacy'); setActiveView('legal'); }}>
+                  Privacy Policy
+                </button>
+              </div>
             </footer>
           </>
         )}
@@ -626,6 +659,11 @@ export function PremiumCard({
   );
 }
 
+function getProviderOrigin(provider: Provider): string {
+  const site = SUPPORTED_SITES.find((s) => s.name === provider);
+  return site?.origin ?? '#';
+}
+
 function WorkspaceCard({
   workspaceSummary,
   busyKey,
@@ -645,11 +683,17 @@ function WorkspaceCard({
       (provider) => getDisplayMemberState(memberStates[provider] ?? 'inactive') === 'inactive',
     );
 
+  const displayLabel = workspace.label
+    ? workspace.label.length > 50
+      ? workspace.label.slice(0, 50) + '…'
+      : workspace.label
+    : `Set #${workspace.id.slice(0, 8)}`;
+
   return (
     <article className="askem-card askem-set-card">
       <div className="askem-card-top">
         <div>
-          <h2>Set #{workspace.id.slice(0, 8)}</h2>
+          <h2 className="askem-set-label" title={workspace.label ?? undefined}>{displayLabel}</h2>
         </div>
         <button
           className="askem-clear-workspace"
@@ -675,10 +719,12 @@ function WorkspaceCard({
         {visibleProviders.map((provider) => {
           const member = workspace.members[provider];
           const enabled = workspace.enabledProviders.includes(provider);
-          const stateTone = getDisplayMemberStateTone(memberStates[provider] ?? 'inactive', enabled);
-          const stateLabel = getDisplayMemberStateLabel(memberStates[provider] ?? 'inactive', enabled);
-          const outcomeCopy = getMemberOutcomeCopy(memberStates[provider] ?? 'inactive', enabled);
-          const sessionLabel = member?.sessionId ? member.sessionId.slice(0, 8) : 'not connected';
+          const rawState = memberStates[provider] ?? 'inactive';
+          const stateTone = getDisplayMemberStateTone(rawState, enabled);
+          const stateLabel = getDisplayMemberStateLabel(rawState, enabled);
+          const outcomeCopy = getMemberOutcomeCopy(rawState, enabled);
+          const displayState = getDisplayMemberState(rawState);
+          const showOpenLink = displayState === 'inactive' && !member?.sessionId;
 
           return (
             <div className="askem-provider-row" key={`${workspace.id}:${provider}`}>
@@ -686,17 +732,31 @@ function WorkspaceCard({
                 <span className="askem-provider-name">{provider}</span>
                 <div className="askem-provider-statusline">
                   <span className={`askem-state askem-state-${stateTone}`}>{stateLabel}</span>
-                  <span className="askem-provider-subcopy">{outcomeCopy}</span>
+                  {showOpenLink ? (
+                    <a
+                      className="askem-provider-open-link"
+                      href={getProviderOrigin(provider)}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        void chrome.tabs.create({ url: getProviderOrigin(provider) });
+                      }}
+                    >
+                      Open {provider}
+                    </a>
+                  ) : (
+                    <span className="askem-provider-subcopy">{outcomeCopy}</span>
+                  )}
                 </div>
               </div>
               <div className="askem-provider-actions">
-                <code>{sessionLabel}</code>
                 <button
                   className="askem-provider-clear"
                   onClick={() => void onClearProvider(workspace.id, provider)}
                   disabled={busyKey === `${workspace.id}:${provider}`}
                 >
-                  Remove from Set
+                  Remove
                 </button>
               </div>
             </div>
@@ -704,5 +764,274 @@ function WorkspaceCard({
         })}
       </div>
     </article>
+  );
+}
+
+const SHORTCUT_LABELS: Record<ShortcutId, string> = {
+  toggleProviderSync: 'Toggle current model sync',
+  toggleGlobalSync: 'Toggle global sync',
+};
+
+function bindingsEqual(a: ShortcutBinding, b: ShortcutBinding): boolean {
+  return (
+    a.key.toLowerCase() === b.key.toLowerCase() &&
+    a.shift === b.shift &&
+    a.alt === b.alt &&
+    // Treat meta and ctrl as equivalent (Apple vs non-Apple)
+    (a.meta || a.ctrl) === (b.meta || b.ctrl)
+  );
+}
+
+function ShortcutRecorder({
+  binding,
+  onRecord,
+  conflict,
+}: {
+  binding: ShortcutBinding;
+  onRecord: (binding: ShortcutBinding) => void;
+  conflict: boolean;
+}) {
+  const [recording, setRecording] = useState(false);
+  const isApple = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (!recording) return;
+
+      // Ignore bare modifier presses
+      if (['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) return;
+
+      // Require at least one modifier
+      if (!event.metaKey && !event.ctrlKey && !event.altKey) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const newBinding: ShortcutBinding = {
+        key: event.key.length === 1 ? event.key.toLowerCase() : event.key,
+        meta: event.metaKey,
+        ctrl: event.ctrlKey,
+        shift: event.shiftKey,
+        alt: event.altKey,
+      };
+
+      onRecord(newBinding);
+      setRecording(false);
+    },
+    [recording, onRecord],
+  );
+
+  useEffect(() => {
+    if (!recording) return;
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
+  }, [recording, handleKeyDown]);
+
+  useEffect(() => {
+    if (!recording) return;
+    const handleBlur = () => setRecording(false);
+    window.addEventListener('blur', handleBlur);
+    return () => window.removeEventListener('blur', handleBlur);
+  }, [recording]);
+
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      className={`askem-shortcut-keys askem-shortcut-recorder ${recording ? 'is-recording' : ''} ${conflict ? 'is-conflict' : ''}`}
+      onClick={() => setRecording(!recording)}
+    >
+      {recording ? 'Press keys…' : formatShortcutDisplay(binding, isApple)}
+    </button>
+  );
+}
+
+function ShortcutsCard({
+  shortcuts,
+  onUpdateShortcut,
+  onResetShortcuts,
+}: {
+  shortcuts: ShortcutConfig;
+  onUpdateShortcut: (id: ShortcutId, binding: ShortcutBinding) => Promise<void>;
+  onResetShortcuts: () => Promise<void>;
+}) {
+  const [conflictMessage, setConflictMessage] = useState<string | null>(null);
+  const isDefault =
+    JSON.stringify(shortcuts) === JSON.stringify(DEFAULT_SHORTCUTS);
+
+  const hasConflict = bindingsEqual(shortcuts.toggleProviderSync, shortcuts.toggleGlobalSync);
+
+  const handleRecord = (id: ShortcutId, binding: ShortcutBinding) => {
+    const otherId: ShortcutId = id === 'toggleProviderSync' ? 'toggleGlobalSync' : 'toggleProviderSync';
+    if (bindingsEqual(binding, shortcuts[otherId])) {
+      setConflictMessage(`This shortcut is already used by "${SHORTCUT_LABELS[otherId]}".`);
+      return;
+    }
+    setConflictMessage(null);
+    void onUpdateShortcut(id, binding);
+  };
+
+  const handleReset = () => {
+    setConflictMessage(null);
+    void onResetShortcuts();
+  };
+
+  return (
+    <section className="askem-card askem-settings-section">
+      <div className="askem-defaults-heading">
+        <div className="askem-defaults-copy">
+          <p className="askem-card-label">Shortcuts</p>
+          <p className="askem-defaults-title">Keyboard shortcuts used in chat pages.</p>
+        </div>
+        {!isDefault && (
+          <button
+            type="button"
+            className="askem-provider-clear"
+            onClick={handleReset}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+      {(conflictMessage || hasConflict) && (
+        <p className="askem-shortcut-conflict">{conflictMessage ?? 'Both shortcuts use the same key combination.'}</p>
+      )}
+      <div className="askem-shortcut-list">
+        {(Object.keys(SHORTCUT_LABELS) as ShortcutId[]).map((id) => (
+          <div className="askem-shortcut-row" key={id}>
+            <span className="askem-shortcut-action">{SHORTCUT_LABELS[id]}</span>
+            <ShortcutRecorder
+              binding={shortcuts[id]}
+              onRecord={(binding) => handleRecord(id, binding)}
+              conflict={hasConflict}
+            />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function OnboardingCard() {
+  const openProvider = (provider: Provider) => {
+    const origin = getProviderOrigin(provider);
+    void chrome.tabs.create({ url: origin });
+  };
+
+  return (
+    <div className="askem-onboarding">
+      <div className="askem-onboarding-header">
+        <span className="askem-onboarding-step">Get Started</span>
+        <p className="askem-onboarding-title">Ask every AI at once</p>
+      </div>
+      <div className="askem-onboarding-body">
+        <p className="askem-onboarding-desc">
+          ask&apos;em uses official chat interfaces so you get the full experience — artifacts, web search, file uploads, and all features each provider offers.
+        </p>
+        <div className="askem-onboarding-steps">
+          <div className="askem-onboarding-step-item">
+            <span className="askem-onboarding-num">1</span>
+            <span>Open any AI chat below</span>
+          </div>
+          <div className="askem-onboarding-step-item">
+            <span className="askem-onboarding-num">2</span>
+            <span>Type your prompt and send</span>
+          </div>
+          <div className="askem-onboarding-step-item">
+            <span className="askem-onboarding-num">3</span>
+            <span>It auto-syncs to the other models</span>
+          </div>
+        </div>
+        <div className="askem-onboarding-providers">
+          {PROVIDERS.map((provider) => (
+            <button
+              key={provider}
+              className="askem-onboarding-provider-btn"
+              onClick={() => openProvider(provider)}
+              type="button"
+            >
+              {provider}
+              <span className="askem-onboarding-arrow">→</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => void }) {
+  return (
+    <section className="askem-legal-page">
+      <div className="askem-legal-top">
+        <button type="button" className="askem-legal-back" onClick={onBack}>
+          ← Back
+        </button>
+      </div>
+      {page === 'terms' ? (
+        <div className="askem-legal-body">
+          <h2>Terms of Service</h2>
+          <p className="askem-legal-updated">Last updated: April 2026</p>
+
+          <h3>1. Acceptance</h3>
+          <p>By installing or using the ask&apos;em browser extension (&quot;Extension&quot;), you agree to these Terms of Service. If you do not agree, please uninstall the Extension.</p>
+
+          <h3>2. Description of Service</h3>
+          <p>ask&apos;em is a browser extension that synchronizes prompts you type across multiple AI chat provider websites. The Extension operates entirely within your browser and interacts with third-party websites on your behalf.</p>
+
+          <h3>3. Third-Party Services</h3>
+          <p>The Extension interacts with third-party AI chat services (Claude, ChatGPT, Gemini, DeepSeek). Your use of those services is governed by their respective terms. ask&apos;em is not affiliated with any of these providers.</p>
+
+          <h3>4. User Responsibilities</h3>
+          <p>You are responsible for your prompts and for complying with each provider&apos;s terms. You must have valid accounts with the providers you use.</p>
+
+          <h3>5. No Warranty</h3>
+          <p>The Extension is provided &quot;as is&quot; without warranty of any kind. AI provider websites may change at any time, which may temporarily affect functionality.</p>
+
+          <h3>6. Limitation of Liability</h3>
+          <p>To the maximum extent permitted by law, the developers of ask&apos;em shall not be liable for any indirect, incidental, or consequential damages arising from your use of the Extension.</p>
+
+          <h3>7. Changes</h3>
+          <p>We may update these terms. Continued use after changes constitutes acceptance.</p>
+        </div>
+      ) : (
+        <div className="askem-legal-body">
+          <h2>Privacy Policy</h2>
+          <p className="askem-legal-updated">Last updated: April 2026</p>
+
+          <h3>1. Data Collection</h3>
+          <p>ask&apos;em does <strong>not</strong> collect, transmit, or store any personal data on external servers. All data remains entirely within your browser&apos;s local storage.</p>
+
+          <h3>2. What We Store Locally</h3>
+          <p>The Extension stores the following data in your browser&apos;s chrome.storage:</p>
+          <ul>
+            <li>Workspace state (which chat sessions are grouped together)</li>
+            <li>Your preference settings (default providers, sync toggle state)</li>
+            <li>Debug logs (only when you explicitly enable diagnostic tracing)</li>
+          </ul>
+          <p>This data never leaves your browser.</p>
+
+          <h3>3. Prompt Content</h3>
+          <p>Your prompts are read temporarily in memory to forward them between chat tabs. They are <strong>not</strong> stored persistently, logged, or transmitted to any server controlled by us.</p>
+
+          <h3>4. Third-Party Interaction</h3>
+          <p>When you use the Extension, your prompts are sent to third-party AI providers through their official web interfaces — exactly as if you typed them yourself. Each provider&apos;s own privacy policy governs how they handle your data.</p>
+
+          <h3>5. Analytics &amp; Tracking</h3>
+          <p>ask&apos;em contains <strong>no analytics, telemetry, or tracking</strong> of any kind.</p>
+
+          <h3>6. Permissions</h3>
+          <p>The Extension requests only the minimum permissions needed:</p>
+          <ul>
+            <li><strong>storage</strong> — to save your preferences locally</li>
+            <li><strong>tabs</strong> — to manage and sync across chat tabs</li>
+          </ul>
+
+          <h3>7. Contact</h3>
+          <p>Questions about this policy? Reach us at one77r@gmail.com.</p>
+        </div>
+      )}
+    </section>
   );
 }

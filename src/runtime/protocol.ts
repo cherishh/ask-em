@@ -20,6 +20,7 @@ export type ConversationRef = {
 
 export type Workspace = {
   id: string;
+  label?: string;
   members: Partial<Record<Provider, ConversationRef>>;
   enabledProviders: Provider[];
   createdAt: number;
@@ -28,6 +29,32 @@ export type Workspace = {
 };
 
 export type DefaultEnabledProviders = Record<Provider, boolean>;
+
+export type ShortcutBinding = {
+  key: string;
+  meta: boolean;
+  ctrl: boolean;
+  shift: boolean;
+  alt: boolean;
+};
+
+export type ShortcutId = 'toggleProviderSync' | 'toggleGlobalSync';
+
+export type ShortcutConfig = Record<ShortcutId, ShortcutBinding>;
+
+export const DEFAULT_SHORTCUTS: ShortcutConfig = {
+  toggleProviderSync: { key: '.', meta: false, ctrl: true, shift: false, alt: false },
+  toggleGlobalSync: { key: '.', meta: false, ctrl: true, shift: true, alt: false },
+};
+
+export function formatShortcutDisplay(binding: ShortcutBinding, isApple: boolean): string {
+  const parts: string[] = [];
+  if (binding.ctrl || binding.meta) parts.push(isApple ? '⌘' : 'Ctrl');
+  if (binding.alt) parts.push(isApple ? '⌥' : 'Alt');
+  if (binding.shift) parts.push('Shift');
+  parts.push(binding.key === ' ' ? 'Space' : binding.key.length === 1 ? binding.key.toUpperCase() : binding.key);
+  return parts.join(' + ');
+}
 
 export type DebugLogEntry = {
   id: string;
@@ -56,6 +83,7 @@ export type LocalState = {
   globalSyncEnabled: boolean;
   debugLoggingEnabled: boolean;
   defaultEnabledProviders: DefaultEnabledProviders;
+  shortcuts: ShortcutConfig;
   workspaces: Record<string, Workspace>;
   workspaceIndex: WorkspaceIndex;
   debugLogs: DebugLogEntry[];
@@ -134,6 +162,7 @@ export type StatusResponseMessage = {
   debugLoggingEnabled: boolean;
   workspaceLimit: number;
   defaultEnabledProviders: DefaultEnabledProviders;
+  shortcuts: ShortcutConfig;
   workspaces: WorkspaceSummary[];
   recentLogs: DebugLogEntry[];
 };
@@ -195,6 +224,11 @@ export type SetGlobalSyncEnabledMessage = {
   enabled: boolean;
 };
 
+export type SetShortcutsMessage = {
+  type: 'SET_SHORTCUTS';
+  shortcuts: ShortcutConfig;
+};
+
 export type DebugLogMessage = {
   type: 'LOG_DEBUG';
   level: DebugLogEntry['level'];
@@ -225,6 +259,7 @@ export type RuntimeMessage =
   | SetDefaultEnabledProvidersMessage
   | SetWorkspaceProviderEnabledMessage
   | SetGlobalSyncEnabledMessage
+  | SetShortcutsMessage
   | SetDebugLoggingEnabledMessage
   | DebugLogMessage
   | RefreshContentContextMessage
