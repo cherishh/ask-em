@@ -40,10 +40,12 @@ import {
   removeClaimedTabsForWorkspace,
   resolveDeliveryTarget,
 } from '../runtime/recovery';
+import { createSerializedExecutor } from '../runtime/serialized-executor';
 
 const AUTO_CLEAR_GROUP_DELAY_MS = 7_000;
 const EMPTY_GROUP_DELETE_DELAY_MS = 2_000;
 const pendingGroupGcTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const runSerializedBackgroundTask = createSerializedExecutor();
 
 async function notifyTabsToRefreshContext(tabIds: number[]) {
   await Promise.allSettled(
@@ -91,7 +93,7 @@ async function scheduleGroupGcIfEmpty(workspaceId: string) {
   const timeoutId = setTimeout(() => {
     pendingGroupGcTimers.delete(workspaceId);
 
-    void (async () => {
+    void runSerializedBackgroundTask(async () => {
       const [localState, latestSessionState] = await Promise.all([getLocalState(), getSessionState()]);
       if (!localState.workspaces[workspaceId]) {
         return;
@@ -111,7 +113,7 @@ async function scheduleGroupGcIfEmpty(workspaceId: string) {
         workspaceId,
         message: 'Auto-cleared group after all tabs closed',
       });
-    })();
+    });
   }, AUTO_CLEAR_GROUP_DELAY_MS);
 
   pendingGroupGcTimers.set(workspaceId, timeoutId);
@@ -123,7 +125,7 @@ async function scheduleEmptyGroupDeletion(workspaceId: string) {
   const timeoutId = setTimeout(() => {
     pendingGroupGcTimers.delete(workspaceId);
 
-    void (async () => {
+    void runSerializedBackgroundTask(async () => {
       const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
       const workspace = localState.workspaces[workspaceId];
 
@@ -147,7 +149,7 @@ async function scheduleEmptyGroupDeletion(workspaceId: string) {
         workspaceId,
         message: 'Deleted empty group after provider removal',
       });
-    })();
+    });
   }, EMPTY_GROUP_DELETE_DELAY_MS);
 
   pendingGroupGcTimers.set(workspaceId, timeoutId);
@@ -732,7 +734,7 @@ async function handleClearDebugLogs() {
 
 export default defineBackground(() => {
   chrome.tabs.onRemoved.addListener((tabId) => {
-    void (async () => {
+    void runSerializedBackgroundTask(async () => {
       const sessionState = await getSessionState();
       const { sessionState: nextSessionState, removedClaimedTabs } = removeClaimedTabsForTabId(sessionState, tabId);
 
@@ -752,54 +754,61 @@ export default defineBackground(() => {
         });
         await scheduleGroupGcIfEmpty(claimedTab.workspaceId);
       }
-    })();
+    });
   });
 
   chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendResponse) => {
-    void (async () => {
-      switch (message.type) {
-        case 'HELLO':
-        case 'HEARTBEAT':
-          sendResponse(await handlePresenceMessage(message, sender));
-          return;
-        case 'USER_SUBMIT':
-          sendResponse(await handleUserSubmit(message, sender));
-          return;
-        case 'GET_STATUS':
-          sendResponse(await handleGetStatus());
-          return;
-        case 'GET_WORKSPACE_CONTEXT':
-          sendResponse(await handleGetWorkspaceContext(message));
-          return;
-        case 'GET_DEBUG_LOGS':
-          sendResponse(await handleGetDebugLogs());
-          return;
-        case 'SET_DEFAULT_ENABLED_PROVIDERS':
-          sendResponse(await handleSetDefaultEnabledProviders(message));
-          return;
-        case 'SET_WORKSPACE_PROVIDER_ENABLED':
-          sendResponse(await handleSetWorkspaceProviderEnabled(message));
-          return;
-        case 'SET_GLOBAL_SYNC_ENABLED':
-          sendResponse(await handleSetGlobalSyncEnabled(message));
-          return;
-        case 'SET_DEBUG_LOGGING_ENABLED':
-          sendResponse(await handleSetDebugLoggingEnabled(message));
-          return;
-        case 'LOG_DEBUG':
-          sendResponse(await handleDebugLog(message));
-          return;
-        case 'CLEAR_DEBUG_LOGS':
-          sendResponse(await handleClearDebugLogs());
-          return;
-        case 'CLEAR_WORKSPACE':
-        case 'CLEAR_WORKSPACE_PROVIDER':
-          sendResponse(await handleWorkspaceClear(message));
-          return;
-        default:
-          sendResponse({ ok: false, reason: `Unhandled message type: ${message.type}` });
+    void runSerializedBackgroundTask(async () => {
+      try {
+        switch (message.type) {
+          case 'HELLO':
+          case 'HEARTBEAT':
+            sendResponse(await handlePresenceMessage(message, sender));
+            return;
+          case 'USER_SUBMIT':
+            sendResponse(await handleUserSubmit(message, sender));
+            return;
+          case 'GET_STATUS':
+            sendResponse(await handleGetStatus());
+            return;
+          case 'GET_WORKSPACE_CONTEXT':
+            sendResponse(await handleGetWorkspaceContext(message));
+            return;
+          case 'GET_DEBUG_LOGS':
+            sendResponse(await handleGetDebugLogs());
+            return;
+          case 'SET_DEFAULT_ENABLED_PROVIDERS':
+            sendResponse(await handleSetDefaultEnabledProviders(message));
+            return;
+          case 'SET_WORKSPACE_PROVIDER_ENABLED':
+            sendResponse(await handleSetWorkspaceProviderEnabled(message));
+            return;
+          case 'SET_GLOBAL_SYNC_ENABLED':
+            sendResponse(await handleSetGlobalSyncEnabled(message));
+            return;
+          case 'SET_DEBUG_LOGGING_ENABLED':
+            sendResponse(await handleSetDebugLoggingEnabled(message));
+            return;
+          case 'LOG_DEBUG':
+            sendResponse(await handleDebugLog(message));
+            return;
+          case 'CLEAR_DEBUG_LOGS':
+            sendResponse(await handleClearDebugLogs());
+            return;
+          case 'CLEAR_WORKSPACE':
+          case 'CLEAR_WORKSPACE_PROVIDER':
+            sendResponse(await handleWorkspaceClear(message));
+            return;
+          default:
+            sendResponse({ ok: false, reason: `Unhandled message type: ${message.type}` });
+        }
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          reason: error instanceof Error ? error.message : 'Unknown background error',
+        });
       }
-    })();
+    });
 
     return true;
   });
