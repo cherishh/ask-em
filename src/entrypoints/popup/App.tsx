@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ALL_PROVIDERS as PROVIDERS,
   DEFAULT_SHORTCUTS,
@@ -246,6 +246,11 @@ export default function App() {
   const [shortcuts, setShortcuts] = useState<ShortcutConfig>(DEFAULT_SHORTCUTS);
   const [recordingShortcutId, setRecordingShortcutId] = useState<ShortcutId | null>(null);
   const resolvedShortcuts = resolveShortcutConfig(shortcuts);
+  const selectedProviderKey = selectedProviders.join('|');
+  const onboardingProviders = useMemo(
+    () => pickRandomProviders(selectedProviderKey ? (selectedProviderKey.split('|') as Provider[]) : [], 4),
+    [selectedProviderKey],
+  );
 
   const refresh = async () => {
     setLoading(true);
@@ -468,7 +473,7 @@ export default function App() {
                   />
                 ))
               ) : (
-                <OnboardingCard />
+                <OnboardingCard providers={onboardingProviders} />
               )}
             </section>
 
@@ -926,7 +931,7 @@ function WorkspaceCard({
 const SHORTCUT_ROWS = [
   {
     id: 'togglePageParticipation',
-    label: 'Sync this page on/off',
+    label: 'Single page sync on/off',
   },
   {
     id: 'previousProviderTab',
@@ -948,6 +953,12 @@ function normalizeShortcutKey(event: KeyboardEvent): string {
   }
 
   return event.key.length === 1 ? event.key.toLowerCase() : event.key;
+}
+
+function pickRandomProviders(providers: Provider[], limit: number): Provider[] {
+  return [...providers]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, limit);
 }
 
 function ShortcutRecorder({
@@ -1018,7 +1029,7 @@ function ShortcutRecorder({
   );
 }
 
-function OnboardingCard() {
+function OnboardingCard({ providers }: { providers: Provider[] }) {
   const openProvider = (provider: Provider) => {
     const origin = getProviderOrigin(provider);
     void chrome.tabs.create({ url: origin });
@@ -1050,17 +1061,21 @@ function OnboardingCard() {
         </div>
         <p className="askem-onboarding-hint">Make sure you&apos;re logged in to each provider you want to sync.</p>
         <div className="askem-onboarding-providers">
-          {PROVIDERS.map((provider) => (
-            <button
-              key={provider}
-              className="askem-onboarding-provider-btn"
-              onClick={() => openProvider(provider)}
-              type="button"
-            >
-              {provider}
-              <span className="askem-onboarding-arrow">→</span>
-            </button>
-          ))}
+          {providers.length > 0 ? (
+            providers.map((provider) => (
+              <button
+                key={provider}
+                className="askem-onboarding-provider-btn"
+                onClick={() => openProvider(provider)}
+                type="button"
+              >
+                {provider}
+                <span className="askem-onboarding-arrow">→</span>
+              </button>
+            ))
+          ) : (
+            <span className="askem-onboarding-empty">Enable a default model in Advanced.</span>
+          )}
         </div>
       </div>
     </div>

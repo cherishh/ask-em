@@ -1429,6 +1429,14 @@ body {
   gap: 8px;
 }
 
+.askem-onboarding-empty {
+  grid-column: 1 / -1;
+  color: rgba(107, 100, 89, 0.72);
+  font: 700 10px/1.35 "Avenir Next", "Segoe UI", sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .askem-onboarding-provider-btn {
   display: flex;
   align-items: center;
