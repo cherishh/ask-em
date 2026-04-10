@@ -91,21 +91,16 @@ body {
 }
 
 .askem-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
 }
 
 .askem-brand-block {
-  min-width: 0;
+  width: 100%;
 }
 
-.askem-hero-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+.askem-refresh-corner.askem-refresh-corner {
+  position: absolute;
+  top: 22px;
+  right: 22px;
 }
 
 .askem-hero h1 {
@@ -119,7 +114,7 @@ body {
 
 .askem-slogan {
   margin: 10px 0 0;
-  max-width: 26ch;
+  padding-right: 120px;
   color: var(--askem-muted);
   font-size: 13px;
   line-height: 1.4;
@@ -791,6 +786,11 @@ body {
   color: var(--askem-warn);
 }
 
+.askem-state-warning {
+  background: rgba(217, 119, 6, 0.14);
+  color: #92400e;
+}
+
 .askem-state-frozen {
   background: rgba(185, 56, 47, 0.12);
   color: #b9382f;
@@ -1380,6 +1380,14 @@ body {
   color: var(--askem-accent);
   font: 700 11px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
   flex-shrink: 0;
+}
+
+.askem-onboarding-hint {
+  margin: 0 0 12px;
+  color: rgba(107, 100, 89, 0.6);
+  font-size: 11.5px;
+  font-style: italic;
+  line-height: 1.4;
 }
 
 .askem-onboarding-providers {

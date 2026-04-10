@@ -131,6 +131,13 @@ export type DeliverPromptMessage = {
   timestamp: number;
 };
 
+export type ProviderDeliveryResult = {
+  provider: Provider;
+  ok: boolean;
+  blocked?: boolean;
+  reason?: string;
+};
+
 export type PingMessage = {
   type: 'PING';
 };
@@ -153,7 +160,13 @@ export type WorkspaceSummary = {
   memberStates: Partial<Record<Provider, GroupMemberState>>;
 };
 
-export type GroupMemberState = 'active' | 'stale' | 'inactive' | 'pending';
+export type GroupMemberState =
+  | 'ready'
+  | 'login-required'
+  | 'not-ready'
+  | 'stale'
+  | 'inactive'
+  | 'pending';
 
 export type StatusResponseMessage = {
   type: 'STATUS_RESPONSE';

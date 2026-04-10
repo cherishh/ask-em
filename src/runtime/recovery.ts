@@ -140,19 +140,33 @@ export async function waitForContentReady(
   provider: Provider,
   timeoutMs = 15_000,
 ): Promise<PingResponseMessage | null> {
+  const response = await waitForContentStatus(tabId, provider, timeoutMs);
+  return response?.pageState === 'ready' ? response : null;
+}
+
+export async function waitForContentStatus(
+  tabId: number,
+  provider: Provider,
+  timeoutMs = 15_000,
+): Promise<PingResponseMessage | null> {
   const startedAt = Date.now();
+  let latestResponse: PingResponseMessage | null = null;
 
   while (Date.now() - startedAt < timeoutMs) {
     const response = await pingContentTab(tabId);
 
-    if (response?.provider === provider && response.pageState === 'ready') {
-      return response;
+    if (response?.provider === provider) {
+      latestResponse = response;
+
+      if (response.pageState === 'ready' || response.pageState === 'login-required') {
+        return response;
+      }
     }
 
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
-  return null;
+  return latestResponse;
 }
 
 export async function waitForTabLoad(tabId: number, timeoutMs = 15_000): Promise<boolean> {
@@ -195,6 +209,28 @@ async function navigateTab(tabId: number, url: string): Promise<chrome.tabs.Tab 
   }
 }
 
+function assertDeliverableStatus(
+  provider: Provider,
+  status: PingResponseMessage | null,
+  expectedSessionId: string | null,
+): asserts status is PingResponseMessage {
+  if (!status) {
+    throw new Error(`${provider} not ready`);
+  }
+
+  if (status.pageState === 'login-required') {
+    throw new Error(`${provider} login required`);
+  }
+
+  if (status.pageState !== 'ready') {
+    throw new Error(`${provider} not ready`);
+  }
+
+  if (expectedSessionId && status.sessionId !== expectedSessionId) {
+    throw new Error(`${provider} session mismatch`);
+  }
+}
+
 export async function resolveDeliveryTarget(
   workspace: Workspace,
   provider: Provider,
@@ -208,6 +244,10 @@ export async function resolveDeliveryTarget(
   if (claimedTab) {
     const stale = isClaimedTabStale(claimedTab);
     const ping = await pingContentTab(claimedTab.tabId);
+
+    if (ping?.provider === provider && ping.pageState === 'login-required') {
+      throw new Error(`${provider} login required`);
+    }
 
     if (
       ping &&
@@ -230,7 +270,8 @@ export async function resolveDeliveryTarget(
 
       if (updatedTab?.id) {
         await waitForTabLoad(updatedTab.id);
-        await waitForContentReady(updatedTab.id, provider);
+        const status = await waitForContentStatus(updatedTab.id, provider);
+        assertDeliverableStatus(provider, status, expectedSessionId);
         return {
           tabId: updatedTab.id,
           expectedSessionId,
@@ -251,7 +292,8 @@ export async function resolveDeliveryTarget(
   }
 
   await waitForTabLoad(createdTab.id);
-  await waitForContentReady(createdTab.id, provider);
+  const status = await waitForContentStatus(createdTab.id, provider);
+  assertDeliverableStatus(provider, status, expectedSessionId);
 
   return {
     tabId: createdTab.id,

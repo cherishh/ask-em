@@ -12,6 +12,8 @@ import { getVisibleWorkspaceProviders } from '../runtime/workspace';
 
 export type UiState = 'idle' | 'listening' | 'syncing' | 'blocked';
 
+export type SyncIndicatorTone = 'neutral' | 'success' | 'warning';
+
 export type UiContext = {
   workspaceId: string | null;
   providerEnabled: boolean;
@@ -90,11 +92,6 @@ function renderShortcutKeysHtml(keys: string[]): string {
   `;
 }
 
-// 用户不需要知道 stale 状态，直接显示为 active。stale 仅用于 debug，不承担功能性职责
-function getDisplayMemberState(state: GroupMemberState): Exclude<GroupMemberState, 'stale'> {
-  return state === 'stale' ? 'active' : state;
-}
-
 export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) {
   const { mountId, className } = adapter.getUiSpec();
   const shellId = `${mountId}-shell`;
@@ -118,8 +115,8 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        min-height: 30px;
-        padding: 0 12px;
+        min-height: 44px;
+        padding: 7px 12px;
         border-radius: 999px;
         border: 1px solid rgba(15, 23, 42, 0.22);
         background: rgba(255, 252, 246, 0.96);
@@ -157,6 +154,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
       .ask-em-sync-pill::before {
         content: "";
+        flex: 0 0 auto;
         width: 6px;
         height: 6px;
         border-radius: 999px;
@@ -197,6 +195,22 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         --ask-em-accent: rgba(245, 158, 11, 0.96);
       }
 
+      .ask-em-sync-pill[data-sync-tone="success"] {
+        border-color: rgba(22, 163, 74, 0.26);
+        background: rgba(243, 252, 245, 0.98);
+        --ask-em-accent: rgba(22, 163, 74, 0.95);
+      }
+
+      .ask-em-sync-pill[data-sync-tone="warning"] {
+        border-color: rgba(217, 119, 6, 0.42);
+        background: rgba(255, 249, 235, 0.98);
+        color: rgba(120, 53, 15, 0.94);
+        --ask-em-accent: rgba(245, 158, 11, 0.98);
+        box-shadow:
+          0 14px 34px rgba(146, 64, 14, 0.16),
+          inset 0 1px 0 rgba(255, 255, 255, 0.72);
+      }
+
       .ask-em-sync-pill[data-provider-enabled="false"] {
         border-color: rgba(120, 113, 108, 0.2);
         background: rgba(246, 244, 241, 0.98);
@@ -231,8 +245,41 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         cursor: progress;
       }
 
-      .ask-em-pill-label {
+      .ask-em-pill-copy {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .ask-em-pill-label,
+      .ask-em-pill-sync {
+        display: block;
+        max-width: 230px;
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .ask-em-pill-label {
+        line-height: 1;
+      }
+
+      .ask-em-pill-sync {
+        color: rgba(82, 77, 72, 0.74);
+        font: 600 10px/1.1 "Avenir Next", "Segoe UI", sans-serif;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .ask-em-sync-pill[data-sync-tone="success"] .ask-em-pill-sync {
+        color: rgba(21, 128, 61, 0.84);
+      }
+
+      .ask-em-sync-pill[data-sync-tone="warning"] .ask-em-pill-sync {
+        color: rgba(146, 64, 14, 0.9);
+        font-weight: 700;
       }
 
       .ask-em-sync-panel {
@@ -490,6 +537,11 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
       }
 
+      .ask-em-panel-status-dot[data-state="warning"] {
+        background: rgba(245, 158, 11, 0.96);
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
+      }
+
       .ask-em-panel-status-dot[data-state="pending"] {
         background: rgba(59, 130, 246, 0.88);
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
@@ -612,13 +664,30 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     mount.dataset.standaloneCreateSetEnabled = 'true';
     mount.dataset.interactive = 'false';
     mount.dataset.visible = 'false';
-    mount.innerHTML = `<span class="ask-em-pill-label">ready</span>`;
+    mount.dataset.syncTone = 'neutral';
+    mount.innerHTML = `
+      <span class="ask-em-pill-copy">
+        <span class="ask-em-pill-label">ready</span>
+        <span class="ask-em-pill-sync">No sync yet</span>
+      </span>
+    `;
     shell.appendChild(mount);
   } else if (mount.parentElement !== shell) {
     shell.appendChild(mount);
   }
 
+  if (!mount.querySelector('.ask-em-pill-sync')) {
+    mount.dataset.syncTone = 'neutral';
+    mount.innerHTML = `
+      <span class="ask-em-pill-copy">
+        <span class="ask-em-pill-label">ready</span>
+        <span class="ask-em-pill-sync">No sync yet</span>
+      </span>
+    `;
+  }
+
   const label = mount.querySelector('.ask-em-pill-label');
+  const syncLabel = mount.querySelector('.ask-em-pill-sync');
   const context: UiContext = {
     workspaceId: null,
     providerEnabled: true,
@@ -631,12 +700,17 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
   let panelPinned = false;
   let currentProviderToggleBusy = false;
-  let transientLabel: string | null = null;
-  let transientLabelTimeout: number | null = null;
 
   const updateLabel = (text: string) => {
     if (label) {
       label.textContent = text;
+    }
+  };
+
+  const updateSyncLabel = (text: string, tone: SyncIndicatorTone = 'neutral') => {
+    mount.dataset.syncTone = tone;
+    if (syncLabel) {
+      syncLabel.textContent = text;
     }
   };
 
@@ -664,23 +738,28 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     return 'current model is in sync';
   };
 
-  const syncLabel = (nextLabel?: string) => {
-    updateLabel(transientLabel ?? nextLabel ?? getDefaultLabel());
+  const syncPrimaryLabel = () => {
+    updateLabel(getDefaultLabel());
   };
 
-  const setTransientLabel = (nextLabel: string, durationMs = 1_500) => {
-    transientLabel = nextLabel;
-    updateLabel(nextLabel);
-
-    if (transientLabelTimeout !== null) {
-      window.clearTimeout(transientLabelTimeout);
+  const syncStandaloneStatusLabel = () => {
+    if (context.workspaceId || !context.standaloneReady) {
+      return;
     }
 
-    transientLabelTimeout = window.setTimeout(() => {
-      transientLabel = null;
-      transientLabelTimeout = null;
-      syncLabel();
-    }, durationMs);
+    if (!context.globalSyncEnabled) {
+      updateSyncLabel('Prompt stays here');
+      return;
+    }
+
+    if (!context.canStartNewSet) {
+      updateSyncLabel('Set limit reached', 'warning');
+      return;
+    }
+
+    updateSyncLabel(
+      context.standaloneCreateSetEnabled ? 'Next prompt will fan out' : 'Next prompt stays here',
+    );
   };
 
   const setPanelVisible = (visible: boolean) => {
@@ -709,26 +788,64 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     memberState: GroupMemberState,
     globalSyncEnabled: boolean,
   ) => {
-    const displayState = getDisplayMemberState(memberState);
     const member = workspaceSummary.workspace.members[provider];
 
-    if (displayState === 'pending') {
-      return 'pending';
+    if (memberState === 'pending') {
+      return 'connecting';
     }
 
     if (!member) {
       return 'not connected';
     }
 
-    if (displayState === 'inactive') {
-      return displayState;
+    if (memberState === 'inactive') {
+      return 'no live tab';
     }
 
     if (!globalSyncEnabled) {
       return 'frozen';
     }
 
-    return displayState;
+    if (memberState === 'ready') {
+      return 'ready';
+    }
+
+    if (memberState === 'login-required') {
+      return 'needs login';
+    }
+
+    if (memberState === 'not-ready') {
+      return 'loading';
+    }
+
+    if (memberState === 'stale') {
+      return 'check tab';
+    }
+
+    return 'not connected';
+  };
+
+  const getProviderDotState = (
+    memberState: GroupMemberState,
+    globalSyncEnabled: boolean,
+  ): 'active' | 'pending' | 'frozen' | 'warning' | 'inactive' => {
+    if (!globalSyncEnabled && memberState === 'ready') {
+      return 'frozen';
+    }
+
+    if (memberState === 'ready') {
+      return 'active';
+    }
+
+    if (memberState === 'pending') {
+      return 'pending';
+    }
+
+    if (memberState === 'login-required' || memberState === 'not-ready' || memberState === 'stale') {
+      return 'warning';
+    }
+
+    return 'inactive';
   };
 
   const renderPanel = (response: WorkspaceContextResponseMessage | null) => {
@@ -780,12 +897,9 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       <div class="ask-em-panel-list">
         ${visibleProviders
           .map((provider) => {
-            const memberState = getDisplayMemberState(
-              workspaceSummary.memberStates[provider] ?? 'inactive',
-            );
+            const memberState = workspaceSummary.memberStates[provider] ?? 'inactive';
             const enabled = workspaceSummary.workspace.enabledProviders.includes(provider);
-            const dotState =
-              !response.globalSyncEnabled && memberState === 'active' ? 'frozen' : memberState;
+            const dotState = getProviderDotState(memberState, response.globalSyncEnabled);
             const meta = getProviderMeta(provider, workspaceSummary, memberState, response.globalSyncEnabled);
             const isCurrent = provider === adapter.name;
 
@@ -853,7 +967,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       context.providerEnabled = nextEnabled;
       mount.dataset.providerEnabled = String(nextEnabled);
       await refreshPanel();
-      setTransientLabel(nextEnabled ? 'current model sync resumed' : 'current model sync paused', 2_000);
+      updateSyncLabel(nextEnabled ? 'Ready for next prompt' : 'This tab is paused');
     } finally {
       setCurrentProviderToggleBusy(false);
     }
@@ -868,12 +982,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     handlers.onStandaloneSetCreationToggle(nextEnabled);
     context.standaloneCreateSetEnabled = nextEnabled;
     mount.dataset.standaloneCreateSetEnabled = String(nextEnabled);
-    setTransientLabel(
-      nextEnabled
-        ? 'prompt will be send to other models'
-        : 'no more sync. no tab will be open.',
-      3_000,
-    );
+    updateSyncLabel(nextEnabled ? 'Next prompt will fan out' : 'Next prompt stays here');
   };
 
   const refreshPanel = async () => {
@@ -891,7 +1000,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
     context.globalSyncEnabled = response.globalSyncEnabled;
     mount.dataset.globalSyncEnabled = String(context.globalSyncEnabled);
-    syncLabel();
+    syncPrimaryLabel();
     renderPanel(response);
   };
 
@@ -992,7 +1101,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         }
         await refreshPanel();
         if (provider === adapter.name) {
-          setTransientLabel(nextEnabled ? 'current model sync resumed' : 'current model sync paused', 2_000);
+          updateSyncLabel(nextEnabled ? 'Ready for next prompt' : 'This tab is paused');
         }
       })
       .finally(() => {
@@ -1041,16 +1150,14 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     setState(state: UiState, labelText?: string) {
       mount.dataset.state = state;
       if (labelText) {
-        transientLabel = null;
-        if (transientLabelTimeout !== null) {
-          window.clearTimeout(transientLabelTimeout);
-          transientLabelTimeout = null;
-        }
         updateLabel(labelText);
         return;
       }
 
-      syncLabel();
+      syncPrimaryLabel();
+    },
+    setSyncStatus(text: string, tone: SyncIndicatorTone = 'neutral') {
+      updateSyncLabel(text, tone);
     },
     setContext(nextContext: UiContext) {
       context.workspaceId = nextContext.workspaceId;
@@ -1072,7 +1179,8 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         renderPanel(null);
       }
 
-      syncLabel();
+      syncPrimaryLabel();
+      syncStandaloneStatusLabel();
     },
   };
 }

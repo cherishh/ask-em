@@ -28,7 +28,7 @@ const MORE_PROVIDER_REQUEST_OPTIONS = [
 ] as const;
 
 const MORE_PROVIDERS_REQUEST_ENDPOINT = '';
-const MORE_PROVIDERS_REQUEST_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
+const MORE_PROVIDERS_REQUEST_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const MORE_PROVIDERS_REQUEST_STORAGE_KEY = 'askem-more-providers-last-submitted-at';
 const MIN_WORKSPACES_FOR_FREEZE_CONTROL = 2;
 // TODO: wire this to the final HTTP endpoint for collecting provider requests.
@@ -42,19 +42,13 @@ function formatTime(timestamp: number): string {
   }).format(timestamp);
 }
 
-function getDisplayMemberState(state: GroupMemberState): Exclude<GroupMemberState, 'stale'> {
-  return state === 'stale' ? 'active' : state;
-}
-
 function getDisplayMemberStateTone(
   state: GroupMemberState,
   enabled: boolean,
   globalSyncEnabled: boolean,
-): 'active' | 'inactive' | 'pending' | 'sync-paused' | 'frozen' {
-  const displayState = getDisplayMemberState(state);
-
-  if (displayState === 'inactive' || displayState === 'pending') {
-    return displayState;
+): 'active' | 'inactive' | 'pending' | 'sync-paused' | 'frozen' | 'warning' {
+  if (state === 'inactive' || state === 'pending') {
+    return state;
   }
 
   if (!globalSyncEnabled) {
@@ -65,7 +59,15 @@ function getDisplayMemberStateTone(
     return 'sync-paused';
   }
 
-  return displayState;
+  if (state === 'ready') {
+    return 'active';
+  }
+
+  if (state === 'login-required' || state === 'not-ready' || state === 'stale') {
+    return 'warning';
+  }
+
+  return 'inactive';
 }
 
 function getDisplayMemberStateLabel(
@@ -73,13 +75,11 @@ function getDisplayMemberStateLabel(
   enabled: boolean,
   globalSyncEnabled: boolean,
 ): string {
-  const displayState = getDisplayMemberState(state);
-
-  if (displayState === 'inactive') {
+  if (state === 'inactive') {
     return 'No Live Tab';
   }
 
-  if (displayState === 'pending') {
+  if (state === 'pending') {
     return 'Connecting';
   }
 
@@ -91,7 +91,23 @@ function getDisplayMemberStateLabel(
     return 'Sync Paused';
   }
 
-  return 'Active';
+  if (state === 'ready') {
+    return 'Ready';
+  }
+
+  if (state === 'login-required') {
+    return 'Needs Login';
+  }
+
+  if (state === 'not-ready') {
+    return 'Loading';
+  }
+
+  if (state === 'stale') {
+    return 'Check Tab';
+  }
+
+  return 'No Live Tab';
 }
 
 function getMemberOutcomeCopy(
@@ -99,9 +115,7 @@ function getMemberOutcomeCopy(
   enabled: boolean,
   globalSyncEnabled: boolean,
 ): string {
-  const displayState = getDisplayMemberState(state);
-
-  if (displayState === 'inactive') {
+  if (state === 'inactive') {
     if (!enabled) {
       return 'This model has no open tab, and sync is paused, so it will not reopen on the next prompt.';
     }
@@ -109,7 +123,7 @@ function getMemberOutcomeCopy(
     return 'Reopens on the next synced prompt';
   }
 
-  if (displayState === 'pending') {
+  if (state === 'pending') {
     return 'Waiting for this model to connect';
   }
 
@@ -118,10 +132,26 @@ function getMemberOutcomeCopy(
   }
 
   if (!enabled) {
-    return 'Sync is paused for this model, so the next prompt will not be sent here.';
+    return 'Sync is paused for this model, so the next prompt will not be sent to others.';
   }
 
-  return 'Next prompt will be synced';
+  if (state === 'ready') {
+    return 'Next prompt will be synced';
+  }
+
+  if (state === 'login-required') {
+    return 'Sign in before syncing';
+  }
+
+  if (state === 'not-ready') {
+    return 'Waiting for this model to become ready';
+  }
+
+  if (state === 'stale') {
+    return 'Open tab has not checked in recently';
+  }
+
+  return 'Open this provider before syncing';
 }
 
 async function requestStatus(): Promise<StatusResponseMessage | null> {
@@ -369,11 +399,9 @@ export default function App() {
             <h1>ask&apos;em</h1>
             <p className="askem-slogan">One prompt, every official AI chat — full features, zero compromise.</p>
           </div>
-          <div className="askem-hero-actions">
-            <button className="askem-refresh askem-refresh-subtle" onClick={() => void refresh()} disabled={loading}>
-              {loading ? 'Syncing' : 'Refresh'}
-            </button>
-          </div>
+          <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => void refresh()} disabled={loading}>
+            {loading ? 'Syncing' : 'Refresh'}
+          </button>
         </header>
 
         <nav className="askem-view-tabs" aria-label="Popup sections">
@@ -759,7 +787,7 @@ function WorkspaceCard({
   const allProvidersInactive =
     visibleProviders.length > 0 &&
     visibleProviders.every(
-      (provider) => getDisplayMemberState(memberStates[provider] ?? 'inactive') === 'inactive',
+      (provider) => (memberStates[provider] ?? 'inactive') === 'inactive',
     );
 
   const displayLabel = workspace.label
@@ -802,8 +830,7 @@ function WorkspaceCard({
           const stateTone = getDisplayMemberStateTone(rawState, enabled, globalSyncEnabled);
           const stateLabel = getDisplayMemberStateLabel(rawState, enabled, globalSyncEnabled);
           const outcomeCopy = getMemberOutcomeCopy(rawState, enabled, globalSyncEnabled);
-          const displayState = getDisplayMemberState(rawState);
-          const showOpenLink = displayState === 'inactive' && !member?.sessionId;
+          const showOpenLink = rawState === 'inactive' && !member?.sessionId;
 
           return (
             <div className="askem-provider-row" key={`${workspace.id}:${provider}`}>
@@ -948,6 +975,7 @@ function OnboardingCard() {
             <span>It auto-syncs to the other models</span>
           </div>
         </div>
+        <p className="askem-onboarding-hint">Make sure you&apos;re logged in to each provider you want to sync.</p>
         <div className="askem-onboarding-providers">
           {PROVIDERS.map((provider) => (
             <button

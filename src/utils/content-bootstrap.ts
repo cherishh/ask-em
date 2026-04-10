@@ -3,6 +3,7 @@ import type {
   DeliverPromptMessage,
   PingMessage,
   PingResponseMessage,
+  ProviderDeliveryResult,
   RuntimeMessage,
   ShortcutConfig,
   WorkspaceContextResponseMessage,
@@ -15,14 +16,19 @@ import {
   observeUrlChanges,
   sendRuntimeMessage,
 } from './content-routing';
-import { createContentUi, type UiContext } from './content-ui';
+import { createContentUi, type SyncIndicatorTone, type UiContext } from './content-ui';
 
 const STARTUP_PRESENCE_POLL_MS = 1_000;
 const STARTUP_PRESENCE_DURATION_MS = 10_000;
+const PROGRAMMATIC_SUBMIT_SUPPRESS_MS = 30_000;
 
 function shouldShowStandaloneIndicator(adapter: ProviderAdapter): boolean {
   const status = adapter.session.getStatus();
   return status.pageKind === 'new-chat' && status.pageState === 'ready';
+}
+
+function formatModelCount(count: number): string {
+  return `${count} ${count === 1 ? 'model' : 'models'}`;
 }
 
 export function bootstrapContentScript(adapter: ProviderAdapter): void {
@@ -39,6 +45,7 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
   let suppressSubmissionsUntil = 0;
   let lastFingerprint = '';
   let lastFingerprintAt = 0;
+  const recentProgrammaticSubmits = new Map<string, number>();
   let startupPresenceInterval: number | null = null;
   let startupPresenceDeadline = 0;
 
@@ -97,6 +104,115 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
     return 'idle';
   };
 
+  const getRestingUiState = (context: UiContext): 'idle' | 'blocked' => {
+    if (!context.workspaceId) {
+      return getStandaloneUiState(context);
+    }
+
+    if (!context.globalSyncEnabled || !context.providerEnabled) {
+      return 'blocked';
+    }
+
+    return 'idle';
+  };
+
+  const getDeliveryResultPresentation = (deliveryResults: ProviderDeliveryResult[]) => {
+    const total = deliveryResults.length;
+    if (total === 0) {
+      return null;
+    }
+
+    const failed = deliveryResults.filter((result) => !result.ok);
+    const succeeded = total - failed.length;
+
+    if (failed.length === 0) {
+      return {
+        state: 'idle' as const,
+        label: `Synced to ${formatModelCount(total)}`,
+        tone: 'success' as SyncIndicatorTone,
+      };
+    }
+
+    if (succeeded === 0) {
+      return {
+        state: 'blocked' as const,
+        label: failed.length === 1 ? `${failed[0].provider} failed` : 'Sync failed',
+        tone: 'warning' as SyncIndicatorTone,
+      };
+    }
+
+    return {
+      state: 'blocked' as const,
+      label: failed.length === 1 ? `${failed[0].provider} failed` : `${failed.length} providers failed`,
+      tone: 'warning' as SyncIndicatorTone,
+    };
+  };
+
+  const getNoDeliveryPresentation = (response: {
+    synced?: boolean;
+    providerEnabled?: boolean;
+    globalSyncEnabled?: boolean;
+  } | null) => {
+    if (!response) {
+      return {
+        label: 'Sync status unavailable',
+        tone: 'warning' as SyncIndicatorTone,
+      };
+    }
+
+    if (!response.globalSyncEnabled) {
+      return {
+        label: 'Prompt stayed here',
+        tone: 'neutral' as SyncIndicatorTone,
+      };
+    }
+
+    if (response.providerEnabled === false) {
+      return {
+        label: 'This tab is paused',
+        tone: 'neutral' as SyncIndicatorTone,
+      };
+    }
+
+    if (response.synced === false) {
+      return {
+        label: 'No fan-out sent',
+        tone: 'neutral' as SyncIndicatorTone,
+      };
+    }
+
+    return null;
+  };
+
+  const getSubmitContentFingerprint = (content: string) => content.trim();
+
+  const rememberProgrammaticSubmit = (content: string) => {
+    recentProgrammaticSubmits.set(
+      getSubmitContentFingerprint(content),
+      Date.now() + PROGRAMMATIC_SUBMIT_SUPPRESS_MS,
+    );
+  };
+
+  const shouldSuppressProgrammaticSubmit = (content: string) => {
+    const now = Date.now();
+
+    for (const [fingerprint, expiresAt] of recentProgrammaticSubmits) {
+      if (expiresAt <= now) {
+        recentProgrammaticSubmits.delete(fingerprint);
+      }
+    }
+
+    const fingerprint = getSubmitContentFingerprint(content);
+    const expiresAt = recentProgrammaticSubmits.get(fingerprint);
+
+    if (!expiresAt || expiresAt <= now) {
+      return false;
+    }
+
+    recentProgrammaticSubmits.delete(fingerprint);
+    return true;
+  };
+
   const reportPresence = async (kind: 'HELLO' | 'HEARTBEAT') => {
     const status = adapter.session.getStatus();
     const response =
@@ -117,8 +233,9 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
           }>(buildHeartbeatMessage(adapter));
 
     const standaloneVisible = shouldShowStandaloneIndicator(adapter);
-    const standaloneCreateSetEnabled =
-      !response?.workspaceId && standaloneVisible ? uiContext.standaloneCreateSetEnabled : true;
+    const standaloneCreateSetEnabled = response?.workspaceId
+      ? true
+      : uiContext.standaloneCreateSetEnabled;
     uiContext = {
       workspaceId: response?.workspaceId ?? null,
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? false) : true,
@@ -163,7 +280,7 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
           providerEnabled: nextEnabled,
         };
         ui.setContext(uiContext);
-        ui.setState('idle');
+        ui.setState(getRestingUiState(uiContext));
       }
     },
     onStandaloneSetCreationToggle(nextEnabled) {
@@ -188,6 +305,15 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
   const reportUserSubmit = async (rawContent: string) => {
     const content = rawContent.trim();
     if (!content || Date.now() < suppressSubmissionsUntil) {
+      return;
+    }
+
+    if (shouldSuppressProgrammaticSubmit(content)) {
+      await logDebug({
+        level: 'info',
+        message: 'Skipped programmatic submit echo',
+        detail: content.slice(0, 120),
+      });
       return;
     }
 
@@ -216,7 +342,6 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
       return;
     }
 
-    ui.setState('listening', 'sync');
     await logDebug({
       level: 'info',
       message: 'Detected user submit',
@@ -229,6 +354,7 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
       providerEnabled?: boolean;
       globalSyncEnabled?: boolean;
       canStartNewSet?: boolean;
+      deliveryResults?: ProviderDeliveryResult[];
     }>(buildUserSubmitMessage(status, content));
 
     const standaloneReady = shouldShowStandaloneIndicator(adapter);
@@ -237,26 +363,29 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? true) : true,
       globalSyncEnabled: response?.globalSyncEnabled ?? uiContext.globalSyncEnabled,
       standaloneReady,
-      standaloneCreateSetEnabled:
-        !response?.workspaceId && standaloneReady ? uiContext.standaloneCreateSetEnabled : true,
+      standaloneCreateSetEnabled: response?.workspaceId
+        ? true
+        : uiContext.standaloneCreateSetEnabled,
       canStartNewSet: response?.canStartNewSet ?? uiContext.canStartNewSet,
       shortcuts: uiContext.shortcuts,
     };
     ui.setContext(uiContext);
     ui.setVisible(Boolean(uiContext.workspaceId) || standaloneReady);
-    ui.setState(getStandaloneUiState(uiContext));
+    const deliveryPresentation =
+      response?.synced && response.deliveryResults
+        ? getDeliveryResultPresentation(response.deliveryResults)
+        : null;
 
-    window.setTimeout(
-      () =>
-        ui.setState(
-          uiContext.workspaceId
-            ? uiContext.providerEnabled
-              ? 'idle'
-              : 'blocked'
-            : getStandaloneUiState(uiContext),
-        ),
-      1_500,
-    );
+    if (deliveryPresentation) {
+      ui.setState(deliveryPresentation.state);
+      ui.setSyncStatus(deliveryPresentation.label, deliveryPresentation.tone);
+    } else {
+      const noDeliveryPresentation = getNoDeliveryPresentation(response);
+      ui.setState(getRestingUiState(uiContext));
+      if (noDeliveryPresentation) {
+        ui.setSyncStatus(noDeliveryPresentation.label, noDeliveryPresentation.tone);
+      }
+    }
   };
 
   const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.((content) => {
@@ -314,7 +443,8 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
           detail: JSON.stringify(snapshot),
           workspaceId: message.workspaceId,
         });
-        ui.setState('blocked', 'paused');
+        ui.setState('blocked');
+        ui.setSyncStatus('Delivery blocked', 'warning');
         sendResponse({ ok: false, blocked: true, snapshot });
         return;
       }
@@ -325,14 +455,14 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
           message: 'Blocked prompt delivery because provider has no composer adapter',
           workspaceId: message.workspaceId,
         });
-        ui.setState('blocked', 'paused');
+        ui.setState('blocked');
+        ui.setSyncStatus('Delivery blocked', 'warning');
         sendResponse({ ok: false, blocked: true, error: 'Provider does not support prompt delivery' });
         return;
       }
 
       try {
         suppressSubmissionsUntil = Date.now() + 2_500;
-        ui.setState('syncing', 'sync');
         await logDebug({
           level: 'info',
           message: 'Starting prompt delivery in content',
@@ -342,6 +472,7 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
 
         const baselineUrl = adapter.session.getCurrentUrl();
         await adapter.composer.setComposerText(message.content);
+        rememberProgrammaticSubmit(message.content);
         await adapter.composer.submit();
 
         const shouldAwaitSessionRef =
@@ -371,7 +502,8 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
             });
         }
 
-        window.setTimeout(() => ui.setState('idle'), 1_500);
+        ui.setState('idle');
+        ui.setSyncStatus('Received synced prompt', 'success');
         sendResponse({ ok: true });
       } catch (error) {
         await logDebug({
@@ -380,7 +512,8 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
           detail: error instanceof Error ? error.message : String(error),
           workspaceId: message.workspaceId,
         });
-        ui.setState('blocked', 'paused');
+        ui.setState('blocked');
+        ui.setSyncStatus('Delivery failed', 'warning');
         sendResponse({
           ok: false,
           error: error instanceof Error ? error.message : String(error),

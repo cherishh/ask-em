@@ -4,6 +4,7 @@ import {
   type GetWorkspaceContextMessage,
   type HeartbeatMessage,
   type HelloMessage,
+  type ProviderDeliveryResult,
   type Provider,
   type RuntimeMessage,
   type StatusResponseMessage,
@@ -319,12 +320,12 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
 async function deliverPromptToWorkspaceTargets(
   workspaceId: string,
   message: UserSubmitMessage,
-): Promise<void> {
+): Promise<ProviderDeliveryResult[]> {
   const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
   const workspace = localState.workspaces[workspaceId];
 
   if (!workspace) {
-    return;
+    return [];
   }
 
   cancelScheduledGroupGc(workspaceId);
@@ -333,7 +334,7 @@ async function deliverPromptToWorkspaceTargets(
     shouldSyncWorkspaceProvider(message.provider, provider, workspace.enabledProviders),
   );
 
-  await Promise.allSettled(
+  const settledResults = await Promise.allSettled(
     providers.map(async (provider) => {
       try {
         const target = await resolveDeliveryTarget(workspace, provider, sessionState);
@@ -377,27 +378,58 @@ async function deliverPromptToWorkspaceTargets(
 
         const payload = response as { ok?: boolean; blocked?: boolean; error?: string } | undefined;
         if (!payload?.ok) {
+          const reason = payload?.error ?? (payload?.blocked ? 'Prompt delivery blocked' : 'Prompt delivery failed');
           await logDebug({
             level: payload?.blocked ? 'warn' : 'error',
             scope: 'background',
             provider,
             workspaceId,
             message: payload?.blocked ? 'Prompt delivery blocked' : 'Prompt delivery failed',
-            detail: payload?.error,
+            detail: reason,
           });
+          return {
+            provider,
+            ok: false,
+            blocked: payload?.blocked,
+            reason,
+          } satisfies ProviderDeliveryResult;
         }
+
+        return {
+          provider,
+          ok: true,
+        } satisfies ProviderDeliveryResult;
       } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
         await logDebug({
           level: 'error',
           scope: 'background',
           provider,
           workspaceId,
           message: 'Prompt delivery threw',
-          detail: error instanceof Error ? error.message : String(error),
+          detail: reason,
         });
+        return {
+          provider,
+          ok: false,
+          reason,
+        } satisfies ProviderDeliveryResult;
       }
     }),
   );
+
+  return settledResults.map((result, index) => {
+    if (result.status === 'fulfilled') {
+      return result.value;
+    }
+
+    const provider = providers[index];
+    return {
+      provider,
+      ok: false,
+      reason: result.reason instanceof Error ? result.reason.message : String(result.reason),
+    } satisfies ProviderDeliveryResult;
+  });
 }
 
 async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runtime.MessageSender) {
@@ -521,7 +553,7 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
     };
   }
 
-  await deliverPromptToWorkspaceTargets(workspaceLookup.workspaceId, message);
+  const deliveryResults = await deliverPromptToWorkspaceTargets(workspaceLookup.workspaceId, message);
 
   return {
     ok: true,
@@ -530,6 +562,7 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
     providerEnabled: true,
     globalSyncEnabled: true,
     canStartNewSet: canStartNewSet(localState),
+    deliveryResults,
   };
 }
 
@@ -573,7 +606,11 @@ function buildWorkspaceSummary(
         return [provider, 'inactive'];
       }
 
-      return [provider, isClaimedTabStale(claimedTab) ? 'stale' : 'active'];
+      if (isClaimedTabStale(claimedTab)) {
+        return [provider, 'stale'];
+      }
+
+      return [provider, claimedTab.pageState === 'ready' ? 'ready' : claimedTab.pageState];
     }),
   );
 
