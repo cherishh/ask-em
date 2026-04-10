@@ -234,6 +234,138 @@ export async function detachClaimedTabForNewChat(
   };
 }
 
+export async function detachClaimedTabForForeignSession(
+  localState: Awaited<ReturnType<typeof getLocalState>>,
+  sessionState: Awaited<ReturnType<typeof getSessionState>>,
+  tabId: number,
+  provider: Provider,
+  sessionId: string | null,
+  logMessage: string,
+) {
+  if (!sessionId) {
+    return {
+      sessionState,
+      detachedWorkspaceId: null,
+    };
+  }
+
+  const claimedTab = getClaimedTabByTabId(sessionState, tabId, provider);
+  const claimedWorkspace = claimedTab ? localState.workspaces[claimedTab.workspaceId] : null;
+  const member = claimedWorkspace?.members[provider];
+  const isPendingSourceBinding = Boolean(
+    claimedWorkspace &&
+    claimedWorkspace.pendingSource === provider &&
+    claimedWorkspace.members[provider]?.sessionId === null,
+  );
+  const hasBoundMemberSession = Boolean(member?.sessionId);
+  const isStillOnBoundSession = member?.sessionId === sessionId;
+
+  if (
+    !claimedTab ||
+    !claimedWorkspace ||
+    isPendingSourceBinding ||
+    !hasBoundMemberSession ||
+    isStillOnBoundSession
+  ) {
+    return {
+      sessionState,
+      detachedWorkspaceId: null,
+    };
+  }
+
+  const nextSessionState = await clearClaimedTab(claimedTab.workspaceId, provider);
+
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    workspaceId: claimedTab.workspaceId,
+    provider,
+    message: logMessage,
+    detail: `${member?.sessionId ?? 'unbound'} -> ${sessionId}`,
+  });
+
+  await scheduleGroupGcIfEmpty(claimedTab.workspaceId);
+
+  return {
+    sessionState: nextSessionState,
+    detachedWorkspaceId: claimedTab.workspaceId,
+  };
+}
+
+export async function detachClaimedTabForUnresolvedExistingSession(
+  localState: Awaited<ReturnType<typeof getLocalState>>,
+  sessionState: Awaited<ReturnType<typeof getSessionState>>,
+  tabId: number,
+  provider: Provider,
+  logMessage: string,
+) {
+  const claimedTab = getClaimedTabByTabId(sessionState, tabId, provider);
+  const claimedWorkspace = claimedTab ? localState.workspaces[claimedTab.workspaceId] : null;
+  const member = claimedWorkspace?.members[provider];
+  const isPendingSourceBinding = Boolean(
+    claimedWorkspace &&
+    claimedWorkspace.pendingSource === provider &&
+    claimedWorkspace.members[provider]?.sessionId === null,
+  );
+  const hasBoundMemberSession = Boolean(member?.sessionId);
+
+  if (!claimedTab || !claimedWorkspace || isPendingSourceBinding || !hasBoundMemberSession) {
+    return {
+      sessionState,
+      detachedWorkspaceId: null,
+    };
+  }
+
+  const nextSessionState = await clearClaimedTab(claimedTab.workspaceId, provider);
+
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    workspaceId: claimedTab.workspaceId,
+    provider,
+    message: logMessage,
+    detail: `${member?.sessionId ?? 'unbound'} -> unresolved existing-session`,
+  });
+
+  await scheduleGroupGcIfEmpty(claimedTab.workspaceId);
+
+  return {
+    sessionState: nextSessionState,
+    detachedWorkspaceId: claimedTab.workspaceId,
+  };
+}
+
+export async function transferClaimedTabToWorkspace(
+  localState: Awaited<ReturnType<typeof getLocalState>>,
+  sessionState: Awaited<ReturnType<typeof getSessionState>>,
+  tabId: number,
+  provider: Provider,
+  targetWorkspaceId: string,
+) {
+  const claimedTab = getClaimedTabByTabId(sessionState, tabId, provider);
+
+  if (!claimedTab || claimedTab.workspaceId === targetWorkspaceId) {
+    return sessionState;
+  }
+
+  const nextSessionState = await clearClaimedTab(claimedTab.workspaceId, provider);
+
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    workspaceId: claimedTab.workspaceId,
+    provider,
+    message: 'Transferred claimed tab to matching workspace session',
+    detail: `${claimedTab.workspaceId} -> ${targetWorkspaceId}`,
+  });
+
+  if (localState.workspaces[claimedTab.workspaceId]) {
+    await scheduleGroupGcIfEmpty(claimedTab.workspaceId);
+  }
+
+  return nextSessionState;
+}
+
 async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, sender: chrome.runtime.MessageSender) {
   const tabId = sender.tab?.id;
   if (!tabId) {
@@ -257,6 +389,43 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
   }
 
   let workspaceLookup = lookupWorkspaceBySession(localState, message.provider, message.sessionId);
+
+  if (workspaceLookup) {
+    sessionState = await transferClaimedTabToWorkspace(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      workspaceLookup.workspaceId,
+    );
+  }
+
+  if (!workspaceLookup && message.sessionId) {
+    const detachResult = await detachClaimedTabForForeignSession(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      message.sessionId,
+      'Detached claimed tab from previous group on existing-session navigation',
+    );
+    sessionState = detachResult.sessionState;
+  }
+
+  if (
+    !workspaceLookup &&
+    message.pageKind === 'existing-session' &&
+    message.sessionId === null
+  ) {
+    const detachResult = await detachClaimedTabForUnresolvedExistingSession(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      'Detached claimed tab from previous group on unresolved existing-session navigation',
+    );
+    sessionState = detachResult.sessionState;
+  }
 
   if (!workspaceLookup) {
     const claimedTab = getClaimedTabByTabId(sessionState, tabId, message.provider);
@@ -432,10 +601,43 @@ async function deliverPromptToWorkspaceTargets(
   });
 }
 
-async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runtime.MessageSender) {
+export async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runtime.MessageSender) {
   const tabId = sender.tab?.id;
   let { localState, sessionState } = await refreshPendingState();
   let workspaceLookup = lookupWorkspaceBySession(localState, message.provider, message.sessionId);
+
+  if (workspaceLookup && tabId) {
+    sessionState = await transferClaimedTabToWorkspace(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      workspaceLookup.workspaceId,
+    );
+  }
+
+  if (!workspaceLookup && tabId && message.sessionId) {
+    const detachResult = await detachClaimedTabForForeignSession(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      message.sessionId,
+      'Detached claimed tab from previous group on existing-session submit',
+    );
+    sessionState = detachResult.sessionState;
+  }
+
+  if (!workspaceLookup && tabId && message.pageKind === 'existing-session' && message.sessionId === null) {
+    const detachResult = await detachClaimedTabForUnresolvedExistingSession(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      'Detached claimed tab from previous group on unresolved existing-session submit',
+    );
+    sessionState = detachResult.sessionState;
+  }
 
   if (!workspaceLookup && tabId && message.pageKind === 'new-chat' && message.sessionId === null) {
     const detachResult = await detachClaimedTabForNewChat(
