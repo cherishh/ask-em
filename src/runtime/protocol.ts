@@ -38,13 +38,12 @@ export type ShortcutBinding = {
   alt: boolean;
 };
 
-export type ShortcutId = 'toggleProviderSync' | 'toggleGlobalSync';
+export type ShortcutId = 'togglePageParticipation';
 
 export type ShortcutConfig = Record<ShortcutId, ShortcutBinding>;
 
 export const DEFAULT_SHORTCUTS: ShortcutConfig = {
-  toggleProviderSync: { key: '.', meta: false, ctrl: true, shift: false, alt: false },
-  toggleGlobalSync: { key: '.', meta: false, ctrl: true, shift: true, alt: false },
+  togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false },
 };
 
 export function formatShortcutDisplay(binding: ShortcutBinding, isApple: boolean): string {

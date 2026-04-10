@@ -767,20 +767,12 @@ function WorkspaceCard({
   );
 }
 
-const SHORTCUT_LABELS: Record<ShortcutId, string> = {
-  toggleProviderSync: 'Toggle current model sync',
-  toggleGlobalSync: 'Toggle global sync',
-};
-
-function bindingsEqual(a: ShortcutBinding, b: ShortcutBinding): boolean {
-  return (
-    a.key.toLowerCase() === b.key.toLowerCase() &&
-    a.shift === b.shift &&
-    a.alt === b.alt &&
-    // Treat meta and ctrl as equivalent (Apple vs non-Apple)
-    (a.meta || a.ctrl) === (b.meta || b.ctrl)
-  );
-}
+const SHORTCUT_ROWS = [
+  {
+    id: 'togglePageParticipation',
+    label: 'Toggle this page in ask’em',
+  },
+] as const satisfies Array<{ id: ShortcutId; label: string }>;
 
 function ShortcutRecorder({
   binding,
@@ -856,24 +848,14 @@ function ShortcutsCard({
   onUpdateShortcut: (id: ShortcutId, binding: ShortcutBinding) => Promise<void>;
   onResetShortcuts: () => Promise<void>;
 }) {
-  const [conflictMessage, setConflictMessage] = useState<string | null>(null);
   const isDefault =
     JSON.stringify(shortcuts) === JSON.stringify(DEFAULT_SHORTCUTS);
 
-  const hasConflict = bindingsEqual(shortcuts.toggleProviderSync, shortcuts.toggleGlobalSync);
-
   const handleRecord = (id: ShortcutId, binding: ShortcutBinding) => {
-    const otherId: ShortcutId = id === 'toggleProviderSync' ? 'toggleGlobalSync' : 'toggleProviderSync';
-    if (bindingsEqual(binding, shortcuts[otherId])) {
-      setConflictMessage(`This shortcut is already used by "${SHORTCUT_LABELS[otherId]}".`);
-      return;
-    }
-    setConflictMessage(null);
     void onUpdateShortcut(id, binding);
   };
 
   const handleReset = () => {
-    setConflictMessage(null);
     void onResetShortcuts();
   };
 
@@ -894,17 +876,14 @@ function ShortcutsCard({
           </button>
         )}
       </div>
-      {(conflictMessage || hasConflict) && (
-        <p className="askem-shortcut-conflict">{conflictMessage ?? 'Both shortcuts use the same key combination.'}</p>
-      )}
       <div className="askem-shortcut-list">
-        {(Object.keys(SHORTCUT_LABELS) as ShortcutId[]).map((id) => (
+        {SHORTCUT_ROWS.map(({ id, label }) => (
           <div className="askem-shortcut-row" key={id}>
-            <span className="askem-shortcut-action">{SHORTCUT_LABELS[id]}</span>
+            <span className="askem-shortcut-action">{label}</span>
             <ShortcutRecorder
               binding={shortcuts[id]}
               onRecord={(binding) => handleRecord(id, binding)}
-              conflict={hasConflict}
+              conflict={false}
             />
           </div>
         ))}

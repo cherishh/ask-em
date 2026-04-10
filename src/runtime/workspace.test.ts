@@ -20,7 +20,7 @@ function createEmptyState(): LocalState {
     globalSyncEnabled: true,
     debugLoggingEnabled: false,
     defaultEnabledProviders: createDefaultEnabledProviders(),
-    shortcuts: { toggleProviderSync: { key: '.', meta: false, ctrl: true, shift: false, alt: false }, toggleGlobalSync: { key: '.', meta: false, ctrl: true, shift: true, alt: false } },
+    shortcuts: { togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false } },
     workspaces: {},
     workspaceIndex: {},
     debugLogs: [],
@@ -254,7 +254,7 @@ describe('workspace state', () => {
       globalSyncEnabled: true,
       debugLoggingEnabled: false,
       defaultEnabledProviders: createDefaultEnabledProviders(),
-      shortcuts: { toggleProviderSync: { key: '.', meta: false, ctrl: true, shift: false, alt: false }, toggleGlobalSync: { key: '.', meta: false, ctrl: true, shift: true, alt: false } },
+      shortcuts: { togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false } },
       workspaces: {
         w1: { id: 'w1', members: {}, enabledProviders: [], createdAt: 1, updatedAt: 1 },
         w2: { id: 'w2', members: {}, enabledProviders: [], createdAt: 2, updatedAt: 2 },

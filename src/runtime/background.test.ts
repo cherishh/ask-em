@@ -24,7 +24,7 @@ function createLocalState(): LocalState {
       gemini: true,
       deepseek: true,
     },
-    shortcuts: { toggleProviderSync: { key: '.', meta: false, ctrl: true, shift: false, alt: false }, toggleGlobalSync: { key: '.', meta: false, ctrl: true, shift: true, alt: false } },
+    shortcuts: { togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false } },
     workspaces: {},
     workspaceIndex: {},
     debugLogs: [],

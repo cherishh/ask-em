@@ -17,13 +17,14 @@ export type UiContext = {
   providerEnabled: boolean;
   globalSyncEnabled: boolean;
   standaloneReady: boolean;
+  standaloneCreateSetEnabled: boolean;
   canStartNewSet: boolean;
   shortcuts: ShortcutConfig;
 };
 
 export type UiHandlers = {
   onWorkspaceProviderToggle: (provider: Provider, nextEnabled: boolean) => Promise<void>;
-  onGlobalSyncToggle: (nextEnabled: boolean) => Promise<void>;
+  onStandaloneSetCreationToggle: (nextEnabled: boolean) => void;
   loadWorkspaceContext: (workspaceId: string) => Promise<WorkspaceContextResponseMessage | null>;
   onRefreshContext: () => Promise<void>;
 };
@@ -201,6 +202,17 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         background: rgba(246, 244, 241, 0.98);
         color: rgba(68, 64, 60, 0.88);
         --ask-em-accent: rgba(120, 113, 108, 0.84);
+      }
+
+      .ask-em-sync-pill[data-standalone-create-set-enabled="false"] {
+        border-color: rgba(120, 113, 108, 0.2);
+        background: rgba(246, 244, 241, 0.98);
+        color: rgba(68, 64, 60, 0.88);
+        --ask-em-accent: rgba(120, 113, 108, 0.84);
+      }
+
+      .ask-em-sync-pill[data-standalone-create-set-enabled="false"]::before {
+        animation: none;
       }
 
       .ask-em-sync-pill[data-global-sync-enabled="false"] {
@@ -592,6 +604,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     mount.dataset.state = 'idle';
     mount.dataset.providerEnabled = 'true';
     mount.dataset.globalSyncEnabled = 'true';
+    mount.dataset.standaloneCreateSetEnabled = 'true';
     mount.dataset.interactive = 'false';
     mount.dataset.visible = 'false';
     mount.innerHTML = `<span class="ask-em-pill-label">ready</span>`;
@@ -606,6 +619,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     providerEnabled: true,
     globalSyncEnabled: true,
     standaloneReady: false,
+    standaloneCreateSetEnabled: true,
     canStartNewSet: true,
     shortcuts: DEFAULT_SHORTCUTS,
   };
@@ -624,14 +638,18 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   const getDefaultLabel = () => {
     if (!context.workspaceId) {
       if (!context.globalSyncEnabled) {
-        return 'sync off';
+        return 'global sync off';
       }
 
       if (!context.canStartNewSet) {
         return 'set limit reached';
       }
 
-      return 'sync ready';
+      if (!context.standaloneCreateSetEnabled) {
+        return 'fan-out off';
+      }
+
+      return 'fan-out on';
     }
 
     if (!context.globalSyncEnabled || !context.providerEnabled) {
@@ -703,7 +721,22 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     const workspaceSummary = response?.workspaceSummary;
     if (!workspaceSummary || !context.workspaceId) {
       if (context.standaloneReady && !context.workspaceId) {
-        renderTooltip('Click to toggle global sync.', formatBindingKeys(context.shortcuts.toggleGlobalSync));
+        if (!context.globalSyncEnabled) {
+          renderTooltip('Global sync is off in the popup.');
+          return;
+        }
+
+        if (!context.canStartNewSet) {
+          renderTooltip('Set limit reached. Clear a set in the popup first.');
+          return;
+        }
+
+        renderTooltip(
+          context.standaloneCreateSetEnabled
+            ? 'Click to chat here without creating a set.'
+            : 'Click to allow this chat to create a new set.',
+          formatBindingKeys(context.shortcuts.togglePageParticipation),
+        );
         return;
       }
 
@@ -766,7 +799,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       </div>
       <div class="ask-em-panel-shortcut">
         <span>Pause/restart sync for this tab</span>
-        ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.toggleProviderSync))}
+        ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.togglePageParticipation))}
       </div>
     `;
 
@@ -810,22 +843,21 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     }
   };
 
-  const toggleGlobalSync = async () => {
-    if (currentProviderToggleBusy) {
+  const toggleStandaloneSetCreation = () => {
+    if (currentProviderToggleBusy || !context.globalSyncEnabled || !context.canStartNewSet) {
       return;
     }
 
-    const nextEnabled = !context.globalSyncEnabled;
-    setCurrentProviderToggleBusy(true);
-
-    try {
-      await handlers.onGlobalSyncToggle(nextEnabled);
-      context.globalSyncEnabled = nextEnabled;
-      mount.dataset.globalSyncEnabled = String(nextEnabled);
-      setTransientLabel(nextEnabled ? 'global sync ready' : 'global sync off');
-    } finally {
-      setCurrentProviderToggleBusy(false);
-    }
+    const nextEnabled = !context.standaloneCreateSetEnabled;
+    handlers.onStandaloneSetCreationToggle(nextEnabled);
+    context.standaloneCreateSetEnabled = nextEnabled;
+    mount.dataset.standaloneCreateSetEnabled = String(nextEnabled);
+    setTransientLabel(
+      nextEnabled
+        ? 'prompt will be send to other models'
+        : 'no more sync. no tab will be open.',
+      3_000,
+    );
   };
 
   const refreshPanel = async () => {
@@ -869,7 +901,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     event.stopPropagation();
 
     if (!context.workspaceId && context.standaloneReady) {
-      void toggleGlobalSync();
+      toggleStandaloneSetCreation();
       return;
     }
 
@@ -892,7 +924,22 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       return;
     }
 
-    renderTooltip('Click to toggle global sync.', formatBindingKeys(context.shortcuts.toggleGlobalSync));
+    if (!context.globalSyncEnabled) {
+      renderTooltip('Global sync is off in the popup.');
+      return;
+    }
+
+    if (!context.canStartNewSet) {
+      renderTooltip('Set limit reached. Clear a set in the popup first.');
+      return;
+    }
+
+    renderTooltip(
+      context.standaloneCreateSetEnabled
+        ? 'Click to chat here without creating a set.'
+        : 'Click to allow this chat to create a new set.',
+      formatBindingKeys(context.shortcuts.togglePageParticipation),
+    );
   });
 
   shell.addEventListener('mouseleave', () => {
@@ -949,17 +996,21 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   });
 
   document.addEventListener('keydown', (event) => {
-    if (matchesShortcut(event, context.shortcuts.toggleProviderSync) && context.workspaceId) {
+    if (!matchesShortcut(event, context.shortcuts.togglePageParticipation)) {
+      return;
+    }
+
+    if (context.workspaceId) {
       event.preventDefault();
       event.stopPropagation();
       void toggleCurrentProvider();
       return;
     }
 
-    if (matchesShortcut(event, context.shortcuts.toggleGlobalSync)) {
+    if (context.standaloneReady) {
       event.preventDefault();
       event.stopPropagation();
-      void toggleGlobalSync();
+      toggleStandaloneSetCreation();
     }
   });
 
@@ -990,10 +1041,14 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       context.providerEnabled = nextContext.providerEnabled;
       context.globalSyncEnabled = nextContext.globalSyncEnabled;
       context.standaloneReady = nextContext.standaloneReady;
+      context.standaloneCreateSetEnabled = nextContext.standaloneCreateSetEnabled;
       context.canStartNewSet = nextContext.canStartNewSet;
       context.shortcuts = nextContext.shortcuts;
       mount.dataset.providerEnabled = String(nextContext.providerEnabled);
       mount.dataset.globalSyncEnabled = String(nextContext.globalSyncEnabled);
+      mount.dataset.standaloneCreateSetEnabled = String(
+        nextContext.workspaceId ? true : nextContext.standaloneCreateSetEnabled,
+      );
       mount.dataset.interactive = String(Boolean(nextContext.workspaceId || nextContext.standaloneReady));
 
       if (!nextContext.workspaceId && !nextContext.standaloneReady) {

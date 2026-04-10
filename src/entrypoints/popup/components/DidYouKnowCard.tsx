@@ -1,10 +1,10 @@
 import { startTransition, useEffect, useState } from 'react';
 
 const DID_YOU_KNOW_TIPS = [
-  'Use Cmd/Ctrl + . to pause or restart sync for the current tab, and Cmd/Ctrl + Shift + . to toggle global sync.',
+  'Use Cmd/Ctrl + . to pause or restart sync for the current tab, or to keep a fresh chat out of a new set.',
   'Closed a provider in a set by mistake? The next prompt can reopen it automatically, so you can keep moving.',
   'Global Sync Off keeps prompts local and stops new sets from syncing until you turn it back on.',
-  'Click the standalone indicator on a fresh chat to toggle global sync instantly without opening the popup.',
+  'Click the standalone indicator on a fresh chat when you want to chat without creating a new set.',
 ] as const;
 
 export function DidYouKnowCard() {

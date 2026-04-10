@@ -31,6 +31,7 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
     providerEnabled: true,
     globalSyncEnabled: true,
     standaloneReady: false,
+    standaloneCreateSetEnabled: true,
     canStartNewSet: true,
     shortcuts: DEFAULT_SHORTCUTS,
   };
@@ -89,7 +90,7 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
       return 'idle';
     }
 
-    if (!context.globalSyncEnabled || !context.canStartNewSet) {
+    if (!context.globalSyncEnabled || !context.canStartNewSet || !context.standaloneCreateSetEnabled) {
       return 'blocked';
     }
 
@@ -116,11 +117,14 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
           }>(buildHeartbeatMessage(adapter));
 
     const standaloneVisible = shouldShowStandaloneIndicator(adapter);
+    const standaloneCreateSetEnabled =
+      !response?.workspaceId && standaloneVisible ? uiContext.standaloneCreateSetEnabled : true;
     uiContext = {
       workspaceId: response?.workspaceId ?? null,
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? false) : true,
       globalSyncEnabled: response?.globalSyncEnabled ?? true,
       standaloneReady: standaloneVisible,
+      standaloneCreateSetEnabled,
       canStartNewSet: response?.canStartNewSet ?? true,
       shortcuts: response?.shortcuts ?? uiContext.shortcuts,
     };
@@ -162,15 +166,10 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
         ui.setState('idle');
       }
     },
-    async onGlobalSyncToggle(nextEnabled) {
-      await sendRuntimeMessage({
-        type: 'SET_GLOBAL_SYNC_ENABLED',
-        enabled: nextEnabled,
-      });
-
+    onStandaloneSetCreationToggle(nextEnabled) {
       uiContext = {
         ...uiContext,
-        globalSyncEnabled: nextEnabled,
+        standaloneCreateSetEnabled: nextEnabled,
       };
       ui.setContext(uiContext);
       ui.setState(getStandaloneUiState(uiContext));
@@ -201,6 +200,22 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
 
     lastFingerprint = fingerprint;
     lastFingerprintAt = Date.now();
+
+    if (
+      !uiContext.workspaceId &&
+      status.pageKind === 'new-chat' &&
+      status.sessionId === null &&
+      !uiContext.standaloneCreateSetEnabled
+    ) {
+      ui.setState(getStandaloneUiState(uiContext));
+      await logDebug({
+        level: 'info',
+        message: 'Skipped new set creation for standalone chat',
+        detail: content.slice(0, 120),
+      });
+      return;
+    }
+
     ui.setState('listening', 'sync');
     await logDebug({
       level: 'info',
@@ -216,16 +231,19 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
       canStartNewSet?: boolean;
     }>(buildUserSubmitMessage(status, content));
 
+    const standaloneReady = shouldShowStandaloneIndicator(adapter);
     uiContext = {
       workspaceId: response?.workspaceId ?? null,
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? true) : true,
       globalSyncEnabled: response?.globalSyncEnabled ?? uiContext.globalSyncEnabled,
-      standaloneReady: shouldShowStandaloneIndicator(adapter),
+      standaloneReady,
+      standaloneCreateSetEnabled:
+        !response?.workspaceId && standaloneReady ? uiContext.standaloneCreateSetEnabled : true,
       canStartNewSet: response?.canStartNewSet ?? uiContext.canStartNewSet,
       shortcuts: uiContext.shortcuts,
     };
     ui.setContext(uiContext);
-    ui.setVisible(Boolean(uiContext.workspaceId) || shouldShowStandaloneIndicator(adapter));
+    ui.setVisible(Boolean(uiContext.workspaceId) || standaloneReady);
     ui.setState(getStandaloneUiState(uiContext));
 
     window.setTimeout(

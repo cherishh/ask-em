@@ -54,7 +54,7 @@ function isWorkspaceIndexEqual(left: LocalState['workspaceIndex'], right: LocalS
 function normalizeLocalState(state: LocalState): LocalState {
   let normalized = state;
 
-  if (!normalized.shortcuts) {
+  if (!normalized.shortcuts?.togglePageParticipation) {
     normalized = { ...normalized, shortcuts: DEFAULT_SHORTCUTS };
   }
 
