@@ -25,7 +25,7 @@ export const DEFAULT_SESSION_STATE: SessionState = {
   claimedTabs: {},
 };
 
-const DEBUG_LOG_LIMIT = 500;
+const DEBUG_LOG_LIMIT = 350;
 
 type StorageArea = Pick<
   chrome.storage.StorageArea,
