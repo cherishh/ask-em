@@ -2,6 +2,7 @@ import { getSiteInfoByProvider } from './sites';
 import type { AdapterSnapshot, SiteAdapter } from './types';
 import type { DeliverPromptMessage, ProviderStatus } from '../runtime/protocol';
 import {
+  detectObviousErrorPage,
   detectLoginRequired,
   dispatchEnterKey,
   getEditableText,
@@ -26,7 +27,11 @@ function findSendButton(): HTMLElement | null {
 
 function getStatus(): ProviderStatus {
   const currentUrl = window.location.href;
-  const isReady = Boolean(findComposer());
+  const hasObviousError = detectObviousErrorPage([
+    'something went wrong',
+    'try again in a bit',
+  ]);
+  const isReady = Boolean(findComposer()) && !hasObviousError;
   const pageState = isReady
     ? 'ready'
     : detectLoginRequired(['sign in', 'log in', 'google account'])

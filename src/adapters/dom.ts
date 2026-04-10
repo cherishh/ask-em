@@ -175,6 +175,29 @@ export function detectLoginRequired(keywords: string[]): boolean {
   return keywords.some((keyword) => bodyText.includes(keyword.toLowerCase()));
 }
 
+export function detectObviousErrorPage(keywords: string[] = []): boolean {
+  const bodyText = normalizeWhitespace(document.body?.innerText || '').toLowerCase();
+  const titleText = normalizeWhitespace(document.title || '').toLowerCase();
+  const combinedText = `${titleText} ${bodyText}`;
+
+  const defaultKeywords = [
+    '404',
+    'not found',
+    'page not found',
+    'something went wrong',
+    'an error occurred',
+    'try again later',
+    'temporarily unavailable',
+    'service unavailable',
+    'this page isn’t working',
+    "this page isn't working",
+  ];
+
+  return [...defaultKeywords, ...keywords].some((keyword) =>
+    combinedText.includes(keyword.toLowerCase()),
+  );
+}
+
 export async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
