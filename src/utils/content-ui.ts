@@ -336,15 +336,13 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
       .ask-em-sync-panel[data-mode="tooltip"] {
         width: auto;
-        max-width: 240px;
-        padding: 10px 12px 11px;
-        border-radius: 14px;
-        border: 1px solid rgba(15, 23, 42, 0.1);
-        background: rgba(255, 252, 246, 0.98);
-        box-shadow:
-          0 12px 26px rgba(15, 23, 42, 0.1),
-          0 2px 8px rgba(15, 23, 42, 0.04);
-        backdrop-filter: blur(10px) saturate(1.08);
+        max-width: 220px;
+        padding: 7px 10px 8px;
+        border-radius: 8px;
+        border: 0;
+        background: rgba(20, 20, 19, 0.88);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        backdrop-filter: blur(8px);
       }
 
       .ask-em-sync-panel::before {
@@ -428,9 +426,9 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
       .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-note {
         margin: 0;
-        color: rgba(53, 49, 44, 0.88);
-        font: 600 13px/1.3 "Avenir Next", "Segoe UI", sans-serif;
-        letter-spacing: -0.01em;
+        color: rgba(245, 244, 237, 0.92);
+        font: 500 11.5px/1.35 "Avenir Next", "Segoe UI", sans-serif;
+        letter-spacing: 0;
       }
 
       .ask-em-panel-shortcut {
@@ -455,12 +453,12 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
       .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut {
         justify-content: flex-start;
-        gap: 8px;
-        margin-top: 8px;
+        gap: 6px;
+        margin-top: 5px;
         padding-top: 0;
         border-top: 0;
-        color: rgba(107, 100, 89, 0.72);
-        font: 600 10px/1.2 "Avenir Next", "Segoe UI", sans-serif;
+        color: rgba(245, 244, 237, 0.45);
+        font: 500 9px/1.2 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0;
         text-transform: none;
       }
@@ -470,24 +468,23 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       }
 
       .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut-keys {
-        gap: 4px;
+        gap: 3px;
       }
 
       .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut-plus {
-        color: rgba(120, 113, 108, 0.54);
+        color: rgba(245, 244, 237, 0.3);
       }
 
       .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut kbd {
-        min-width: 18px;
-        min-height: 18px;
-        padding: 0 6px;
-        border-radius: 6px;
-        border-color: rgba(15, 23, 42, 0.1);
-        background: rgba(255, 255, 255, 0.96);
-        box-shadow:
-          0 1px 0 rgba(255, 255, 255, 0.9),
-          0 2px 4px rgba(15, 23, 42, 0.06);
-        font-size: 10px;
+        min-width: 16px;
+        min-height: 16px;
+        padding: 0 5px;
+        border-radius: 4px;
+        border-color: rgba(245, 244, 237, 0.15);
+        background: rgba(255, 255, 255, 0.12);
+        box-shadow: none;
+        color: rgba(245, 244, 237, 0.6);
+        font-size: 9px;
       }
 
       .ask-em-panel-shortcut-keys {
@@ -912,19 +909,20 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
     panel.dataset.mode = '';
     const visibleProviders = getVisibleWorkspaceProviders(workspaceSummary.workspace);
-    const badgeClass = response.globalSyncEnabled ? 'ask-em-panel-badge' : 'ask-em-panel-badge is-paused';
-    const badgeLabel = response.globalSyncEnabled ? 'Live Group' : 'Global Pause';
     const globalNote = response.globalSyncEnabled
       ? ''
       : '<p class="ask-em-panel-note">Freeze the world is on. Prompts stay local.</p>';
+    const badgeHtml = response.globalSyncEnabled
+      ? ''
+      : '<span class="ask-em-panel-badge is-paused">Paused</span>';
 
     panel.innerHTML = `
       <div class="ask-em-panel-top">
         <div>
-          <p class="ask-em-panel-kicker">Current Group</p>
+          <p class="ask-em-panel-kicker">Current Set</p>
           <h3 class="ask-em-panel-title"></h3>
         </div>
-        <span class="${badgeClass}">${badgeLabel}</span>
+        ${badgeHtml}
       </div>
       ${globalNote}
       <div class="ask-em-panel-list">
