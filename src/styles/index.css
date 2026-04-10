@@ -622,20 +622,54 @@ body {
   padding: 13px 14px;
 }
 
-.askem-default-provider-list {
+.askem-dm-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.askem-dm-item {
   display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-  margin-top: 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(35, 25, 8, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.52);
+  padding: 9px 11px;
+  color: rgba(107, 100, 89, 0.52);
+  cursor: pointer;
+  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.askem-dm-item:hover {
+  border-color: rgba(35, 25, 8, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.askem-dm-item.is-active {
+  color: var(--askem-ink);
+  border-color: rgba(37, 87, 214, 0.18);
+  background: rgba(246, 249, 255, 0.82);
+}
+
+.askem-dm-check {
+  color: var(--askem-accent);
+  font-size: 12px;
+  line-height: 1;
+  min-width: 14px;
+  text-align: center;
 }
 
 .askem-request-link {
-  align-self: flex-end;
-  margin-top: 10px;
   border: 0;
   background: transparent;
   padding: 0;
-  color: rgba(107, 100, 89, 0.52);
+  color: rgba(107, 100, 89, 0.48);
   cursor: pointer;
   font: 600 9px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
   letter-spacing: 0.1em;

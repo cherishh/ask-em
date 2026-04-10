@@ -236,6 +236,7 @@ export default function App() {
   const [requestSubmitted, setRequestSubmitted] = useState(false);
   const [requestCooldownUntil, setRequestCooldownUntil] = useState<number | null>(null);
   const [activeLegalPage, setActiveLegalPage] = useState<LegalPage>('terms');
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [shortcuts, setShortcuts] = useState<ShortcutConfig>(DEFAULT_SHORTCUTS);
 
   const refresh = async () => {
@@ -399,8 +400,11 @@ export default function App() {
             <h1>ask&apos;em</h1>
             <p className="askem-slogan">One prompt, every official AI chat — full features, zero compromise.</p>
           </div>
-          <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => void refresh()} disabled={loading}>
+          {/* <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => void refresh()} disabled={loading}>
             {loading ? 'Syncing' : 'Refresh'}
+          </button> */}
+          <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => setFeedbackModalOpen(true)} type="button">
+            Feedback
           </button>
         </header>
 
@@ -491,27 +495,27 @@ export default function App() {
               <div className="askem-us-group">
                 <div className="askem-us-row-header">
                   <span className="askem-us-row-title">Default models</span>
-                  <span className="askem-defaults-meta">{selectedProviders.length} selected</span>
+                  <button className="askem-request-link" onClick={openRequestModal} type="button">
+                    + more
+                  </button>
                 </div>
-                <div className="askem-default-provider-list">
+                <div className="askem-dm-list">
                   {PROVIDERS.map((provider) => {
                     const active = selectedProviders.includes(provider);
                     return (
                       <button
                         key={provider}
-                        className={`askem-provider-chip ${active ? 'is-active' : ''}`}
+                        className={`askem-dm-item ${active ? 'is-active' : ''}`}
                         onClick={() => void toggleDefaultProvider(provider)}
                         disabled={loading}
+                        type="button"
                       >
-                        <span className="askem-provider-chip-dot" aria-hidden="true" />
-                        <span>{provider}</span>
+                        <span className="askem-dm-name">{provider}</span>
+                        <span className="askem-dm-check" aria-hidden="true">{active ? '✓' : ''}</span>
                       </button>
                     );
                   })}
                 </div>
-                <button className="askem-request-link" onClick={openRequestModal} type="button">
-                  Request more providers
-                </button>
               </div>
 
               <div className="askem-us-divider" />
@@ -665,6 +669,18 @@ export default function App() {
               <div className="askem-modal-state">
                 <p>You already sent a request recently.</p>
                 <span>You can send another one {formatCooldownRemaining(requestCooldownUntil)}.</span>
+                {/* TODO: remove this dev-only reset button before release */}
+                <button
+                  type="button"
+                  className="askem-provider-clear"
+                  style={{ marginTop: 12 }}
+                  onClick={() => {
+                    window.localStorage.removeItem(MORE_PROVIDERS_REQUEST_STORAGE_KEY);
+                    setRequestCooldownUntil(null);
+                  }}
+                >
+                  DEV: Reset Cooldown
+                </button>
               </div>
             ) : (
               <>
@@ -703,6 +719,30 @@ export default function App() {
                 </div>
               </>
             )}
+          </section>
+        </div>
+      ) : null}
+
+      {feedbackModalOpen ? (
+        <div className="askem-modal-overlay" onClick={() => setFeedbackModalOpen(false)} role="presentation">
+          <section
+            className="askem-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="askem-modal-top">
+              <div>
+                <p className="askem-card-label">Feedback</p>
+                <h2>Send Feedback</h2>
+              </div>
+              <button className="askem-modal-close" onClick={() => setFeedbackModalOpen(false)} type="button">
+                Close
+              </button>
+            </div>
+            <div className="askem-modal-state">
+              <p>TODO</p>
+            </div>
           </section>
         </div>
       ) : null}
