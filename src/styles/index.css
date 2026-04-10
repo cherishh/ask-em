@@ -2,13 +2,13 @@
 
 :root {
   color-scheme: light;
-  --askem-ink: #171717;
-  --askem-muted: #6b6459;
-  --askem-panel: rgba(255, 252, 246, 0.92);
-  --askem-line: rgba(35, 25, 8, 0.12);
-  --askem-shadow: rgba(55, 35, 0, 0.12);
-  --askem-accent: #2557d6;
-  --askem-danger: #b9382f;
+  --askem-ink: #141413;
+  --askem-muted: #5e5d59;
+  --askem-panel: rgba(250, 249, 245, 0.92);
+  --askem-line: #f0eee6;
+  --askem-shadow: rgba(0, 0, 0, 0.05);
+  --askem-accent: #c96442;
+  --askem-danger: #b53333;
   --askem-warn: #9c6b00;
   --askem-ok: #1f7a59;
 }
@@ -18,9 +18,8 @@ body {
   min-width: 396px;
   min-height: 720px;
   background:
-    radial-gradient(circle at top left, rgba(255, 212, 160, 0.26), transparent 38%),
-    radial-gradient(circle at bottom right, rgba(92, 132, 255, 0.18), transparent 34%),
-    linear-gradient(160deg, #f7f1e7 0%, #f3eee6 48%, #eee7dc 100%);
+    radial-gradient(circle at top left, rgba(201, 100, 66, 0.08), transparent 40%),
+    #f5f4ed;
   color: var(--askem-ink);
   font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
@@ -78,7 +77,7 @@ body {
   padding: 8px 14px;
   color: var(--askem-muted);
   cursor: pointer;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
@@ -105,10 +104,10 @@ body {
 
 .askem-hero h1 {
   margin: 0;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 34px;
   line-height: 0.95;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: -0.04em;
 }
 
@@ -147,7 +146,7 @@ body {
 .askem-refresh {
   border-radius: 999px;
   padding: 9px 12px;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
@@ -239,25 +238,25 @@ body {
   display: block;
   margin-bottom: 8px;
   color: var(--askem-muted);
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.08em;
 }
 
 .askem-card h2 {
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .askem-sync-pill-label {
   color: var(--askem-muted);
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .askem-sync-pill strong {
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 18px;
   line-height: 1;
 }
@@ -265,12 +264,12 @@ body {
 .askem-facts-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(40, 70, 154, 0.12);
+  border: 1px solid rgba(201, 100, 66, 0.12);
   border-radius: 18px;
   padding: 14px 16px 15px;
   background:
     linear-gradient(180deg, rgba(253, 251, 246, 0.96), rgba(246, 242, 233, 0.92)),
-    radial-gradient(circle at top right, rgba(80, 121, 255, 0.14), transparent 32%);
+    radial-gradient(circle at top right, rgba(201, 100, 66, 0.14), transparent 32%);
   box-shadow:
     0 16px 30px rgba(55, 35, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.68);
@@ -280,7 +279,7 @@ body {
   padding: 18px;
   background:
     linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(247, 243, 236, 0.92)),
-    radial-gradient(circle at top right, rgba(92, 132, 255, 0.08), transparent 28%);
+    radial-gradient(circle at top right, rgba(201, 100, 66, 0.08), transparent 28%);
 }
 
 .askem-facts-card::before {
@@ -288,11 +287,11 @@ body {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(66, 102, 223, 0.14), transparent 26%),
+    linear-gradient(90deg, rgba(201, 100, 66, 0.14), transparent 26%),
     repeating-linear-gradient(
       -45deg,
-      rgba(66, 102, 223, 0.035) 0,
-      rgba(66, 102, 223, 0.035) 10px,
+      rgba(201, 100, 66, 0.035) 0,
+      rgba(201, 100, 66, 0.035) 10px,
       transparent 10px,
       transparent 20px
     );
@@ -327,18 +326,18 @@ body {
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(66, 102, 223, 0.18);
+  background: rgba(201, 100, 66, 0.18);
   cursor: pointer;
   transition: background 180ms ease, transform 180ms ease;
 }
 
 .askem-facts-dots button.is-active {
-  background: rgba(37, 87, 214, 0.76);
+  background: rgba(201, 100, 66, 0.76);
   transform: scale(1.15);
 }
 
 .askem-facts-dots button:hover {
-  background: rgba(37, 87, 214, 0.42);
+  background: rgba(201, 100, 66, 0.42);
 }
 
 .askem-facts-copy {
@@ -401,7 +400,7 @@ body {
   display: inline-flex;
   margin-bottom: 8px;
   color: oklch(57.7% 0.245 27.325);
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.22em;
   text-transform: uppercase;
 }
@@ -416,7 +415,7 @@ body {
   display: block;
   margin: 0;
   color: oklch(57.7% 0.245 27.325);
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 25px;
   line-height: 1.02;
 }
@@ -462,7 +461,7 @@ body {
   display: inline-flex;
   margin-bottom: 8px;
   color: #815400;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
@@ -476,7 +475,7 @@ body {
   display: block;
   margin-bottom: 6px;
   color: #5c3b00;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 24px;
   line-height: 1.05;
 }
@@ -502,7 +501,7 @@ body {
 
 .askem-advanced-heading h2 {
   margin: 0;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 28px;
   line-height: 0.98;
 }
@@ -524,7 +523,7 @@ body {
 
 .askem-section-heading h2 {
   margin: 0;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 28px;
   line-height: 0.98;
 }
@@ -539,7 +538,7 @@ body {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.76);
   color: var(--askem-ink);
-  font: 700 12px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 12px/1 "Avenir Next", "Segoe UI", sans-serif;
 }
 
 .askem-card {
@@ -576,7 +575,7 @@ body {
 .askem-provider-clear {
   border-radius: 999px;
   padding: 7px 10px;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -597,7 +596,7 @@ body {
   margin: -2px 0 14px;
   padding-left: 12px;
   color: #8a5a00;
-  font: 700 10px/1.45 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1.45 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -640,7 +639,7 @@ body {
   padding: 9px 11px;
   color: rgba(107, 100, 89, 0.52);
   cursor: pointer;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
@@ -653,8 +652,8 @@ body {
 
 .askem-dm-item.is-active {
   color: var(--askem-ink);
-  border-color: rgba(37, 87, 214, 0.18);
-  background: rgba(246, 249, 255, 0.82);
+  border-color: rgba(201, 100, 66, 0.18);
+  background: rgba(255, 249, 244, 0.82);
 }
 
 .askem-dm-check {
@@ -671,7 +670,7 @@ body {
   padding: 0;
   color: rgba(107, 100, 89, 0.48);
   cursor: pointer;
-  font: 600 9px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 600 9px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.1em;
   text-decoration: none;
   text-transform: uppercase;
@@ -710,9 +709,9 @@ body {
   align-items: center;
   border-radius: 999px;
   padding: 4px 7px;
-  background: rgba(37, 87, 214, 0.08);
+  background: rgba(201, 100, 66, 0.08);
   color: var(--askem-accent);
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -736,15 +735,15 @@ body {
   padding: 8px 10px;
   color: var(--askem-ink);
   cursor: pointer;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   transition: border-color 140ms ease, background 140ms ease;
 }
 
 .askem-provider-chip.is-active {
-  border-color: rgba(37, 87, 214, 0.28);
-  background: rgba(246, 249, 255, 0.94);
+  border-color: rgba(201, 100, 66, 0.28);
+  background: rgba(255, 249, 244, 0.94);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
@@ -758,7 +757,7 @@ body {
 
 .askem-provider-chip.is-active .askem-provider-chip-dot {
   background: var(--askem-accent);
-  box-shadow: 0 0 0 3px rgba(37, 87, 214, 0.12);
+  box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.12);
 }
 
 .askem-provider-row {
@@ -774,7 +773,7 @@ body {
 .askem-provider-name {
   display: block;
   margin-bottom: 5px;
-  font: 700 12px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 12px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -795,7 +794,7 @@ body {
   align-items: center;
   border-radius: 999px;
   padding: 4px 8px;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -811,7 +810,7 @@ body {
 }
 
 .askem-state-pending {
-  background: rgba(37, 87, 214, 0.12);
+  background: rgba(201, 100, 66, 0.12);
   color: var(--askem-accent);
 }
 
@@ -832,7 +831,7 @@ body {
 
 .askem-provider-actions code {
   color: var(--askem-muted);
-  font: 600 11px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 600 11px/1 "Avenir Next", "Segoe UI", sans-serif;
 }
 
 .askem-provider-subcopy {
@@ -861,7 +860,7 @@ body {
   border-radius: 24px;
   background:
     linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(247, 243, 236, 0.96)),
-    radial-gradient(circle at top right, rgba(92, 132, 255, 0.1), transparent 28%);
+    radial-gradient(circle at top right, rgba(201, 100, 66, 0.1), transparent 28%);
   box-shadow: 0 28px 50px rgba(55, 35, 0, 0.16);
   padding: 18px;
 }
@@ -876,7 +875,7 @@ body {
 
 .askem-modal-top h2 {
   margin: 0;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 30px;
   line-height: 0.98;
 }
@@ -887,7 +886,7 @@ body {
   padding: 4px 0;
   color: var(--askem-muted);
   cursor: pointer;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
@@ -909,15 +908,15 @@ body {
   padding: 9px 12px;
   color: var(--askem-ink);
   cursor: pointer;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   transition: border-color 140ms ease, background 140ms ease;
 }
 
 .askem-request-chip.is-active {
-  border-color: rgba(37, 87, 214, 0.28);
-  background: rgba(246, 249, 255, 0.94);
+  border-color: rgba(201, 100, 66, 0.28);
+  background: rgba(255, 249, 244, 0.94);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
@@ -932,7 +931,7 @@ body {
 .askem-modal-state p {
   margin: 0;
   color: #3f3a31;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 24px;
   line-height: 1.08;
 }
@@ -959,7 +958,7 @@ body {
 
 .askem-empty p {
   margin: 0;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 24px;
 }
 
@@ -1049,7 +1048,7 @@ body {
   flex-wrap: wrap;
   gap: 8px;
   color: var(--askem-muted);
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1068,7 +1067,7 @@ body {
 
 .askem-log-row p {
   margin: 6px 0 0;
-  font: 600 12px/1.55 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 600 12px/1.55 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.01em;
 }
 
@@ -1077,7 +1076,7 @@ body {
   display: block;
   margin-top: 6px;
   color: var(--askem-muted);
-  font: 600 11px/1.4 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 600 11px/1.4 "Avenir Next", "Segoe UI", sans-serif;
 }
 
 .askem-log-actions {
@@ -1144,7 +1143,7 @@ body {
 }
 
 .askem-freeze-title {
-  font: 700 12px/1.2 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 12px/1.2 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--askem-ink);
@@ -1201,7 +1200,7 @@ body {
   padding: 18px;
   background:
     linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(247, 243, 236, 0.92)),
-    radial-gradient(circle at top right, rgba(92, 132, 255, 0.08), transparent 28%);
+    radial-gradient(circle at top right, rgba(201, 100, 66, 0.08), transparent 28%);
 }
 
 .askem-unified-settings > .askem-card-label {
@@ -1296,7 +1295,7 @@ body {
   padding: 2px 0;
   color: var(--askem-muted);
   cursor: pointer;
-  font: 700 9px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 9px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   text-decoration: underline;
@@ -1327,7 +1326,7 @@ body {
 /* Provider open link */
 .askem-provider-open-link {
   color: var(--askem-accent);
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-decoration: none;
@@ -1341,11 +1340,11 @@ body {
 
 /* Onboarding card */
 .askem-onboarding {
-  border: 1px solid rgba(37, 87, 214, 0.14);
+  border: 1px solid rgba(201, 100, 66, 0.14);
   border-radius: 22px;
   background:
     linear-gradient(180deg, rgba(253, 251, 246, 0.97), rgba(246, 243, 236, 0.94)),
-    radial-gradient(circle at top right, rgba(80, 121, 255, 0.12), transparent 36%);
+    radial-gradient(circle at top right, rgba(201, 100, 66, 0.12), transparent 36%);
   box-shadow:
     0 18px 35px rgba(55, 35, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
@@ -1354,26 +1353,26 @@ body {
 
 .askem-onboarding-header {
   padding: 16px 18px 14px;
-  border-bottom: 1px solid rgba(37, 87, 214, 0.08);
+  border-bottom: 1px solid rgba(201, 100, 66, 0.08);
   background:
-    radial-gradient(circle at top left, rgba(80, 121, 255, 0.08), transparent 52%);
+    radial-gradient(circle at top left, rgba(201, 100, 66, 0.08), transparent 52%);
 }
 
 .askem-onboarding-header .askem-onboarding-step {
   display: inline-flex;
   margin-bottom: 8px;
   color: var(--askem-accent);
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .askem-onboarding-title {
   margin: 0;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 22px;
   line-height: 1.05;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: -0.03em;
 }
 
@@ -1410,9 +1409,9 @@ body {
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: rgba(37, 87, 214, 0.1);
+  background: rgba(201, 100, 66, 0.1);
   color: var(--askem-accent);
-  font: 700 11px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 11px/1 "Avenir Next", "Segoe UI", sans-serif;
   flex-shrink: 0;
 }
 
@@ -1441,16 +1440,16 @@ body {
   padding: 10px 12px;
   color: var(--askem-ink);
   cursor: pointer;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
 
 .askem-onboarding-provider-btn:hover {
-  border-color: rgba(37, 87, 214, 0.22);
-  background: rgba(246, 249, 255, 0.94);
-  box-shadow: 0 4px 12px rgba(37, 87, 214, 0.08);
+  border-color: rgba(201, 100, 66, 0.22);
+  background: rgba(255, 249, 244, 0.94);
+  box-shadow: 0 4px 12px rgba(201, 100, 66, 0.08);
 }
 
 .askem-onboarding-arrow {
@@ -1504,7 +1503,7 @@ body {
     0 2px 4px rgba(15, 23, 42, 0.06),
     inset 0 -1px 0 rgba(15, 23, 42, 0.04);
   color: rgba(15, 23, 42, 0.82);
-  font: 700 11px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 11px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
@@ -1515,15 +1514,15 @@ body {
 }
 
 .askem-shortcut-recorder:hover {
-  border-color: rgba(37, 87, 214, 0.22);
-  background: rgba(246, 249, 255, 0.94);
+  border-color: rgba(201, 100, 66, 0.22);
+  background: rgba(255, 249, 244, 0.94);
 }
 
 .askem-shortcut-recorder.is-recording {
-  border-color: rgba(37, 87, 214, 0.4);
-  background: rgba(246, 249, 255, 0.98);
+  border-color: rgba(201, 100, 66, 0.4);
+  background: rgba(255, 249, 244, 0.98);
   box-shadow:
-    0 0 0 3px rgba(37, 87, 214, 0.1),
+    0 0 0 3px rgba(201, 100, 66, 0.1),
     0 2px 4px rgba(15, 23, 42, 0.06);
   color: var(--askem-accent);
   animation: askem-shortcut-pulse 1.2s ease-in-out infinite;
@@ -1545,8 +1544,8 @@ body {
 }
 
 @keyframes askem-shortcut-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(37, 87, 214, 0.1), 0 2px 4px rgba(15, 23, 42, 0.06); }
-  50% { box-shadow: 0 0 0 5px rgba(37, 87, 214, 0.14), 0 2px 4px rgba(15, 23, 42, 0.06); }
+  0%, 100% { box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.1), 0 2px 4px rgba(15, 23, 42, 0.06); }
+  50% { box-shadow: 0 0 0 5px rgba(201, 100, 66, 0.14), 0 2px 4px rgba(15, 23, 42, 0.06); }
 }
 
 /* Legal links in footer */
@@ -1633,7 +1632,7 @@ body {
   padding: 4px 0;
   color: var(--askem-accent);
   cursor: pointer;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   transition: color 140ms ease;
@@ -1654,9 +1653,9 @@ body {
 
 .askem-legal-body h2 {
   margin: 0 0 4px;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 24px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.1;
 }
 
@@ -1669,7 +1668,7 @@ body {
 
 .askem-legal-body h3 {
   margin: 16px 0 6px;
-  font: 700 11px/1.2 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  font: 700 11px/1.2 "Avenir Next", "Segoe UI", sans-serif;
   letter-spacing: 0.06em;
   color: var(--askem-ink);
 }

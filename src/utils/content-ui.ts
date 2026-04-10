@@ -116,7 +116,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         align-items: center;
         gap: 8px;
         min-height: 44px;
-        padding: 7px 12px;
+        padding: 10px 16px;
         border-radius: 999px;
         border: 1px solid rgba(15, 23, 42, 0.22);
         background: rgba(255, 252, 246, 0.96);
@@ -125,7 +125,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
           0 14px 34px rgba(15, 23, 42, 0.18),
           inset 0 1px 0 rgba(255, 255, 255, 0.72);
         color: rgba(15, 23, 42, 0.84);
-        font: 700 11px/1.1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, Consolas, monospace;
+        font: 500 11px/1.1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.11em;
         text-transform: uppercase;
         opacity: 0.96;
@@ -356,7 +356,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       .ask-em-panel-kicker {
         margin: 0 0 6px;
         color: rgba(107, 100, 89, 0.92);
-        font: 700 9px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 700 9px/1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.18em;
         text-transform: uppercase;
       }
@@ -384,7 +384,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         border-radius: 999px;
         background: rgba(37, 87, 214, 0.08);
         color: rgba(37, 87, 214, 0.82);
-        font: 700 9px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 700 9px/1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         white-space: nowrap;
@@ -417,7 +417,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         padding-top: 10px;
         border-top: 1px solid rgba(15, 23, 42, 0.08);
         color: rgba(82, 77, 72, 0.8);
-        font: 600 10px/1.35 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 600 10px/1.35 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.08em;
         text-transform: uppercase;
       }
@@ -491,7 +491,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
           0 2px 6px rgba(15, 23, 42, 0.08),
           inset 0 -1px 0 rgba(15, 23, 42, 0.06);
         color: rgba(15, 23, 42, 0.86);
-        font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.02em;
         text-transform: none;
       }
@@ -557,14 +557,14 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         align-items: center;
         gap: 6px;
         min-width: 0;
-        font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.14em;
         text-transform: uppercase;
       }
 
       .ask-em-panel-current {
         color: rgba(37, 87, 214, 0.78);
-        font: 700 8px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 700 8px/1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.16em;
         text-transform: uppercase;
       }
