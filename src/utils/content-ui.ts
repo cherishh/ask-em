@@ -495,6 +495,11 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
       }
 
+      .ask-em-panel-status-dot[data-state="frozen"] {
+        background: rgba(120, 113, 108, 0.72);
+        box-shadow: 0 0 0 3px rgba(120, 113, 108, 0.1);
+      }
+
       .ask-em-panel-provider {
         display: inline-flex;
         align-items: center;
@@ -702,6 +707,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     provider: Provider,
     workspaceSummary: WorkspaceSummary,
     memberState: GroupMemberState,
+    globalSyncEnabled: boolean,
   ) => {
     const displayState = getDisplayMemberState(memberState);
     const member = workspaceSummary.workspace.members[provider];
@@ -712,6 +718,14 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
     if (!member) {
       return 'not connected';
+    }
+
+    if (displayState === 'inactive') {
+      return displayState;
+    }
+
+    if (!globalSyncEnabled) {
+      return 'frozen';
     }
 
     return displayState;
@@ -752,7 +766,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     const badgeLabel = response.globalSyncEnabled ? 'Live Group' : 'Global Pause';
     const globalNote = response.globalSyncEnabled
       ? ''
-      : '<p class="ask-em-panel-note">Global sync is paused. Changes here stay queued until sync resumes.</p>';
+      : '<p class="ask-em-panel-note">Freeze the world is on. Prompts stay local.</p>';
 
     panel.innerHTML = `
       <div class="ask-em-panel-top">
@@ -770,14 +784,16 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
               workspaceSummary.memberStates[provider] ?? 'inactive',
             );
             const enabled = workspaceSummary.workspace.enabledProviders.includes(provider);
-            const meta = getProviderMeta(provider, workspaceSummary, memberState);
+            const dotState =
+              !response.globalSyncEnabled && memberState === 'active' ? 'frozen' : memberState;
+            const meta = getProviderMeta(provider, workspaceSummary, memberState, response.globalSyncEnabled);
             const isCurrent = provider === adapter.name;
 
             return `
               <div class="ask-em-panel-row" data-current="${String(isCurrent)}">
                 <div>
                   <div class="ask-em-panel-row-top">
-                    <span class="ask-em-panel-status-dot" data-state="${memberState}"></span>
+                    <span class="ask-em-panel-status-dot" data-state="${dotState}"></span>
                     <span class="ask-em-panel-provider">
                       ${provider}
                       ${isCurrent ? '<span class="ask-em-panel-current">this tab</span>' : ''}

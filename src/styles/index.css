@@ -635,23 +635,22 @@ body {
 }
 
 .askem-request-link {
-  margin-top: 14px;
+  align-self: flex-end;
+  margin-top: 10px;
   border: 0;
   background: transparent;
   padding: 0;
-  color: var(--askem-muted);
+  color: rgba(107, 100, 89, 0.52);
   cursor: pointer;
-  font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
-  letter-spacing: 0.12em;
-  text-decoration: underline;
-  text-decoration-color: rgba(107, 100, 89, 0.28);
-  text-underline-offset: 0.24em;
-  transition: color 140ms ease, text-decoration-color 140ms ease;
+  font: 600 9px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: color 140ms ease;
 }
 
 .askem-request-link:hover {
-  color: var(--askem-ink);
-  text-decoration-color: rgba(23, 23, 23, 0.42);
+  color: var(--askem-muted);
 }
 
 .askem-defaults-heading {
@@ -790,6 +789,11 @@ body {
 .askem-state-sync-paused {
   background: rgba(156, 107, 0, 0.12);
   color: var(--askem-warn);
+}
+
+.askem-state-frozen {
+  background: rgba(185, 56, 47, 0.12);
+  color: #b9382f;
 }
 
 .askem-provider-actions code {
@@ -1078,6 +1082,199 @@ body {
   }
 }
 
+/* Freeze the World — home page global sync toggle */
+.askem-freeze-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(120, 113, 108, 0.12);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(246, 244, 241, 0.92), rgba(240, 237, 232, 0.88));
+  transition: border-color 180ms ease, background 180ms ease;
+}
+
+.askem-freeze-section:has(.askem-freeze-switch[data-enabled="true"]) {
+  border-color: rgba(185, 56, 47, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 248, 247, 0.94), rgba(255, 242, 240, 0.90));
+}
+
+.askem-freeze-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.askem-freeze-title {
+  font: 700 12px/1.2 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--askem-ink);
+}
+
+.askem-freeze-sub {
+  color: var(--askem-muted);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.askem-freeze-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 42px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 160ms ease;
+}
+
+.askem-freeze-switch::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14);
+  transition: transform 160ms ease;
+}
+
+.askem-freeze-switch[data-enabled="true"] {
+  background: rgba(185, 56, 47, 0.82);
+}
+
+.askem-freeze-switch[data-enabled="true"]::after {
+  transform: translateX(18px);
+}
+
+.askem-freeze-switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Unified settings card */
+.askem-unified-settings {
+  padding: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(247, 243, 236, 0.92)),
+    radial-gradient(circle at top right, rgba(92, 132, 255, 0.08), transparent 28%);
+}
+
+.askem-unified-settings > .askem-card-label {
+  margin-bottom: 14px;
+}
+
+.askem-us-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.askem-us-divider {
+  height: 1px;
+  margin: 14px 0;
+  background: rgba(35, 25, 8, 0.08);
+}
+
+.askem-us-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.askem-us-row-title {
+  display: block;
+  color: var(--askem-ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.askem-us-row-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--askem-muted);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.askem-us-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.askem-us-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 160ms ease;
+}
+
+.askem-us-switch::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
+  transition: transform 160ms ease;
+}
+
+.askem-us-switch[data-enabled="true"] {
+  background: rgba(22, 163, 74, 0.88);
+}
+
+.askem-us-switch[data-enabled="true"]::after {
+  transform: translateX(18px);
+}
+
+.askem-us-switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.askem-us-reset {
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  color: var(--askem-muted);
+  cursor: pointer;
+  font: 700 9px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-decoration-color: rgba(107, 100, 89, 0.24);
+  text-underline-offset: 0.2em;
+  transition: color 140ms ease;
+}
+
+.askem-us-reset:hover {
+  color: var(--askem-ink);
+}
+
 /* Workspace label (prompt excerpt instead of hash) */
 .askem-set-label {
   font-size: 15px !important;
@@ -1312,6 +1509,10 @@ body {
 
 /* Legal links in footer */
 .askem-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
   padding: 2px 2px 8px;
   color: var(--askem-muted);
   text-align: center;
@@ -1331,7 +1532,23 @@ body {
 }
 
 .askem-legal-links {
-  margin-top: 6px;
+  margin: 0;
+}
+
+.askem-author {
+  margin-top: 14px;
+  color: rgba(107, 100, 89, 0.48);
+  font-size: 11px;
+}
+
+.askem-author a {
+  color: rgba(143, 71, 0, 0.52);
+  border-bottom-color: rgba(143, 71, 0, 0.12);
+}
+
+.askem-author a:hover {
+  color: rgba(143, 71, 0, 0.8);
+  border-bottom-color: rgba(143, 71, 0, 0.3);
 }
 
 .askem-legal-link {

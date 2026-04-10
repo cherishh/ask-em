@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createDefaultEnabledProviders, HEARTBEAT_STALE_MS, type LocalState, type SessionState } from './protocol';
+import {
+  createDefaultEnabledProviders,
+  HEARTBEAT_STALE_MS,
+  MAX_WORKSPACES,
+  type LocalState,
+  type SessionState,
+} from './protocol';
 import {
   bindWorkspaceMember,
   cleanupPendingWorkspaces,
@@ -249,16 +255,27 @@ describe('workspace state', () => {
     expect(nextState.workspaceIndex['claude:c-1']).toBeUndefined();
   });
 
-  it('enforces the workspace limit of two', () => {
+  it('enforces the configured workspace limit', () => {
     const state: LocalState = {
       globalSyncEnabled: true,
       debugLoggingEnabled: false,
       defaultEnabledProviders: createDefaultEnabledProviders(),
       shortcuts: { togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false } },
-      workspaces: {
-        w1: { id: 'w1', members: {}, enabledProviders: [], createdAt: 1, updatedAt: 1 },
-        w2: { id: 'w2', members: {}, enabledProviders: [], createdAt: 2, updatedAt: 2 },
-      },
+      workspaces: Object.fromEntries(
+        Array.from({ length: MAX_WORKSPACES }, (_, index) => {
+          const id = `w${index + 1}`;
+          return [
+            id,
+            {
+              id,
+              members: {},
+              enabledProviders: [],
+              createdAt: index + 1,
+              updatedAt: index + 1,
+            },
+          ];
+        }),
+      ),
       workspaceIndex: {},
       debugLogs: [],
     };

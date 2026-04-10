@@ -1,5 +1,5 @@
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
-import { ALL_PROVIDERS as PROVIDERS, DEFAULT_SHORTCUTS, formatShortcutDisplay } from '../../runtime/protocol';
+import { ALL_PROVIDERS as PROVIDERS, DEFAULT_SHORTCUTS, MAX_WORKSPACES, formatShortcutDisplay } from '../../runtime/protocol';
 import type {
   DebugLogEntry,
   GroupMemberState,
@@ -30,6 +30,7 @@ const MORE_PROVIDER_REQUEST_OPTIONS = [
 const MORE_PROVIDERS_REQUEST_ENDPOINT = '';
 const MORE_PROVIDERS_REQUEST_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 const MORE_PROVIDERS_REQUEST_STORAGE_KEY = 'askem-more-providers-last-submitted-at';
+const MIN_WORKSPACES_FOR_FREEZE_CONTROL = 2;
 // TODO: wire this to the final HTTP endpoint for collecting provider requests.
 
 function formatTime(timestamp: number): string {
@@ -48,11 +49,16 @@ function getDisplayMemberState(state: GroupMemberState): Exclude<GroupMemberStat
 function getDisplayMemberStateTone(
   state: GroupMemberState,
   enabled: boolean,
-): 'active' | 'inactive' | 'pending' | 'sync-paused' {
+  globalSyncEnabled: boolean,
+): 'active' | 'inactive' | 'pending' | 'sync-paused' | 'frozen' {
   const displayState = getDisplayMemberState(state);
 
   if (displayState === 'inactive' || displayState === 'pending') {
     return displayState;
+  }
+
+  if (!globalSyncEnabled) {
+    return 'frozen';
   }
 
   if (!enabled) {
@@ -62,7 +68,11 @@ function getDisplayMemberStateTone(
   return displayState;
 }
 
-function getDisplayMemberStateLabel(state: GroupMemberState, enabled: boolean): string {
+function getDisplayMemberStateLabel(
+  state: GroupMemberState,
+  enabled: boolean,
+  globalSyncEnabled: boolean,
+): string {
   const displayState = getDisplayMemberState(state);
 
   if (displayState === 'inactive') {
@@ -73,6 +83,10 @@ function getDisplayMemberStateLabel(state: GroupMemberState, enabled: boolean): 
     return 'Connecting';
   }
 
+  if (!globalSyncEnabled) {
+    return 'Frozen';
+  }
+
   if (!enabled) {
     return 'Sync Paused';
   }
@@ -80,7 +94,11 @@ function getDisplayMemberStateLabel(state: GroupMemberState, enabled: boolean): 
   return 'Active';
 }
 
-function getMemberOutcomeCopy(state: GroupMemberState, enabled: boolean): string {
+function getMemberOutcomeCopy(
+  state: GroupMemberState,
+  enabled: boolean,
+  globalSyncEnabled: boolean,
+): string {
   const displayState = getDisplayMemberState(state);
 
   if (displayState === 'inactive') {
@@ -93,6 +111,10 @@ function getMemberOutcomeCopy(state: GroupMemberState, enabled: boolean): string
 
   if (displayState === 'pending') {
     return 'Waiting for this model to connect';
+  }
+
+  if (!globalSyncEnabled) {
+    return 'Freeze the world is on. Prompts stay local.';
   }
 
   if (!enabled) {
@@ -228,7 +250,7 @@ export default function App() {
   };
 
   const workspaceCount = status?.workspaces.length ?? 0;
-  const limit = status?.workspaceLimit ?? 2;
+  const limit = status?.workspaceLimit ?? MAX_WORKSPACES;
   const atLimit = workspaceCount >= limit;
   const globalSyncEnabled = status?.globalSyncEnabled ?? true;
 
@@ -348,15 +370,6 @@ export default function App() {
             <p className="askem-slogan">One prompt, every official AI chat — full features, zero compromise.</p>
           </div>
           <div className="askem-hero-actions">
-            <button
-              className={`askem-sync-pill ${globalSyncEnabled ? 'is-active' : 'is-paused'}`}
-              onClick={() => void toggleGlobalSync()}
-              disabled={loading}
-              type="button"
-            >
-              <span className="askem-sync-pill-label">Sync New Prompts</span>
-              <strong>{globalSyncEnabled ? 'On' : 'Off'}</strong>
-            </button>
             <button className="askem-refresh askem-refresh-subtle" onClick={() => void refresh()} disabled={loading}>
               {loading ? 'Syncing' : 'Refresh'}
             </button>
@@ -390,7 +403,7 @@ export default function App() {
             {atLimit ? (
               <WarningCard
                 eyebrow="Heads up"
-                title="Both set slots are in use."
+                title="All set slots are in use."
                 body="Clear a finished set below to free up a slot for your next comparison."
               />
             ) : null}
@@ -408,6 +421,7 @@ export default function App() {
                   <WorkspaceCard
                     key={workspaceSummary.workspace.id}
                     workspaceSummary={workspaceSummary}
+                    globalSyncEnabled={globalSyncEnabled}
                     busyKey={busyKey}
                     onClearWorkspace={clearWorkspace}
                     onClearProvider={clearProvider}
@@ -417,6 +431,23 @@ export default function App() {
                 <OnboardingCard />
               )}
             </section>
+
+            {workspaceCount >= MIN_WORKSPACES_FOR_FREEZE_CONTROL && (
+              <section className="askem-freeze-section">
+                <div className="askem-freeze-copy">
+                  <span className="askem-freeze-title">Freeze the world</span>
+                  <span className="askem-freeze-sub">Stop syncing for all sets</span>
+                </div>
+                <button
+                  type="button"
+                  className="askem-freeze-switch"
+                  data-enabled={String(!globalSyncEnabled)}
+                  onClick={() => void toggleGlobalSync()}
+                  disabled={loading}
+                  aria-label={globalSyncEnabled ? 'Freeze sync' : 'Unfreeze sync'}
+                />
+              </section>
+            )}
           </>
         ) : (
           <>
@@ -426,41 +457,87 @@ export default function App() {
               </div>
             </section>
 
-            <section className="askem-card askem-settings-section">
-              <div className="askem-defaults-heading">
-                <div className="askem-defaults-copy">
-                  <p className="askem-card-label">Defaults</p>
-                  <p className="askem-defaults-title">Choose which models join when a new set starts.</p>
+            <section className="askem-card askem-unified-settings">
+              <p className="askem-card-label">Settings</p>
+
+              <div className="askem-us-group">
+                <div className="askem-us-row-header">
+                  <span className="askem-us-row-title">Default models</span>
+                  <span className="askem-defaults-meta">{selectedProviders.length} selected</span>
                 </div>
-                <span className="askem-defaults-meta">{selectedProviders.length} selected</span>
+                <div className="askem-default-provider-list">
+                  {PROVIDERS.map((provider) => {
+                    const active = selectedProviders.includes(provider);
+                    return (
+                      <button
+                        key={provider}
+                        className={`askem-provider-chip ${active ? 'is-active' : ''}`}
+                        onClick={() => void toggleDefaultProvider(provider)}
+                        disabled={loading}
+                      >
+                        <span className="askem-provider-chip-dot" aria-hidden="true" />
+                        <span>{provider}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button className="askem-request-link" onClick={openRequestModal} type="button">
+                  Request more providers
+                </button>
               </div>
-              <div className="askem-default-provider-list">
-                {PROVIDERS.map((provider) => {
-                  const active = selectedProviders.includes(provider);
 
-                  return (
+              <div className="askem-us-divider" />
+
+              <div className="askem-us-group">
+                <div className="askem-us-toggle-row">
+                  <div>
+                    <span className="askem-us-row-title">Auto-sync new chats</span>
+                    <span className="askem-us-row-sub">
+                      {globalSyncEnabled
+                        ? 'New chats automatically fan-out.'
+                        : 'New chats stay solo.'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="askem-us-switch"
+                    data-enabled={String(globalSyncEnabled)}
+                    onClick={() => void toggleGlobalSync()}
+                    disabled={loading}
+                    aria-label={globalSyncEnabled ? 'Disable auto-sync' : 'Enable auto-sync'}
+                  />
+                </div>
+              </div>
+
+              <div className="askem-us-divider" />
+
+              <div className="askem-us-group">
+                <div className="askem-us-row-header">
+                  <span className="askem-us-row-title">Shortcut</span>
+                  {JSON.stringify(shortcuts) !== JSON.stringify(DEFAULT_SHORTCUTS) && (
                     <button
-                      key={provider}
-                      className={`askem-provider-chip ${active ? 'is-active' : ''}`}
-                      onClick={() => void toggleDefaultProvider(provider)}
-                      disabled={loading}
+                      type="button"
+                      className="askem-us-reset"
+                      onClick={() => void resetShortcuts()}
                     >
-                      <span className="askem-provider-chip-dot" aria-hidden="true" />
-                      <span>{provider}</span>
+                      Reset
                     </button>
-                  );
-                })}
+                  )}
+                </div>
+                <div className="askem-shortcut-list">
+                  {SHORTCUT_ROWS.map(({ id, label }) => (
+                    <div className="askem-shortcut-row" key={id}>
+                      <span className="askem-shortcut-action">{label}</span>
+                      <ShortcutRecorder
+                        binding={shortcuts[id]}
+                        onRecord={(binding) => void updateShortcut(id, binding)}
+                        conflict={false}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-              <button className="askem-request-link" onClick={openRequestModal} type="button">
-                Request more providers
-              </button>
             </section>
-
-            <ShortcutsCard
-              shortcuts={shortcuts}
-              onUpdateShortcut={updateShortcut}
-              onResetShortcuts={resetShortcuts}
-            />
 
             <section className="askem-card askem-logs-card">
               <div className="askem-debug-top">
@@ -513,11 +590,6 @@ export default function App() {
             </section>
 
             <footer className="askem-footer">
-              <span>by </span>
-              <a href="https://tuxi.dev/" target="_blank" rel="noreferrer">
-                Tuxi
-              </a>
-              <span> · one77r@gmail.com</span>
               <div className="askem-legal-links">
                 <button type="button" className="askem-legal-link" onClick={() => { setActiveLegalPage('terms'); setActiveView('legal'); }}>
                   Terms of Service
@@ -526,6 +598,11 @@ export default function App() {
                 <button type="button" className="askem-legal-link" onClick={() => { setActiveLegalPage('privacy'); setActiveView('legal'); }}>
                   Privacy Policy
                 </button>
+              </div>
+              <div className="askem-author">
+                <span>by </span>
+                <a href="https://tuxi.dev/" target="_blank" rel="noreferrer">Tuxi</a>
+                <span> · one77r@gmail.com</span>
               </div>
             </footer>
           </>
@@ -666,11 +743,13 @@ function getProviderOrigin(provider: Provider): string {
 
 function WorkspaceCard({
   workspaceSummary,
+  globalSyncEnabled,
   busyKey,
   onClearWorkspace,
   onClearProvider,
 }: {
   workspaceSummary: WorkspaceSummary;
+  globalSyncEnabled: boolean;
   busyKey: string | null;
   onClearWorkspace: (workspaceId: string) => Promise<void>;
   onClearProvider: (workspaceId: string, provider: Provider) => Promise<void>;
@@ -720,9 +799,9 @@ function WorkspaceCard({
           const member = workspace.members[provider];
           const enabled = workspace.enabledProviders.includes(provider);
           const rawState = memberStates[provider] ?? 'inactive';
-          const stateTone = getDisplayMemberStateTone(rawState, enabled);
-          const stateLabel = getDisplayMemberStateLabel(rawState, enabled);
-          const outcomeCopy = getMemberOutcomeCopy(rawState, enabled);
+          const stateTone = getDisplayMemberStateTone(rawState, enabled, globalSyncEnabled);
+          const stateLabel = getDisplayMemberStateLabel(rawState, enabled, globalSyncEnabled);
+          const outcomeCopy = getMemberOutcomeCopy(rawState, enabled, globalSyncEnabled);
           const displayState = getDisplayMemberState(rawState);
           const showOpenLink = displayState === 'inactive' && !member?.sessionId;
 
@@ -836,59 +915,6 @@ function ShortcutRecorder({
     >
       {recording ? 'Press keys…' : formatShortcutDisplay(binding, isApple)}
     </button>
-  );
-}
-
-function ShortcutsCard({
-  shortcuts,
-  onUpdateShortcut,
-  onResetShortcuts,
-}: {
-  shortcuts: ShortcutConfig;
-  onUpdateShortcut: (id: ShortcutId, binding: ShortcutBinding) => Promise<void>;
-  onResetShortcuts: () => Promise<void>;
-}) {
-  const isDefault =
-    JSON.stringify(shortcuts) === JSON.stringify(DEFAULT_SHORTCUTS);
-
-  const handleRecord = (id: ShortcutId, binding: ShortcutBinding) => {
-    void onUpdateShortcut(id, binding);
-  };
-
-  const handleReset = () => {
-    void onResetShortcuts();
-  };
-
-  return (
-    <section className="askem-card askem-settings-section">
-      <div className="askem-defaults-heading">
-        <div className="askem-defaults-copy">
-          <p className="askem-card-label">Shortcuts</p>
-          <p className="askem-defaults-title">Keyboard shortcuts used in chat pages.</p>
-        </div>
-        {!isDefault && (
-          <button
-            type="button"
-            className="askem-provider-clear"
-            onClick={handleReset}
-          >
-            Reset
-          </button>
-        )}
-      </div>
-      <div className="askem-shortcut-list">
-        {SHORTCUT_ROWS.map(({ id, label }) => (
-          <div className="askem-shortcut-row" key={id}>
-            <span className="askem-shortcut-action">{label}</span>
-            <ShortcutRecorder
-              binding={shortcuts[id]}
-              onRecord={(binding) => handleRecord(id, binding)}
-              conflict={false}
-            />
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }
 
