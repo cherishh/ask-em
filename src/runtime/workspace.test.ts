@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createDefaultEnabledProviders,
+  DEFAULT_SHORTCUTS,
   HEARTBEAT_STALE_MS,
   MAX_WORKSPACES,
   type LocalState,
@@ -26,7 +27,7 @@ function createEmptyState(): LocalState {
     globalSyncEnabled: true,
     debugLoggingEnabled: false,
     defaultEnabledProviders: createDefaultEnabledProviders(),
-    shortcuts: { togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false } },
+    shortcuts: DEFAULT_SHORTCUTS,
     workspaces: {},
     workspaceIndex: {},
     debugLogs: [],
@@ -260,7 +261,7 @@ describe('workspace state', () => {
       globalSyncEnabled: true,
       debugLoggingEnabled: false,
       defaultEnabledProviders: createDefaultEnabledProviders(),
-      shortcuts: { togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false } },
+      shortcuts: DEFAULT_SHORTCUTS,
       workspaces: Object.fromEntries(
         Array.from({ length: MAX_WORKSPACES }, (_, index) => {
           const id = `w${index + 1}`;

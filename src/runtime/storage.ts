@@ -25,6 +25,8 @@ export const DEFAULT_SESSION_STATE: SessionState = {
   claimedTabs: {},
 };
 
+const DEBUG_LOG_LIMIT = 500;
+
 type StorageArea = Pick<
   chrome.storage.StorageArea,
   'get' | 'set' | 'remove'
@@ -53,10 +55,6 @@ function isWorkspaceIndexEqual(left: LocalState['workspaceIndex'], right: LocalS
 
 function normalizeLocalState(state: LocalState): LocalState {
   let normalized = state;
-
-  if (!normalized.shortcuts?.togglePageParticipation) {
-    normalized = { ...normalized, shortcuts: DEFAULT_SHORTCUTS };
-  }
 
   const workspaceIndex = rebuildWorkspaceIndex(normalized.workspaces);
 
@@ -133,7 +131,7 @@ export async function appendDebugLog(entry: Omit<DebugLogEntry, 'id' | 'timestam
 
     return {
       ...state,
-      debugLogs: [...state.debugLogs, debugLog].slice(-1000),
+      debugLogs: [...state.debugLogs, debugLog].slice(-DEBUG_LOG_LIMIT),
     };
   });
 }

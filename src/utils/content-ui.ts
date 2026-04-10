@@ -7,7 +7,7 @@ import type {
   WorkspaceContextResponseMessage,
   WorkspaceSummary,
 } from '../runtime/protocol';
-import { DEFAULT_SHORTCUTS } from '../runtime/protocol';
+import { DEFAULT_SHORTCUTS, resolveShortcutConfig } from '../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../runtime/workspace';
 
 export type UiState = 'idle' | 'listening' | 'syncing' | 'blocked';
@@ -27,6 +27,12 @@ export type UiContext = {
 export type UiHandlers = {
   onWorkspaceProviderToggle: (provider: Provider, nextEnabled: boolean) => Promise<void>;
   onStandaloneSetCreationToggle: (nextEnabled: boolean) => void;
+  onProviderTabSwitch: (direction: 'next' | 'previous') => Promise<{
+    ok?: boolean;
+    switched?: boolean;
+    provider?: Provider;
+    reason?: string;
+  } | null>;
   loadWorkspaceContext: (workspaceId: string) => Promise<WorkspaceContextResponseMessage | null>;
   onRefreshContext: () => Promise<void>;
 };
@@ -60,11 +66,30 @@ function matchesShortcut(event: KeyboardEvent, binding: ShortcutBinding): boolea
     }
   }
   return (
-    event.key.toLowerCase() === binding.key.toLowerCase() &&
+    matchesShortcutKey(event, binding) &&
     modifierMatch &&
     event.shiftKey === binding.shift &&
     event.altKey === binding.alt
   );
+}
+
+function matchesShortcutKey(event: KeyboardEvent, binding: ShortcutBinding): boolean {
+  const eventKey = event.key.toLowerCase();
+  const bindingKey = binding.key.toLowerCase();
+
+  if (eventKey === bindingKey) {
+    return true;
+  }
+
+  if (bindingKey === '.' && (event.code === 'Period' || eventKey === '>')) {
+    return true;
+  }
+
+  if (bindingKey === ',' && (event.code === 'Comma' || eventKey === '<')) {
+    return true;
+  }
+
+  return false;
 }
 
 function formatBindingKeys(binding: ShortcutBinding): string[] {
@@ -471,6 +496,14 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         gap: 5px;
       }
 
+      .ask-em-panel-shortcut-combo-group {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
       .ask-em-panel-shortcut-plus {
         color: rgba(107, 100, 89, 0.62);
         font: inherit;
@@ -864,8 +897,8 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
         renderTooltip(
           context.standaloneCreateSetEnabled
-            ? 'Click to chat here without creating a set.'
-            : 'Click to allow this chat to create a new set.',
+            ? 'Click to stop fan-out. Becomes normal single chat.'
+            : 'Click to enable fan-out. Power on!',
           formatBindingKeys(context.shortcuts.togglePageParticipation),
         );
         return;
@@ -930,6 +963,13 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       <div class="ask-em-panel-shortcut">
         <span>Pause/restart sync for this tab</span>
         ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.togglePageParticipation))}
+      </div>
+      <div class="ask-em-panel-shortcut">
+        <span>Switch tabs</span>
+        <span class="ask-em-panel-shortcut-combo-group">
+          ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.previousProviderTab))}
+          ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.nextProviderTab))}
+        </span>
       </div>
     `;
 
@@ -1061,8 +1101,8 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
     renderTooltip(
       context.standaloneCreateSetEnabled
-        ? 'Click to chat here without creating a set.'
-        : 'Click to allow this chat to create a new set.',
+        ? 'Click to stop fan-out. Becomes normal single chat.'
+        : 'Click to enable fan-out. Power on!',
       formatBindingKeys(context.shortcuts.togglePageParticipation),
     );
   });
@@ -1121,6 +1161,23 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   });
 
   document.addEventListener('keydown', (event) => {
+    const switchDirection = matchesShortcut(event, context.shortcuts.previousProviderTab)
+      ? 'previous'
+      : matchesShortcut(event, context.shortcuts.nextProviderTab)
+        ? 'next'
+        : null;
+
+    if (switchDirection && context.workspaceId) {
+      event.preventDefault();
+      event.stopPropagation();
+      void handlers.onProviderTabSwitch(switchDirection).then((response) => {
+        if (response?.switched === false && response.reason) {
+          updateSyncLabel(response.reason, 'neutral');
+        }
+      });
+      return;
+    }
+
     if (!matchesShortcut(event, context.shortcuts.togglePageParticipation)) {
       return;
     }
@@ -1166,7 +1223,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       context.standaloneReady = nextContext.standaloneReady;
       context.standaloneCreateSetEnabled = nextContext.standaloneCreateSetEnabled;
       context.canStartNewSet = nextContext.canStartNewSet;
-      context.shortcuts = nextContext.shortcuts;
+      context.shortcuts = resolveShortcutConfig(nextContext.shortcuts);
       mount.dataset.providerEnabled = String(nextContext.providerEnabled);
       mount.dataset.globalSyncEnabled = String(nextContext.globalSyncEnabled);
       mount.dataset.standaloneCreateSetEnabled = String(

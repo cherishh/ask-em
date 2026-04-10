@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_SHORTCUTS } from './protocol';
 import type { LocalState, SessionState, UserSubmitMessage } from './protocol';
 
 const storageMocks = vi.hoisted(() => ({
@@ -24,7 +25,7 @@ function createLocalState(): LocalState {
       gemini: true,
       deepseek: true,
     },
-    shortcuts: { togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false } },
+    shortcuts: DEFAULT_SHORTCUTS,
     workspaces: {},
     workspaceIndex: {},
     debugLogs: [],
@@ -53,8 +54,12 @@ describe('background new-chat detachment', () => {
       tabs: {
         get: vi.fn().mockResolvedValue({ id: 9 }),
         sendMessage: vi.fn().mockResolvedValue({ ok: true }),
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
         query: vi.fn().mockResolvedValue([]),
         onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
       },
     });
   });
@@ -756,5 +761,199 @@ describe('background new-chat detachment', () => {
         workspaceId: 'w1',
       }),
     );
+  });
+
+  it('switches to the next claimed provider tab in workspace order', async () => {
+    const localState: LocalState = {
+      ...createLocalState(),
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {
+            claude: { provider: 'claude', sessionId: 'c-1', url: 'https://claude.ai/chat/c-1' },
+            gemini: { provider: 'gemini', sessionId: 'm-1', url: 'https://gemini.google.com/app/m-1' },
+            deepseek: { provider: 'deepseek', sessionId: 'd-1', url: 'https://chat.deepseek.com/a/chat/s/d-1' },
+          },
+          enabledProviders: ['claude', 'gemini', 'deepseek'],
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+        'gemini:m-1': 'w1',
+        'deepseek:d-1': 'w1',
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': {
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-1',
+          sessionId: 'c-1',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+        'w1:gemini': {
+          provider: 'gemini',
+          workspaceId: 'w1',
+          tabId: 12,
+          currentUrl: 'https://gemini.google.com/app/m-1',
+          sessionId: 'm-1',
+          pageState: 'login-required',
+          lastSeenAt: 10,
+        },
+        'w1:deepseek': {
+          provider: 'deepseek',
+          workspaceId: 'w1',
+          tabId: 13,
+          currentUrl: 'https://chat.deepseek.com/a/chat/s/d-1',
+          sessionId: 'd-1',
+          pageState: 'not-ready',
+          lastSeenAt: 10,
+        },
+      },
+    };
+
+    storageMocks.getLocalState.mockResolvedValue(localState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const { handleSwitchProviderTab } = await import('../entrypoints/background');
+    const result = await handleSwitchProviderTab(
+      { type: 'SWITCH_PROVIDER_TAB', provider: 'claude', direction: 'next' },
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(chrome.tabs.update).toHaveBeenCalledWith(12, { active: true });
+    expect(result).toEqual({
+      ok: true,
+      switched: true,
+      provider: 'gemini',
+    });
+  });
+
+  it('switches to the previous claimed provider tab with wraparound', async () => {
+    const localState: LocalState = {
+      ...createLocalState(),
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {
+            claude: { provider: 'claude', sessionId: 'c-1', url: 'https://claude.ai/chat/c-1' },
+            chatgpt: { provider: 'chatgpt', sessionId: 'g-1', url: 'https://chatgpt.com/c/g-1' },
+            deepseek: { provider: 'deepseek', sessionId: 'd-1', url: 'https://chat.deepseek.com/a/chat/s/d-1' },
+          },
+          enabledProviders: ['claude', 'chatgpt', 'deepseek'],
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+        'chatgpt:g-1': 'w1',
+        'deepseek:d-1': 'w1',
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': {
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-1',
+          sessionId: 'c-1',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+        'w1:chatgpt': {
+          provider: 'chatgpt',
+          workspaceId: 'w1',
+          tabId: 10,
+          currentUrl: 'https://chatgpt.com/c/g-1',
+          sessionId: 'g-1',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+        'w1:deepseek': {
+          provider: 'deepseek',
+          workspaceId: 'w1',
+          tabId: 13,
+          currentUrl: 'https://chat.deepseek.com/a/chat/s/d-1',
+          sessionId: 'd-1',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+      },
+    };
+
+    storageMocks.getLocalState.mockResolvedValue(localState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const { handleSwitchProviderTab } = await import('../entrypoints/background');
+    const result = await handleSwitchProviderTab(
+      { type: 'SWITCH_PROVIDER_TAB', provider: 'claude', direction: 'previous' },
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(chrome.tabs.update).toHaveBeenCalledWith(13, { active: true });
+    expect(result).toEqual({
+      ok: true,
+      switched: true,
+      provider: 'deepseek',
+    });
+  });
+
+  it('does not switch when the current tab has no other claimed provider tab in its set', async () => {
+    const localState: LocalState = {
+      ...createLocalState(),
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {
+            claude: { provider: 'claude', sessionId: 'c-1', url: 'https://claude.ai/chat/c-1' },
+          },
+          enabledProviders: ['claude', 'chatgpt'],
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': {
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-1',
+          sessionId: 'c-1',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+      },
+    };
+
+    storageMocks.getLocalState.mockResolvedValue(localState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const { handleSwitchProviderTab } = await import('../entrypoints/background');
+    const result = await handleSwitchProviderTab(
+      { type: 'SWITCH_PROVIDER_TAB', provider: 'claude', direction: 'next' },
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(chrome.tabs.update).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      ok: true,
+      switched: false,
+      reason: 'No other provider tab',
+    });
   });
 });

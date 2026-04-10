@@ -8,7 +8,7 @@ import type {
   ShortcutConfig,
   WorkspaceContextResponseMessage,
 } from '../runtime/protocol';
-import { DEFAULT_SHORTCUTS } from '../runtime/protocol';
+import { DEFAULT_SHORTCUTS, resolveShortcutConfig } from '../runtime/protocol';
 import {
   buildHeartbeatMessage,
   buildHelloMessage,
@@ -243,7 +243,7 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
       standaloneReady: standaloneVisible,
       standaloneCreateSetEnabled,
       canStartNewSet: response?.canStartNewSet ?? true,
-      shortcuts: response?.shortcuts ?? uiContext.shortcuts,
+      shortcuts: resolveShortcutConfig(response?.shortcuts ?? uiContext.shortcuts),
     };
     ui.setContext(uiContext);
     ui.setVisible(Boolean(response?.workspaceId) || standaloneVisible);
@@ -290,6 +290,18 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
       };
       ui.setContext(uiContext);
       ui.setState(getStandaloneUiState(uiContext));
+    },
+    async onProviderTabSwitch(direction) {
+      return await sendRuntimeMessage<{
+        ok?: boolean;
+        switched?: boolean;
+        provider?: typeof adapter.name;
+        reason?: string;
+      }>({
+        type: 'SWITCH_PROVIDER_TAB',
+        provider: adapter.name,
+        direction,
+      });
     },
     async loadWorkspaceContext(workspaceId) {
       return await sendRuntimeMessage<WorkspaceContextResponseMessage>({

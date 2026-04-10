@@ -1,5 +1,11 @@
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
-import { ALL_PROVIDERS as PROVIDERS, DEFAULT_SHORTCUTS, MAX_WORKSPACES, formatShortcutDisplay } from '../../runtime/protocol';
+import {
+  ALL_PROVIDERS as PROVIDERS,
+  DEFAULT_SHORTCUTS,
+  MAX_WORKSPACES,
+  formatShortcutDisplay,
+  resolveShortcutConfig,
+} from '../../runtime/protocol';
 import type {
   DebugLogEntry,
   GroupMemberState,
@@ -238,6 +244,8 @@ export default function App() {
   const [activeLegalPage, setActiveLegalPage] = useState<LegalPage>('terms');
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [shortcuts, setShortcuts] = useState<ShortcutConfig>(DEFAULT_SHORTCUTS);
+  const [recordingShortcutId, setRecordingShortcutId] = useState<ShortcutId | null>(null);
+  const resolvedShortcuts = resolveShortcutConfig(shortcuts);
 
   const refresh = async () => {
     setLoading(true);
@@ -248,7 +256,7 @@ export default function App() {
         setSelectedProviders(
           PROVIDERS.filter((provider) => nextStatus.defaultEnabledProviders[provider]),
         );
-        setShortcuts(nextStatus.shortcuts ?? DEFAULT_SHORTCUTS);
+        setShortcuts(resolveShortcutConfig(nextStatus.shortcuts));
       }
       setLoading(false);
     });
@@ -309,7 +317,7 @@ export default function App() {
   };
 
   const updateShortcut = async (id: ShortcutId, binding: ShortcutBinding) => {
-    const next = { ...shortcuts, [id]: binding };
+    const next = { ...resolvedShortcuts, [id]: binding };
     setShortcuts(next);
     await chrome.runtime.sendMessage({ type: 'SET_SHORTCUTS', shortcuts: next });
   };
@@ -546,7 +554,7 @@ export default function App() {
               <div className="askem-us-group">
                 <div className="askem-us-row-header">
                   <span className="askem-us-row-title">Shortcut</span>
-                  {JSON.stringify(shortcuts) !== JSON.stringify(DEFAULT_SHORTCUTS) && (
+                  {JSON.stringify(resolvedShortcuts) !== JSON.stringify(DEFAULT_SHORTCUTS) && (
                     <button
                       type="button"
                       className="askem-us-reset"
@@ -561,7 +569,9 @@ export default function App() {
                     <div className="askem-shortcut-row" key={id}>
                       <span className="askem-shortcut-action">{label}</span>
                       <ShortcutRecorder
-                        binding={shortcuts[id]}
+                        binding={resolvedShortcuts[id]}
+                        recording={recordingShortcutId === id}
+                        onRecordingChange={(recording) => setRecordingShortcutId(recording ? id : null)}
                         onRecord={(binding) => void updateShortcut(id, binding)}
                         conflict={false}
                       />
@@ -916,20 +926,43 @@ function WorkspaceCard({
 const SHORTCUT_ROWS = [
   {
     id: 'togglePageParticipation',
-    label: 'Toggle this page in ask’em',
+    label: 'Sync this page on/off',
+  },
+  {
+    id: 'previousProviderTab',
+    label: 'Go to previous tab',
+  },
+  {
+    id: 'nextProviderTab',
+    label: 'Go to next tab',
   },
 ] as const satisfies Array<{ id: ShortcutId; label: string }>;
 
+function normalizeShortcutKey(event: KeyboardEvent): string {
+  if (event.code === 'Period') {
+    return '.';
+  }
+
+  if (event.code === 'Comma') {
+    return ',';
+  }
+
+  return event.key.length === 1 ? event.key.toLowerCase() : event.key;
+}
+
 function ShortcutRecorder({
   binding,
+  recording,
+  onRecordingChange,
   onRecord,
   conflict,
 }: {
   binding: ShortcutBinding;
+  recording: boolean;
+  onRecordingChange: (recording: boolean) => void;
   onRecord: (binding: ShortcutBinding) => void;
   conflict: boolean;
 }) {
-  const [recording, setRecording] = useState(false);
   const isApple = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -947,7 +980,7 @@ function ShortcutRecorder({
       event.stopPropagation();
 
       const newBinding: ShortcutBinding = {
-        key: event.key.length === 1 ? event.key.toLowerCase() : event.key,
+        key: normalizeShortcutKey(event),
         meta: event.metaKey,
         ctrl: event.ctrlKey,
         shift: event.shiftKey,
@@ -955,9 +988,9 @@ function ShortcutRecorder({
       };
 
       onRecord(newBinding);
-      setRecording(false);
+      onRecordingChange(false);
     },
-    [recording, onRecord],
+    [recording, onRecord, onRecordingChange],
   );
 
   useEffect(() => {
@@ -968,17 +1001,17 @@ function ShortcutRecorder({
 
   useEffect(() => {
     if (!recording) return;
-    const handleBlur = () => setRecording(false);
+    const handleBlur = () => onRecordingChange(false);
     window.addEventListener('blur', handleBlur);
     return () => window.removeEventListener('blur', handleBlur);
-  }, [recording]);
+  }, [recording, onRecordingChange]);
 
   return (
     <button
       ref={buttonRef}
       type="button"
       className={`askem-shortcut-keys askem-shortcut-recorder ${recording ? 'is-recording' : ''} ${conflict ? 'is-conflict' : ''}`}
-      onClick={() => setRecording(!recording)}
+      onClick={() => onRecordingChange(!recording)}
     >
       {recording ? 'Press keys…' : formatShortcutDisplay(binding, isApple)}
     </button>

@@ -8,6 +8,7 @@ import {
   type Provider,
   type RuntimeMessage,
   type StatusResponseMessage,
+  type SwitchProviderTabMessage,
   type UserSubmitMessage,
 } from '../runtime/protocol';
 import {
@@ -452,6 +453,18 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
 
   cancelScheduledGroupGc(workspaceLookup.workspaceId);
 
+  const previousClaimedTab = sessionState.claimedTabs[`${workspaceLookup.workspaceId}:${message.provider}`];
+  if (message.pageState === 'login-required' && previousClaimedTab?.pageState !== 'login-required') {
+    await logDebug({
+      level: 'warn',
+      scope: 'background',
+      workspaceId: workspaceLookup.workspaceId,
+      provider: message.provider,
+      message: 'Provider login required',
+      detail: `${previousClaimedTab?.pageState ?? 'unknown'} -> login-required @ ${message.currentUrl}`,
+    });
+  }
+
   await upsertClaimedTab(workspaceLookup.workspaceId, message.provider, {
     provider: message.provider,
     workspaceId: workspaceLookup.workspaceId,
@@ -564,18 +577,28 @@ async function deliverPromptToWorkspaceTargets(
           } satisfies ProviderDeliveryResult;
         }
 
+        await logDebug({
+          level: 'info',
+          scope: 'background',
+          provider,
+          workspaceId,
+          message: 'Prompt delivery accepted',
+          detail: `${message.provider} -> ${provider}`,
+        });
+
         return {
           provider,
           ok: true,
         } satisfies ProviderDeliveryResult;
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
+        const isLoginRequired = reason.toLowerCase().includes('login required');
         await logDebug({
-          level: 'error',
+          level: isLoginRequired ? 'warn' : 'error',
           scope: 'background',
           provider,
           workspaceId,
-          message: 'Prompt delivery threw',
+          message: isLoginRequired ? 'Prompt delivery login required' : 'Prompt delivery threw',
           detail: reason,
         });
         return {
@@ -675,6 +698,13 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
   }
 
   if (!workspaceLookup?.workspace) {
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      provider: message.provider,
+      message: 'Ignored submit without workspace',
+      detail: `${message.pageKind}: ${message.sessionId ?? 'no-session'} @ ${message.currentUrl}`,
+    });
     return {
       ok: true,
       synced: false,
@@ -756,6 +786,31 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
   }
 
   const deliveryResults = await deliverPromptToWorkspaceTargets(workspaceLookup.workspaceId, message);
+  if (deliveryResults.length > 0) {
+    const succeeded = deliveryResults.filter((result) => result.ok);
+    const failed = deliveryResults.filter((result) => !result.ok);
+    await logDebug({
+      level: failed.length > 0 ? 'warn' : 'info',
+      scope: 'background',
+      provider: message.provider,
+      workspaceId: workspaceLookup.workspaceId,
+      message: 'Sync fan-out completed',
+      detail: failed.length > 0
+        ? `${succeeded.length}/${deliveryResults.length} ok; failed: ${failed
+            .map((result) => `${result.provider}${result.reason ? ` (${result.reason})` : ''}`)
+            .join(', ')}`
+        : `${succeeded.length}/${deliveryResults.length} ok`,
+    });
+  } else {
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      provider: message.provider,
+      workspaceId: workspaceLookup.workspaceId,
+      message: 'No sync fan-out targets',
+      detail: workspaceLookup.workspace.enabledProviders.join(', '),
+    });
+  }
 
   return {
     ok: true,
@@ -766,6 +821,97 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
     canStartNewSet: canStartNewSet(localState),
     deliveryResults,
   };
+}
+
+export async function handleSwitchProviderTab(
+  message: SwitchProviderTabMessage,
+  sender: chrome.runtime.MessageSender,
+) {
+  const tabId = sender.tab?.id;
+  if (!tabId) {
+    return {
+      ok: false,
+      switched: false,
+      reason: 'No active provider tab',
+    };
+  }
+
+  const { localState, sessionState } = await refreshPendingState();
+  const currentClaimedTab = getClaimedTabByTabId(sessionState, tabId, message.provider);
+  const workspace = currentClaimedTab ? localState.workspaces[currentClaimedTab.workspaceId] : null;
+
+  if (!currentClaimedTab || !workspace) {
+    return {
+      ok: true,
+      switched: false,
+      reason: 'Not in a set',
+    };
+  }
+
+  const providerOrder = ALL_PROVIDERS.filter(
+    (provider) => sessionState.claimedTabs[`${currentClaimedTab.workspaceId}:${provider}`],
+  );
+  const currentIndex = providerOrder.indexOf(message.provider);
+
+  if (providerOrder.length < 2 || currentIndex === -1) {
+    return {
+      ok: true,
+      switched: false,
+      reason: 'No other provider tab',
+    };
+  }
+
+  const offset = message.direction === 'next' ? 1 : -1;
+  const targetIndex = (currentIndex + offset + providerOrder.length) % providerOrder.length;
+  const targetProvider = providerOrder[targetIndex];
+  const targetClaimedTab = sessionState.claimedTabs[`${currentClaimedTab.workspaceId}:${targetProvider}`];
+
+  if (!targetClaimedTab) {
+    return {
+      ok: true,
+      switched: false,
+      reason: 'No other provider tab',
+    };
+  }
+
+  try {
+    const targetTab = await chrome.tabs.update(targetClaimedTab.tabId, { active: true });
+    if (typeof targetTab?.windowId === 'number') {
+      await chrome.windows.update(targetTab.windowId, { focused: true });
+    }
+
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      workspaceId: currentClaimedTab.workspaceId,
+      provider: targetProvider,
+      message: 'Switched provider tab',
+      detail: `${message.provider} -> ${targetProvider}`,
+    });
+
+    return {
+      ok: true,
+      switched: true,
+      provider: targetProvider,
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    await clearClaimedTab(currentClaimedTab.workspaceId, targetProvider);
+    await logDebug({
+      level: 'warn',
+      scope: 'background',
+      workspaceId: currentClaimedTab.workspaceId,
+      provider: targetProvider,
+      message: 'Provider tab switch target unavailable',
+      detail: reason,
+    });
+
+    return {
+      ok: false,
+      switched: false,
+      reason: 'Provider tab unavailable',
+    };
+  }
 }
 
 async function handleGetStatus(): Promise<StatusResponseMessage> {
@@ -860,6 +1006,13 @@ async function handleWorkspaceClear(
       setSessionState(removeClaimedTabsForWorkspace(sessionState, message.workspaceId)),
     ]);
     await notifyTabsToRefreshContext(targetTabIds);
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      workspaceId: message.workspaceId,
+      message: 'Cleared workspace',
+      detail: `${targetTabIds.length} claimed tabs refreshed`,
+    });
 
     return { ok: true };
   }
@@ -880,6 +1033,14 @@ async function handleWorkspaceClear(
   if (claimedTab) {
     await notifyTabsToRefreshContext([claimedTab.tabId]);
   }
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    workspaceId: message.workspaceId,
+    provider: message.provider,
+    message: 'Removed provider from workspace',
+    detail: claimedTab ? `refreshed tab ${claimedTab.tabId}` : 'no claimed tab',
+  });
 
   const nextLocalState = clearWorkspaceProvider(localState, message.workspaceId, message.provider);
   const nextWorkspace = nextLocalState.workspaces[message.workspaceId];
@@ -1031,6 +1192,9 @@ export default defineBackground(() => {
           return;
         case 'USER_SUBMIT':
           sendResponse(await handleUserSubmit(message, sender));
+          return;
+        case 'SWITCH_PROVIDER_TAB':
+          sendResponse(await handleSwitchProviderTab(message, sender));
           return;
         case 'GET_STATUS':
           sendResponse(await handleGetStatus());

@@ -38,13 +38,24 @@ export type ShortcutBinding = {
   alt: boolean;
 };
 
-export type ShortcutId = 'togglePageParticipation';
+export type ShortcutId = 'togglePageParticipation' | 'nextProviderTab' | 'previousProviderTab';
 
 export type ShortcutConfig = Record<ShortcutId, ShortcutBinding>;
 
 export const DEFAULT_SHORTCUTS: ShortcutConfig = {
   togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false },
+  nextProviderTab: { key: '.', meta: false, ctrl: true, shift: true, alt: false },
+  previousProviderTab: { key: ',', meta: false, ctrl: true, shift: true, alt: false },
 };
+
+export function resolveShortcutConfig(
+  shortcuts?: Partial<Record<ShortcutId, ShortcutBinding>> | null,
+): ShortcutConfig {
+  return {
+    ...DEFAULT_SHORTCUTS,
+    ...shortcuts,
+  };
+}
 
 export function formatShortcutDisplay(binding: ShortcutBinding, isApple: boolean): string {
   const parts: string[] = [];
@@ -241,6 +252,12 @@ export type SetShortcutsMessage = {
   shortcuts: ShortcutConfig;
 };
 
+export type SwitchProviderTabMessage = {
+  type: 'SWITCH_PROVIDER_TAB';
+  provider: Provider;
+  direction: 'next' | 'previous';
+};
+
 export type DebugLogMessage = {
   type: 'LOG_DEBUG';
   level: DebugLogEntry['level'];
@@ -272,6 +289,7 @@ export type RuntimeMessage =
   | SetWorkspaceProviderEnabledMessage
   | SetGlobalSyncEnabledMessage
   | SetShortcutsMessage
+  | SwitchProviderTabMessage
   | SetDebugLoggingEnabledMessage
   | DebugLogMessage
   | RefreshContentContextMessage
