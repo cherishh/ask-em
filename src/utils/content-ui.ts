@@ -1,4 +1,4 @@
-import type { SiteAdapter } from '../adapters/types';
+import type { ProviderAdapter } from '../adapters/types';
 import type {
   GroupMemberState,
   Provider,
@@ -58,7 +58,7 @@ function getDisplayMemberState(state: GroupMemberState): Exclude<GroupMemberStat
   return state === 'stale' ? 'active' : state;
 }
 
-export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
+export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) {
   const { mountId, className } = adapter.getUiSpec();
   const shellId = `${mountId}-shell`;
 

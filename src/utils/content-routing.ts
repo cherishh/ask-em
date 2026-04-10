@@ -5,10 +5,10 @@ import type {
   RuntimeMessage,
   UserSubmitMessage,
 } from '../runtime/protocol';
-import type { SiteAdapter } from '../adapters/types';
+import type { ProviderAdapter } from '../adapters/types';
 
-export function buildHelloMessage(adapter: SiteAdapter): HelloMessage {
-  const status = adapter.getStatus();
+export function buildHelloMessage(adapter: ProviderAdapter): HelloMessage {
+  const status = adapter.session.getStatus();
 
   return {
     type: 'HELLO',
@@ -20,8 +20,8 @@ export function buildHelloMessage(adapter: SiteAdapter): HelloMessage {
   };
 }
 
-export function buildHeartbeatMessage(adapter: SiteAdapter): HeartbeatMessage {
-  const status = adapter.getStatus();
+export function buildHeartbeatMessage(adapter: ProviderAdapter): HeartbeatMessage {
+  const status = adapter.session.getStatus();
 
   return {
     type: 'HEARTBEAT',

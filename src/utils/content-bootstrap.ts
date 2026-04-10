@@ -1,4 +1,4 @@
-import type { SiteAdapter } from '../adapters/types';
+import type { ProviderAdapter } from '../adapters/types';
 import type {
   DeliverPromptMessage,
   PingMessage,
@@ -18,12 +18,12 @@ import { createContentUi, type UiContext } from './content-ui';
 const STARTUP_PRESENCE_POLL_MS = 1_000;
 const STARTUP_PRESENCE_DURATION_MS = 10_000;
 
-function shouldShowStandaloneIndicator(adapter: SiteAdapter): boolean {
-  const status = adapter.getStatus();
+function shouldShowStandaloneIndicator(adapter: ProviderAdapter): boolean {
+  const status = adapter.session.getStatus();
   return status.pageKind === 'new-chat' && status.pageState === 'ready';
 }
 
-export function bootstrapContentScript(adapter: SiteAdapter): void {
+export function bootstrapContentScript(adapter: ProviderAdapter): void {
   let uiContext: UiContext = {
     workspaceId: null,
     providerEnabled: true,
@@ -94,7 +94,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
   };
 
   const reportPresence = async (kind: 'HELLO' | 'HEARTBEAT') => {
-    const status = adapter.getStatus();
+    const status = adapter.session.getStatus();
     const response =
       kind === 'HELLO'
         ? await sendRuntimeMessage<{
@@ -186,7 +186,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
       return;
     }
 
-    const status = adapter.getStatus();
+    const status = adapter.session.getStatus();
     const fingerprint = `${status.currentUrl}::${content}`;
 
     if (fingerprint === lastFingerprint && Date.now() - lastFingerprintAt < 1_500) {
@@ -234,7 +234,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     );
   };
 
-  const unsubscribe = adapter.subscribeToUserSubmissions?.((content) => {
+  const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.((content) => {
     void reportUserSubmit(content);
   });
 
@@ -257,7 +257,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
   chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
     void (async () => {
       if ((message as PingMessage).type === 'PING') {
-        const status = adapter.getStatus();
+        const status = adapter.session.getStatus();
         const response: PingResponseMessage = {
           type: 'PING_RESPONSE',
           provider: status.provider,
@@ -281,8 +281,8 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
         return;
       }
 
-      const snapshot = adapter.getStatus();
-      if (!adapter.canDeliverPrompt?.(message as DeliverPromptMessage, snapshot)) {
+      const snapshot = adapter.session.getStatus();
+      if (!adapter.session.canDeliverPrompt?.(message as DeliverPromptMessage, snapshot)) {
         await logDebug({
           level: 'warn',
           message: 'Blocked prompt delivery in content',
@@ -291,6 +291,17 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
         });
         ui.setState('blocked', 'paused');
         sendResponse({ ok: false, blocked: true, snapshot });
+        return;
+      }
+
+      if (!adapter.composer) {
+        await logDebug({
+          level: 'warn',
+          message: 'Blocked prompt delivery because provider has no composer adapter',
+          workspaceId: message.workspaceId,
+        });
+        ui.setState('blocked', 'paused');
+        sendResponse({ ok: false, blocked: true, error: 'Provider does not support prompt delivery' });
         return;
       }
 
@@ -304,9 +315,9 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
           workspaceId: message.workspaceId,
         });
 
-        const baselineUrl = adapter.getCurrentUrl();
-        await adapter.setComposerText?.(message.content);
-        await adapter.submit?.();
+        const baselineUrl = adapter.session.getCurrentUrl();
+        await adapter.composer.setComposerText(message.content);
+        await adapter.composer.submit();
 
         const shouldAwaitSessionRef =
           snapshot.sessionId === null ||
@@ -315,7 +326,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
 
         if (shouldAwaitSessionRef) {
           void adapter
-            .waitForSessionRefUpdate?.(baselineUrl)
+            .session.waitForSessionRefUpdate?.(baselineUrl)
             .then(async (ref) => {
               await logDebug({
                 level: 'info',
