@@ -122,9 +122,9 @@ Success criteria:
 
 Goal: separate domain types from runtime transport types.
 
-- [ ] Split storage/domain types from runtime request/response messages.
-- [ ] Move constants and shortcut helpers into narrower modules.
-- [ ] Tighten response/request typing where possible.
+- [x] Split storage/domain types from runtime request/response messages.
+- [x] Move constants and shortcut helpers into narrower modules.
+- [x] Tighten response/request typing where possible.
 
 Success criteria:
 
