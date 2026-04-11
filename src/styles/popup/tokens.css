@@ -1,0 +1,79 @@
+:root {
+  color-scheme: light;
+
+  --askem-font-sans: "Avenir Next", "Segoe UI", sans-serif;
+  --askem-font-serif: Georgia, "Times New Roman", serif;
+
+  --askem-ink: #141413;
+  --askem-muted: #5e5d59;
+  --askem-body: #454035;
+  --askem-bg-base: #f5f4ed;
+  --askem-panel: rgba(250, 249, 245, 0.92);
+  --askem-line: #f0eee6;
+  --askem-shadow: rgba(0, 0, 0, 0.05);
+  --askem-accent: #c96442;
+  --askem-danger: #b53333;
+  --askem-danger-strong: #b9382f;
+  --askem-warn: #9c6b00;
+  --askem-warn-strong: #92400e;
+  --askem-ok: #1f7a59;
+  --askem-link: #8f4700;
+  --askem-link-hover: #693100;
+  --askem-blue-link-hover: #1a3fa0;
+
+  --askem-overlay-scrim: rgba(19, 15, 10, 0.2);
+  --askem-muted-surface: rgba(107, 100, 89, 0.1);
+  --askem-muted-surface-strong: rgba(107, 100, 89, 0.28);
+  --askem-accent-surface-subtle: rgba(201, 100, 66, 0.08);
+  --askem-accent-surface-soft: rgba(201, 100, 66, 0.12);
+  --askem-accent-surface: rgba(201, 100, 66, 0.18);
+  --askem-accent-surface-strong: rgba(255, 249, 244, 0.94);
+  --askem-accent-surface-stronger: rgba(255, 249, 244, 0.98);
+  --askem-warning-surface: rgba(217, 119, 6, 0.14);
+  --askem-warn-surface-soft: rgba(156, 107, 0, 0.12);
+  --askem-danger-surface: rgba(185, 56, 47, 0.12);
+  --askem-ok-surface: rgba(31, 122, 89, 0.12);
+
+  --askem-border-soft: rgba(35, 25, 8, 0.08);
+  --askem-border: rgba(35, 25, 8, 0.12);
+  --askem-border-strong: rgba(35, 25, 8, 0.18);
+  --askem-border-accent-soft: rgba(201, 100, 66, 0.18);
+  --askem-border-accent-hover: rgba(201, 100, 66, 0.22);
+  --askem-border-accent: rgba(201, 100, 66, 0.28);
+  --askem-border-accent-strong: rgba(201, 100, 66, 0.4);
+
+  --askem-white-surface: rgba(255, 255, 255, 0.72);
+  --askem-white-surface-strong: rgba(255, 255, 255, 0.96);
+  --askem-white-surface-soft: rgba(255, 255, 255, 0.78);
+  --askem-white-surface-muted: rgba(255, 255, 255, 0.52);
+  --askem-card-surface:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(247, 243, 236, 0.92)),
+    radial-gradient(circle at top right, rgba(201, 100, 66, 0.08), transparent 28%);
+  --askem-card-shadow: 0 18px 35px var(--askem-shadow);
+  --askem-card-shadow-soft: 0 10px 24px rgba(55, 35, 0, 0.08);
+  --askem-card-inset: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --askem-keycap-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.92),
+    0 2px 4px rgba(15, 23, 42, 0.06),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.04);
+  --askem-ring-accent-soft: 0 0 0 3px rgba(201, 100, 66, 0.1);
+  --askem-ring-accent: 0 0 0 3px rgba(201, 100, 66, 0.12);
+  --askem-ring-accent-strong: 0 0 0 5px rgba(201, 100, 66, 0.14);
+  --askem-switch-thumb-shadow: 0 1px 4px rgba(15, 23, 42, 0.14);
+  --askem-fine-stripe:
+    repeating-linear-gradient(
+      90deg,
+      rgba(92, 71, 26, 0.018) 0,
+      rgba(92, 71, 26, 0.018) 1px,
+      transparent 1px,
+      transparent 14px
+    );
+
+  --askem-switch-off: rgba(148, 163, 184, 0.3);
+  --askem-switch-on: rgba(22, 163, 74, 0.88);
+  --askem-switch-thumb: rgba(255, 255, 255, 0.96);
+
+  --askem-radius-card: 22px;
+  --askem-radius-card-lg: 24px;
+  --askem-radius-pill: 999px;
+}

@@ -1,0 +1,171 @@
+.askem-unified-settings {
+  padding: 18px;
+  background: var(--askem-card-surface);
+}
+
+.askem-unified-settings > .askem-card-label {
+  margin-bottom: 14px;
+}
+
+.askem-us-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.askem-us-divider {
+  height: 1px;
+  margin: 14px 0;
+  background: var(--askem-border-soft);
+}
+
+.askem-us-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.askem-us-row-title {
+  display: block;
+  color: var(--askem-ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.askem-us-row-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--askem-muted);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.askem-us-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.askem-us-switch {
+  width: 40px;
+  height: 22px;
+}
+
+.askem-us-switch::after {
+  width: 16px;
+  height: 16px;
+  box-shadow: var(--askem-switch-thumb-shadow);
+}
+
+.askem-us-switch[data-enabled="true"] {
+  background: var(--askem-switch-on);
+}
+
+.askem-us-switch[data-enabled="true"]::after {
+  transform: translateX(18px);
+}
+
+.askem-us-switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.askem-us-reset {
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  color: var(--askem-muted);
+  cursor: pointer;
+  font: 700 9px/1 var(--askem-font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-decoration-color: rgba(107, 100, 89, 0.24);
+  text-underline-offset: 0.2em;
+  transition: color 140ms ease;
+}
+
+.askem-us-reset:hover {
+  color: var(--askem-ink);
+}
+
+.askem-shortcut-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.askem-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(35, 25, 8, 0.06);
+}
+
+.askem-shortcut-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.askem-shortcut-action {
+  color: var(--askem-ink);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.askem-shortcut-keys {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 240, 233, 0.92));
+  box-shadow: var(--askem-keycap-shadow);
+  color: rgba(15, 23, 42, 0.82);
+  font: 700 11px/1 var(--askem-font-sans);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.askem-shortcut-recorder {
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.askem-shortcut-recorder:hover {
+  border-color: var(--askem-border-accent-hover);
+  background: var(--askem-accent-surface-strong);
+}
+
+.askem-shortcut-recorder.is-recording {
+  border-color: var(--askem-border-accent-strong);
+  background: var(--askem-accent-surface-stronger);
+  box-shadow: var(--askem-ring-accent-soft), 0 2px 4px rgba(15, 23, 42, 0.06);
+  color: var(--askem-accent);
+  animation: askem-shortcut-pulse 1.2s ease-in-out infinite;
+}
+
+.askem-shortcut-recorder.is-conflict {
+  border-color: rgba(185, 56, 47, 0.32);
+  background: rgba(255, 245, 244, 0.94);
+  color: var(--askem-danger);
+}
+
+.askem-shortcut-conflict {
+  margin: 10px 0 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(185, 56, 47, 0.08);
+  color: var(--askem-danger);
+  font: 600 11px/1.4 var(--askem-font-sans);
+}
+
+@keyframes askem-shortcut-pulse {
+  0%, 100% { box-shadow: var(--askem-ring-accent-soft), 0 2px 4px rgba(15, 23, 42, 0.06); }
+  50% { box-shadow: var(--askem-ring-accent-strong), 0 2px 4px rgba(15, 23, 42, 0.06); }
+}

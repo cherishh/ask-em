@@ -1,0 +1,77 @@
+.askem-legal-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.askem-legal-top {
+  display: flex;
+  align-items: center;
+}
+
+.askem-legal-back {
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  color: var(--askem-accent);
+  cursor: pointer;
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: color 140ms ease;
+}
+
+.askem-legal-back:hover {
+  color: var(--askem-blue-link-hover);
+}
+
+.askem-legal-body {
+  border: 1px solid var(--askem-line);
+  border-radius: var(--askem-radius-card);
+  background: var(--askem-panel);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--askem-card-shadow);
+  padding: 18px;
+}
+
+.askem-legal-body h2 {
+  margin: 0 0 4px;
+  font-family: var(--askem-font-serif);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.askem-legal-updated {
+  margin: 0 0 18px;
+  color: var(--askem-muted);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.askem-legal-body h3 {
+  margin: 16px 0 6px;
+  font: 700 11px/1.2 var(--askem-font-sans);
+  letter-spacing: 0.06em;
+  color: var(--askem-ink);
+}
+
+.askem-legal-body p,
+.askem-legal-body ul {
+  color: var(--askem-body);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.askem-legal-body p {
+  margin: 0 0 8px;
+}
+
+.askem-legal-body ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+
+.askem-legal-body li {
+  margin-bottom: 4px;
+}

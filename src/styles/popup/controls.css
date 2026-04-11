@@ -1,0 +1,186 @@
+.askem-refresh,
+.askem-clear-workspace,
+.askem-provider-clear {
+  border: 1px solid var(--askem-line);
+  background: var(--askem-white-surface-soft);
+  color: var(--askem-ink);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.askem-refresh:hover,
+.askem-clear-workspace:hover,
+.askem-provider-clear:hover {
+  border-color: rgba(35, 25, 8, 0.2);
+  background: var(--askem-white-surface-strong);
+}
+
+.askem-refresh:disabled,
+.askem-clear-workspace:disabled,
+.askem-provider-clear:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.askem-refresh {
+  border-radius: var(--askem-radius-pill);
+  padding: 9px 12px;
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.askem-clear-workspace,
+.askem-provider-clear {
+  border-radius: var(--askem-radius-pill);
+  padding: 7px 10px;
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.askem-refresh-subtle {
+  position: relative;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--askem-muted);
+  box-shadow: none;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  transition:
+    color 140ms ease,
+    letter-spacing 140ms ease;
+}
+
+.askem-refresh-subtle::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1px;
+  background: rgba(23, 23, 23, 0.22);
+  transform: scaleX(0.24);
+  transform-origin: right center;
+  opacity: 0;
+  transition:
+    transform 140ms ease,
+    opacity 140ms ease,
+    background 140ms ease;
+}
+
+.askem-refresh-subtle:hover {
+  color: var(--askem-ink);
+  letter-spacing: 0.2em;
+}
+
+.askem-refresh-subtle:hover::after {
+  background: rgba(23, 23, 23, 0.48);
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+.askem-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--askem-border);
+  border-radius: var(--askem-radius-pill);
+  background: var(--askem-white-surface-soft);
+  padding: 9px 11px;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+  box-shadow: var(--askem-card-shadow-soft);
+}
+
+.askem-sync-pill:hover {
+  border-color: var(--askem-border-strong);
+  background: var(--askem-white-surface-strong);
+}
+
+.askem-sync-pill.is-paused {
+  border-color: rgba(184, 78, 24, 0.18);
+  background:
+    linear-gradient(180deg, var(--askem-accent-surface-strong), rgba(255, 242, 232, 0.92));
+}
+
+.askem-sync-pill:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.askem-sync-pill-label {
+  color: var(--askem-muted);
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.askem-sync-pill strong {
+  font-family: var(--askem-font-serif);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.askem-provider-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  border: 1px solid var(--askem-border);
+  border-radius: var(--askem-radius-pill);
+  background: var(--askem-white-surface);
+  padding: 8px 10px;
+  color: var(--askem-ink);
+  cursor: pointer;
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.askem-provider-chip.is-active {
+  border-color: var(--askem-border-accent);
+  background: var(--askem-accent-surface-strong);
+  box-shadow: var(--askem-card-inset);
+}
+
+.askem-provider-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--askem-radius-pill);
+  background: var(--askem-muted-surface-strong);
+  box-shadow: inset 0 0 0 1px var(--askem-border-soft);
+}
+
+.askem-provider-chip.is-active .askem-provider-chip-dot {
+  background: var(--askem-accent);
+  box-shadow: var(--askem-ring-accent);
+}
+
+.askem-freeze-switch,
+.askem-us-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--askem-radius-pill);
+  background: var(--askem-switch-off);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 160ms ease;
+}
+
+.askem-freeze-switch::after,
+.askem-us-switch::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  border-radius: var(--askem-radius-pill);
+  background: var(--askem-switch-thumb);
+  transition: transform 160ms ease;
+}

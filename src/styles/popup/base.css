@@ -1,0 +1,186 @@
+body {
+  margin: 0;
+  min-width: 396px;
+  min-height: 360px;
+  background:
+    radial-gradient(circle at top left, rgba(201, 100, 66, 0.08), transparent 40%),
+    var(--askem-bg-base);
+  color: var(--askem-ink);
+  font-family: var(--askem-font-sans);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.askem-popup-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.askem-popup-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(130deg, rgba(255, 255, 255, 0.44), transparent 36%),
+    var(--askem-fine-stripe);
+  pointer-events: none;
+}
+
+.askem-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 360px;
+  padding: 20px;
+}
+
+.askem-view-tabs {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-self: flex-start;
+  padding: 5px;
+  border: 1px solid rgba(35, 25, 8, 0.1);
+  border-radius: var(--askem-radius-pill);
+  background: rgba(255, 251, 245, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.askem-view-tab {
+  border: 0;
+  border-radius: var(--askem-radius-pill);
+  background: transparent;
+  padding: 8px 14px;
+  color: var(--askem-muted);
+  cursor: pointer;
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+.askem-view-tab.is-active {
+  background: var(--askem-white-surface-strong);
+  color: var(--askem-ink);
+  box-shadow: 0 6px 18px rgba(55, 35, 0, 0.08);
+}
+
+.askem-brand-block {
+  width: 100%;
+}
+
+.askem-refresh-corner.askem-refresh-corner {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+}
+
+.askem-hero h1 {
+  margin: 0;
+  font-family: var(--askem-font-serif);
+  font-size: 34px;
+  line-height: 0.95;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.askem-slogan {
+  margin: 10px 0 0;
+  padding-right: 120px;
+  color: var(--askem-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.askem-card {
+  border: 1px solid var(--askem-line);
+  border-radius: var(--askem-radius-card);
+  padding: 15px;
+  background: var(--askem-card-surface);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--askem-card-shadow);
+}
+
+.askem-card-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--askem-muted);
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.08em;
+}
+
+.askem-card h2 {
+  margin: 0;
+  font-family: var(--askem-font-serif);
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.askem-card-copy {
+  margin: 10px 0 0;
+  color: var(--askem-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.askem-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.askem-card h2 {
+  font-size: 26px;
+}
+
+.askem-workspaces {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.askem-advanced-heading {
+  display: grid;
+  gap: 8px;
+  padding: 4px 2px 2px;
+}
+
+.askem-advanced-heading h2,
+.askem-section-heading h2 {
+  margin: 0;
+  font-family: var(--askem-font-serif);
+  font-size: 28px;
+  line-height: 0.98;
+}
+
+.askem-advanced-copy {
+  margin: 0;
+  max-width: 44ch;
+  color: var(--askem-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.askem-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.askem-section-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid var(--askem-border);
+  border-radius: var(--askem-radius-pill);
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--askem-ink);
+  font: 700 12px/1 var(--askem-font-sans);
+}
