@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ALL_PROVIDERS as PROVIDERS,
   DEFAULT_SHORTCUTS,
@@ -18,26 +18,15 @@ import type {
 } from '../../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../../runtime/workspace';
 import { SUPPORTED_SITES } from '../../adapters/sites';
+import { RequestProvidersModal } from './components/request-providers-modal';
+import { useDiagnostics } from './hooks/use-diagnostics';
+import { usePopupStatus } from './hooks/use-popup-status';
+import { useProviderRequest } from './hooks/use-provider-request';
 
 type PopupView = 'home' | 'settings' | 'legal';
 type LegalPage = 'terms' | 'privacy';
 
-const MORE_PROVIDER_REQUEST_OPTIONS = [
-  'Perplexity',
-  'Grok',
-  'Meta AI',
-  'Mistral',
-  'Qwen',
-  'Kimi',
-  'Doubao',
-  'Poe',
-] as const;
-
-const MORE_PROVIDERS_REQUEST_ENDPOINT = '';
-const MORE_PROVIDERS_REQUEST_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
-const MORE_PROVIDERS_REQUEST_STORAGE_KEY = 'askem-more-providers-last-submitted-at';
 const MIN_WORKSPACES_FOR_FREEZE_CONTROL = 2;
-// TODO: wire this to the final HTTP endpoint for collecting provider requests.
 
 function formatTime(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -152,257 +141,54 @@ function getMemberOutcomeCopy(
   return 'Open this provider before syncing';
 }
 
-async function requestStatus(): Promise<StatusResponseMessage | null> {
-  return chrome.runtime.sendMessage({ type: 'GET_STATUS' });
-}
-
-async function requestFullLogs(): Promise<DebugLogEntry[]> {
-  const response = (await chrome.runtime.sendMessage({
-    type: 'GET_DEBUG_LOGS',
-  })) as { logs?: DebugLogEntry[] } | null;
-
-  return response?.logs ?? [];
-}
-
-function downloadJsonFile(filename: string, payload: string) {
-  const blob = new Blob([payload], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function getMoreProvidersCooldownUntil(): number | null {
-  const rawValue = window.localStorage.getItem(MORE_PROVIDERS_REQUEST_STORAGE_KEY);
-
-  if (!rawValue) {
-    return null;
-  }
-
-  const submittedAt = Number(rawValue);
-  if (!Number.isFinite(submittedAt)) {
-    return null;
-  }
-
-  const cooldownUntil = submittedAt + MORE_PROVIDERS_REQUEST_COOLDOWN_MS;
-  return cooldownUntil > Date.now() ? cooldownUntil : null;
-}
-
-function setMoreProvidersSubmittedNow() {
-  window.localStorage.setItem(MORE_PROVIDERS_REQUEST_STORAGE_KEY, String(Date.now()));
-}
-
-function formatCooldownRemaining(cooldownUntil: number): string {
-  const remainingMs = Math.max(0, cooldownUntil - Date.now());
-  const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
-
-  if (remainingDays <= 1) {
-    return 'tomorrow';
-  }
-
-  return `in ${remainingDays} days`;
-}
-
-async function submitMoreProviderRequest(requestedProviders: string[]) {
-  if (!MORE_PROVIDERS_REQUEST_ENDPOINT) {
-    console.info('TODO: submit more provider request', requestedProviders);
-    await new Promise((resolve) => window.setTimeout(resolve, 240));
-    return;
-  }
-
-  await fetch(MORE_PROVIDERS_REQUEST_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ requestedProviders }),
-  });
-}
-
 export default function App() {
   const [activeView, setActiveView] = useState<PopupView>('home');
-  const [status, setStatus] = useState<StatusResponseMessage | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [selectedProviders, setSelectedProviders] = useState<Provider[]>(PROVIDERS);
-  const [logActionBusy, setLogActionBusy] = useState(false);
-  const [requestModalOpen, setRequestModalOpen] = useState(false);
-  const [requestedProviders, setRequestedProviders] = useState<string[]>([]);
-  const [requestSubmitting, setRequestSubmitting] = useState(false);
-  const [requestSubmitted, setRequestSubmitted] = useState(false);
-  const [requestCooldownUntil, setRequestCooldownUntil] = useState<number | null>(null);
   const [activeLegalPage, setActiveLegalPage] = useState<LegalPage>('terms');
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
-  const [shortcuts, setShortcuts] = useState<ShortcutConfig>(DEFAULT_SHORTCUTS);
   const [recordingShortcutId, setRecordingShortcutId] = useState<ShortcutId | null>(null);
-  const resolvedShortcuts = resolveShortcutConfig(shortcuts);
+  const {
+    status,
+    loading,
+    busyKey,
+    selectedProviders,
+    resolvedShortcuts,
+    refresh,
+    clearWorkspace,
+    clearProvider,
+    toggleDefaultProvider,
+    toggleGlobalSync,
+    toggleCloseTabsOnDeleteSet,
+    updateShortcut,
+    resetShortcuts,
+  } = usePopupStatus();
+  const {
+    logActionBusy,
+    clearLogs,
+    toggleDebugLogging,
+    downloadLogs,
+  } = useDiagnostics(status?.debugLoggingEnabled, refresh);
+  const {
+    requestModalOpen,
+    requestedProviders,
+    requestSubmitting,
+    requestSubmitted,
+    requestCooldownUntil,
+    toggleRequestedProvider,
+    openRequestModal,
+    closeRequestModal,
+    submitRequestModal,
+    resetRequestCooldownForDev,
+  } = useProviderRequest();
   const selectedProviderKey = selectedProviders.join('|');
   const onboardingProviders = useMemo(
     () => pickRandomProviders(selectedProviderKey ? (selectedProviderKey.split('|') as Provider[]) : [], 4),
     [selectedProviderKey],
   );
 
-  const refresh = async (options: { silent?: boolean } = {}) => {
-    if (!options.silent) setLoading(true);
-    const nextStatus = await requestStatus();
-    startTransition(() => {
-      setStatus(nextStatus);
-      if (nextStatus) {
-        setSelectedProviders(
-          PROVIDERS.filter((provider) => nextStatus.defaultEnabledProviders[provider]),
-        );
-        setShortcuts(resolveShortcutConfig(nextStatus.shortcuts));
-      }
-      if (!options.silent) setLoading(false);
-    });
-  };
-
-  useEffect(() => {
-    void refresh();
-  }, []);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      void refresh({ silent: true });
-    }, 1200);
-
-    return () => window.clearInterval(intervalId);
-  }, []);
-
-  const clearWorkspace = async (workspaceId: string) => {
-    setBusyKey(workspaceId);
-    await chrome.runtime.sendMessage({ type: 'CLEAR_WORKSPACE', workspaceId });
-    await refresh();
-    setBusyKey(null);
-  };
-
-  const clearProvider = async (workspaceId: string, provider: Provider) => {
-    setBusyKey(`${workspaceId}:${provider}`);
-    await chrome.runtime.sendMessage({ type: 'CLEAR_WORKSPACE_PROVIDER', workspaceId, provider });
-    await refresh();
-    setBusyKey(null);
-  };
-
   const workspaceCount = status?.workspaces.length ?? 0;
   const limit = status?.workspaceLimit ?? MAX_WORKSPACES;
   const atLimit = workspaceCount >= limit;
   const globalSyncEnabled = status?.globalSyncEnabled ?? true;
-
-  const toggleDefaultProvider = async (provider: Provider) => {
-    const nextProviders = selectedProviders.includes(provider)
-      ? selectedProviders.filter((item) => item !== provider)
-      : [...selectedProviders, provider];
-
-    setSelectedProviders(nextProviders);
-    await chrome.runtime.sendMessage({
-      type: 'SET_DEFAULT_ENABLED_PROVIDERS',
-      providers: nextProviders,
-    });
-    await refresh();
-  };
-
-  const toggleGlobalSync = async () => {
-    const nextEnabled = !status?.globalSyncEnabled;
-    await chrome.runtime.sendMessage({
-      type: 'SET_GLOBAL_SYNC_ENABLED',
-      enabled: nextEnabled,
-    });
-    await refresh({ silent: true });
-  };
-
-  const toggleCloseTabsOnDeleteSet = async () => {
-    const nextEnabled = !status?.closeTabsOnDeleteSet;
-    await chrome.runtime.sendMessage({
-      type: 'SET_CLOSE_TABS_ON_DELETE_SET',
-      enabled: nextEnabled,
-    });
-    await refresh({ silent: true });
-  };
-
-  const updateShortcut = async (id: ShortcutId, binding: ShortcutBinding) => {
-    const next = { ...resolvedShortcuts, [id]: binding };
-    setShortcuts(next);
-    await chrome.runtime.sendMessage({ type: 'SET_SHORTCUTS', shortcuts: next });
-  };
-
-  const resetShortcuts = async () => {
-    setShortcuts(DEFAULT_SHORTCUTS);
-    await chrome.runtime.sendMessage({ type: 'SET_SHORTCUTS', shortcuts: DEFAULT_SHORTCUTS });
-  };
-
-  const copyLogs = async () => {
-    setLogActionBusy(true);
-    const logs = await requestFullLogs();
-    const payload = JSON.stringify(logs, null, 2);
-    await navigator.clipboard.writeText(payload);
-    setLogActionBusy(false);
-  };
-
-  const clearLogs = async () => {
-    setLogActionBusy(true);
-    await chrome.runtime.sendMessage({ type: 'CLEAR_DEBUG_LOGS' });
-    await refresh();
-    setLogActionBusy(false);
-  };
-
-  const toggleDebugLogging = async () => {
-    const nextEnabled = !status?.debugLoggingEnabled;
-    setLogActionBusy(true);
-    await chrome.runtime.sendMessage({ type: 'SET_DEBUG_LOGGING_ENABLED', enabled: nextEnabled });
-    await refresh();
-    setLogActionBusy(false);
-  };
-
-  const downloadLogs = async () => {
-    setLogActionBusy(true);
-    const logs = await requestFullLogs();
-    const payload = JSON.stringify(logs, null, 2);
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    downloadJsonFile(`ask-em-debug-logs-${timestamp}.json`, payload);
-    setLogActionBusy(false);
-  };
-
-  const toggleRequestedProvider = (provider: string) => {
-    setRequestedProviders((current) =>
-      current.includes(provider)
-        ? current.filter((item) => item !== provider)
-        : [...current, provider],
-    );
-  };
-
-  const openRequestModal = () => {
-    setRequestedProviders([]);
-    setRequestSubmitted(false);
-    setRequestCooldownUntil(getMoreProvidersCooldownUntil());
-    setRequestModalOpen(true);
-  };
-
-  const closeRequestModal = () => {
-    if (requestSubmitting) {
-      return;
-    }
-
-    setRequestModalOpen(false);
-  };
-
-  const submitRequestModal = async () => {
-    if (requestSubmitting || requestedProviders.length === 0 || requestCooldownUntil) {
-      return;
-    }
-
-    setRequestSubmitting(true);
-
-    try {
-      await submitMoreProviderRequest(requestedProviders);
-      setMoreProvidersSubmittedNow();
-      setRequestCooldownUntil(getMoreProvidersCooldownUntil());
-      setRequestSubmitted(true);
-    } finally {
-      setRequestSubmitting(false);
-    }
-  };
 
   return (
     <main className="askem-popup-shell">
@@ -683,87 +469,17 @@ export default function App() {
         )}
       </section>
 
-      {requestModalOpen ? (
-        <div className="askem-modal-overlay" onClick={closeRequestModal} role="presentation">
-          <section
-            className="askem-modal"
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="askem-request-modal-title"
-          >
-            <div className="askem-modal-top">
-              <div>
-                <p className="askem-card-label">Requests</p>
-                <h2 id="askem-request-modal-title">Request More Providers</h2>
-              </div>
-              <button className="askem-modal-close" onClick={closeRequestModal} type="button">
-                Close
-              </button>
-            </div>
-
-            {requestSubmitted ? (
-              <div className="askem-modal-state">
-                <p>Thanks. Your request is in.</p>
-                <span>We&apos;re on it. Stay tuned.</span>
-              </div>
-            ) : requestCooldownUntil ? (
-              <div className="askem-modal-state">
-                <p>You already sent a request recently.</p>
-                <span>You can send another one {formatCooldownRemaining(requestCooldownUntil)}.</span>
-                {/* TODO: remove this dev-only reset button before release */}
-                <button
-                  type="button"
-                  className="askem-provider-clear"
-                  style={{ marginTop: 12 }}
-                  onClick={() => {
-                    window.localStorage.removeItem(MORE_PROVIDERS_REQUEST_STORAGE_KEY);
-                    setRequestCooldownUntil(null);
-                  }}
-                >
-                  DEV: Reset Cooldown
-                </button>
-              </div>
-            ) : (
-              <>
-                <p className="askem-card-copy">
-                  Pick the providers you want us to add next. Choose as many as you want.
-                </p>
-                <div className="askem-request-grid">
-                  {MORE_PROVIDER_REQUEST_OPTIONS.map((provider) => {
-                    const active = requestedProviders.includes(provider);
-
-                    return (
-                      <button
-                        key={provider}
-                        className={`askem-request-chip ${active ? 'is-active' : ''}`}
-                        onClick={() => toggleRequestedProvider(provider)}
-                        type="button"
-                      >
-                        <span className="askem-provider-chip-dot" aria-hidden="true" />
-                        <span>{provider}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="askem-modal-actions">
-                  <button className="askem-provider-clear" onClick={closeRequestModal} type="button">
-                    Cancel
-                  </button>
-                  <button
-                    className="askem-clear-workspace"
-                    onClick={() => void submitRequestModal()}
-                    disabled={requestSubmitting || requestedProviders.length === 0}
-                    type="button"
-                  >
-                    {requestSubmitting ? 'Sending' : 'Send Request'}
-                  </button>
-                </div>
-              </>
-            )}
-          </section>
-        </div>
-      ) : null}
+      <RequestProvidersModal
+        open={requestModalOpen}
+        requestedProviders={requestedProviders}
+        requestSubmitting={requestSubmitting}
+        requestSubmitted={requestSubmitted}
+        requestCooldownUntil={requestCooldownUntil}
+        onToggleProvider={toggleRequestedProvider}
+        onClose={closeRequestModal}
+        onSubmit={() => void submitRequestModal()}
+        onResetCooldownForDev={resetRequestCooldownForDev}
+      />
 
       {feedbackModalOpen ? (
         <div className="askem-modal-overlay" onClick={() => setFeedbackModalOpen(false)} role="presentation">

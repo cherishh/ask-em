@@ -107,11 +107,11 @@ Success criteria:
 
 Goal: split `App.tsx` into hooks + focused components.
 
-- [ ] Extract popup status polling hook.
-- [ ] Extract shortcut settings hook/component.
-- [ ] Extract request modal flow.
-- [ ] Extract diagnostics/log actions flow.
-- [ ] Extract legal/feedback modal boundaries if still needed.
+- [x] Extract popup status polling hook.
+- [x] Extract shortcut settings hook/component.
+- [x] Extract request modal flow.
+- [x] Extract diagnostics/log actions flow.
+- [x] Extract legal/feedback modal boundaries if still needed.
 
 Success criteria:
 
