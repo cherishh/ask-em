@@ -445,6 +445,11 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         text-transform: uppercase;
       }
 
+      .ask-em-panel-shortcut-label {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+
       .ask-em-panel-shortcut.is-standalone {
         margin-top: 10px;
         padding-top: 0;
@@ -491,6 +496,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         display: inline-flex;
         align-items: center;
         gap: 5px;
+        flex-shrink: 0;
       }
 
       .ask-em-panel-shortcut-combo-group {
@@ -524,6 +530,8 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.02em;
         text-transform: none;
+        white-space: nowrap;
+        flex-shrink: 0;
       }
 
       .ask-em-panel-list {
@@ -848,10 +856,6 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       return 'loading';
     }
 
-    if (memberState === 'stale') {
-      return 'check tab';
-    }
-
     return 'not connected';
   };
 
@@ -871,7 +875,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       return 'pending';
     }
 
-    if (memberState === 'login-required' || memberState === 'not-ready' || memberState === 'stale') {
+    if (memberState === 'login-required' || memberState === 'not-ready') {
       return 'warning';
     }
 
@@ -959,11 +963,11 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
           .join('')}
       </div>
       <div class="ask-em-panel-shortcut">
-        <span>Pause/restart sync for this tab</span>
+        <span class="ask-em-panel-shortcut-label">Pause/restart sync for this tab</span>
         ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.togglePageParticipation))}
       </div>
       <div class="ask-em-panel-shortcut">
-        <span>Switch tabs</span>
+        <span class="ask-em-panel-shortcut-label">Switch tabs</span>
         <span class="ask-em-panel-shortcut-combo-group">
           ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.previousProviderTab))}
           ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.nextProviderTab))}

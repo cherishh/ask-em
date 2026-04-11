@@ -36,7 +36,6 @@ import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspacePro
 import {
   countClaimedTabsForWorkspace,
   getClaimedTabByTabId,
-  isClaimedTabStale,
   reconcileClaimedTabsWithBrowser,
   removeClaimedTabsForTabId,
   removeClaimedTabsForWorkspace,
@@ -952,10 +951,6 @@ function buildWorkspaceSummary(
 
       if (!claimedTab) {
         return [provider, 'inactive'];
-      }
-
-      if (isClaimedTabStale(claimedTab)) {
-        return [provider, 'stale'];
       }
 
       return [provider, claimedTab.pageState === 'ready' ? 'ready' : claimedTab.pageState];

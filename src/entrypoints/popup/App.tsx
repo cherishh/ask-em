@@ -69,7 +69,7 @@ function getDisplayMemberStateTone(
     return 'active';
   }
 
-  if (state === 'login-required' || state === 'not-ready' || state === 'stale') {
+  if (state === 'login-required' || state === 'not-ready') {
     return 'warning';
   }
 
@@ -107,10 +107,6 @@ function getDisplayMemberStateLabel(
 
   if (state === 'not-ready') {
     return 'Loading';
-  }
-
-  if (state === 'stale') {
-    return 'Check Tab';
   }
 
   return 'No Live Tab';
@@ -151,10 +147,6 @@ function getMemberOutcomeCopy(
 
   if (state === 'not-ready') {
     return 'Waiting for this model to become ready';
-  }
-
-  if (state === 'stale') {
-    return 'Open tab has not checked in recently';
   }
 
   return 'Open this provider before syncing';

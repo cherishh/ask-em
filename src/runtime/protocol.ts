@@ -175,7 +175,6 @@ export type GroupMemberState =
   | 'ready'
   | 'login-required'
   | 'not-ready'
-  | 'stale'
   | 'inactive'
   | 'pending';
 

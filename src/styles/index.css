@@ -196,7 +196,9 @@ body {
 
 .askem-card {
   border: 1px solid var(--askem-line);
-  background: var(--askem-panel);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(247, 243, 236, 0.92)),
+    radial-gradient(circle at top right, rgba(201, 100, 66, 0.08), transparent 28%);
   backdrop-filter: blur(12px);
 }
 
