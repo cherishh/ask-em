@@ -67,6 +67,7 @@ describe('content bootstrap wiring', () => {
     | ((message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => unknown)
     | null;
   let submitHandler: ((content: string) => void) | null;
+  let beforeUnloadHandler: (() => void) | null;
   let status: ProviderStatus;
   let ui: {
     setContext: ReturnType<typeof vi.fn>;
@@ -81,6 +82,7 @@ describe('content bootstrap wiring', () => {
     vi.clearAllMocks();
     runtimeListener = null;
     submitHandler = null;
+    beforeUnloadHandler = null;
 
     status = {
       provider: 'claude',
@@ -104,10 +106,16 @@ describe('content bootstrap wiring', () => {
     vi.stubGlobal('window', {
       setInterval: vi.fn(() => 1),
       clearInterval: vi.fn(),
-      addEventListener: vi.fn(),
+      addEventListener: vi.fn((event: string, handler: () => void) => {
+        if (event === 'beforeunload') {
+          beforeUnloadHandler = handler;
+        }
+      }),
+      removeEventListener: vi.fn(),
     });
     vi.stubGlobal('document', {
       addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
     });
     vi.stubGlobal('chrome', {
       runtime: {
@@ -238,5 +246,50 @@ describe('content bootstrap wiring', () => {
     expect(ui.setState).toHaveBeenLastCalledWith('idle', 'current model is in sync');
     expect(ui.setSyncStatus).toHaveBeenLastCalledWith('all models synced', 'neutral');
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('normal');
+  });
+
+  it('cleans up submit, url, timer, and event listeners on beforeunload', async () => {
+    const unsubscribe = vi.fn();
+    const stopObservingUrl = vi.fn();
+    uiMocks.createContentUi.mockReturnValue(ui);
+    routingMocks.observeUrlChanges.mockReturnValue(stopObservingUrl);
+
+    const composer = {
+      subscribeToUserSubmissions(onSubmit: (content: string) => void) {
+        submitHandler = onSubmit;
+        return unsubscribe;
+      },
+      setComposerText: vi.fn(),
+      submit: vi.fn(),
+    };
+
+    const { bootstrapContentScript } = await import('./content-bootstrap');
+    bootstrapContentScript({
+      name: 'claude',
+      getUiSpec() {
+        return {
+          mountId: 'ask-em-test-ui',
+          className: 'ask-em-provider-ui ask-em-provider-ui-claude',
+        };
+      },
+      session: {
+        getStatus: () => status,
+        getCurrentUrl: () => status.currentUrl,
+        canDeliverPrompt: () => true,
+      },
+      composer,
+    });
+
+    await flushMicrotasks();
+    beforeUnloadHandler?.();
+
+    expect(unsubscribe).toHaveBeenCalled();
+    expect(stopObservingUrl).toHaveBeenCalled();
+    expect(window.clearInterval).toHaveBeenCalled();
+    expect(window.removeEventListener).toHaveBeenCalledWith('focus', expect.any(Function));
+    expect(document.removeEventListener).toHaveBeenCalledWith(
+      'visibilitychange',
+      expect.any(Function),
+    );
   });
 });

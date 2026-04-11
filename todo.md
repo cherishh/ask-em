@@ -61,11 +61,11 @@ Success criteria:
 
 Goal: turn `content-bootstrap.ts` into wiring code instead of a monolithic controller.
 
-- [ ] Extract presence controller.
-- [ ] Extract submit controller and echo-suppression logic.
-- [ ] Extract delivery controller / runtime message handling.
-- [ ] Extract shared content state shape where needed.
-- [ ] Add teardown ownership so listeners/timers are clearly managed.
+- [x] Extract presence controller.
+- [x] Extract submit controller and echo-suppression logic.
+- [x] Extract delivery controller / runtime message handling.
+- [x] Extract shared content state shape where needed.
+- [x] Add teardown ownership so listeners/timers are clearly managed.
 
 Success criteria:
 
