@@ -452,6 +452,310 @@ describe('background new-chat detachment', () => {
       detachedWorkspaceId: null,
     });
   });
+});
+
+describe('background claimed-tab reconciliation', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    vi.stubGlobal('defineBackground', vi.fn((callback: unknown) => callback));
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 9 }),
+        sendMessage: vi.fn().mockResolvedValue({ ok: true }),
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('falls back to the claimed workspace when presence allows it', async () => {
+    const localState: LocalState = {
+      ...createLocalState(),
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {
+            claude: {
+              provider: 'claude',
+              sessionId: null,
+              url: 'https://claude.ai/new',
+            },
+          },
+          enabledProviders: ['claude'],
+          createdAt: 1,
+          updatedAt: 1,
+          pendingSource: 'claude',
+        },
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': {
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/new',
+          sessionId: null,
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+      },
+    };
+
+    const { reconcileClaimedTabContext } = await import('../entrypoints/background');
+    const result = await reconcileClaimedTabContext({
+      localState,
+      sessionState,
+      tabId: 9,
+      provider: 'claude',
+      pageKind: 'new-chat',
+      sessionId: null,
+      currentUrl: 'https://claude.ai/new',
+      allowClaimedFallback: true,
+      logMessages: {
+        newChat: 'Detached claimed tab from previous group on new-chat navigation',
+        foreignSession: 'Detached claimed tab from previous group on existing-session navigation',
+        unresolvedExistingSession: 'Detached claimed tab from previous group on unresolved existing-session navigation',
+      },
+    });
+
+    expect(storageMocks.clearClaimedTab).not.toHaveBeenCalled();
+    expect(result.workspaceLookup).toEqual({
+      workspaceId: 'w1',
+      workspace: localState.workspaces.w1,
+    });
+  });
+
+  it('transfers a claimed tab to the matching workspace session', async () => {
+    const localState: LocalState = {
+      ...createLocalState(),
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {
+            claude: {
+              provider: 'claude',
+              sessionId: 'c-a',
+              url: 'https://claude.ai/chat/c-a',
+            },
+          },
+          enabledProviders: ['claude'],
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        w2: {
+          id: 'w2',
+          members: {
+            claude: {
+              provider: 'claude',
+              sessionId: 'c-b',
+              url: 'https://claude.ai/chat/c-b',
+            },
+          },
+          enabledProviders: ['claude'],
+          createdAt: 2,
+          updatedAt: 2,
+        },
+      },
+      workspaceIndex: {
+        'claude:c-a': 'w1',
+        'claude:c-b': 'w2',
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': {
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-a',
+          sessionId: 'c-a',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+      },
+    };
+
+    storageMocks.clearClaimedTab.mockResolvedValue({ claimedTabs: {} });
+
+    const { reconcileClaimedTabContext } = await import('../entrypoints/background');
+    const result = await reconcileClaimedTabContext({
+      localState,
+      sessionState,
+      tabId: 9,
+      provider: 'claude',
+      pageKind: 'existing-session',
+      sessionId: 'c-b',
+      currentUrl: 'https://claude.ai/chat/c-b',
+      allowClaimedFallback: false,
+      logMessages: {
+        newChat: 'Detached claimed tab from previous group on new-chat submit',
+        foreignSession: 'Detached claimed tab from previous group on existing-session submit',
+        unresolvedExistingSession: 'Detached claimed tab from previous group on unresolved existing-session submit',
+      },
+    });
+
+    expect(storageMocks.clearClaimedTab).toHaveBeenCalledWith('w1', 'claude');
+    expect(result.workspaceLookup).toEqual({
+      workspaceId: 'w2',
+      workspace: localState.workspaces.w2,
+    });
+  });
+
+  it('detaches a claimed tab on a foreign existing session when no workspace matches', async () => {
+    const localState: LocalState = {
+      ...createLocalState(),
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {
+            claude: {
+              provider: 'claude',
+              sessionId: 'c-set',
+              url: 'https://claude.ai/chat/c-set',
+            },
+          },
+          enabledProviders: ['claude'],
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      workspaceIndex: {
+        'claude:c-set': 'w1',
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': {
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-set',
+          sessionId: 'c-set',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+      },
+    };
+
+    storageMocks.clearClaimedTab.mockResolvedValue({ claimedTabs: {} });
+
+    const { reconcileClaimedTabContext } = await import('../entrypoints/background');
+    const result = await reconcileClaimedTabContext({
+      localState,
+      sessionState,
+      tabId: 9,
+      provider: 'claude',
+      pageKind: 'existing-session',
+      sessionId: 'c-old',
+      currentUrl: 'https://claude.ai/chat/c-old',
+      allowClaimedFallback: false,
+      logMessages: {
+        newChat: 'Detached claimed tab from previous group on new-chat submit',
+        foreignSession: 'Detached claimed tab from previous group on existing-session submit',
+        unresolvedExistingSession: 'Detached claimed tab from previous group on unresolved existing-session submit',
+      },
+    });
+
+    expect(storageMocks.clearClaimedTab).toHaveBeenCalledWith('w1', 'claude');
+    expect(result.workspaceLookup).toBeNull();
+  });
+
+  it('detaches a claimed tab on unresolved existing-session pages', async () => {
+    const localState: LocalState = {
+      ...createLocalState(),
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {
+            claude: {
+              provider: 'claude',
+              sessionId: 'c-set',
+              url: 'https://claude.ai/chat/c-set',
+            },
+          },
+          enabledProviders: ['claude'],
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      workspaceIndex: {
+        'claude:c-set': 'w1',
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': {
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-set',
+          sessionId: 'c-set',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+      },
+    };
+
+    storageMocks.clearClaimedTab.mockResolvedValue({ claimedTabs: {} });
+
+    const { reconcileClaimedTabContext } = await import('../entrypoints/background');
+    const result = await reconcileClaimedTabContext({
+      localState,
+      sessionState,
+      tabId: 9,
+      provider: 'claude',
+      pageKind: 'existing-session',
+      sessionId: null,
+      currentUrl: 'https://claude.ai/chat/unknown',
+      allowClaimedFallback: false,
+      logMessages: {
+        newChat: 'Detached claimed tab from previous group on new-chat submit',
+        foreignSession: 'Detached claimed tab from previous group on existing-session submit',
+        unresolvedExistingSession: 'Detached claimed tab from previous group on unresolved existing-session submit',
+      },
+    });
+
+    expect(storageMocks.clearClaimedTab).toHaveBeenCalledWith('w1', 'claude');
+    expect(result.workspaceLookup).toBeNull();
+  });
+});
+
+describe('background submit routing', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    vi.stubGlobal('defineBackground', vi.fn((callback: unknown) => callback));
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 9 }),
+        sendMessage: vi.fn().mockResolvedValue({ ok: true }),
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('does not fan out when submit comes from a claimed tab on an unrelated existing session', async () => {
     const localState: LocalState = {

@@ -47,10 +47,10 @@ Success criteria:
 
 Goal: unify the detach/transfer/keep rules so presence and submit use the same source of truth.
 
-- [ ] Introduce a single claimed-tab transition classifier.
-- [ ] Remove duplicated orchestration between presence and submit paths.
-- [ ] Cover new-chat, foreign-session, unresolved-session, and transfer cases with tests.
-- [ ] Keep existing edge-case behavior intact.
+- [x] Introduce a single claimed-tab transition classifier.
+- [x] Remove duplicated orchestration between presence and submit paths.
+- [x] Cover new-chat, foreign-session, unresolved-session, and transfer cases with tests.
+- [x] Keep existing edge-case behavior intact.
 
 Success criteria:
 

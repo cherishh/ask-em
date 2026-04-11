@@ -31,6 +31,7 @@ import {
   detachClaimedTabForForeignSession,
   detachClaimedTabForNewChat,
   detachClaimedTabForUnresolvedExistingSession,
+  reconcileClaimedTabContext,
   transferClaimedTabToWorkspace,
 } from '../background/presence';
 import { refreshPendingState } from '../background/state';
@@ -42,6 +43,7 @@ export {
   detachClaimedTabForForeignSession,
   detachClaimedTabForNewChat,
   detachClaimedTabForUnresolvedExistingSession,
+  reconcileClaimedTabContext,
   handleGetDebugLogs,
   handleGetStatus,
   handleGetWorkspaceContext,

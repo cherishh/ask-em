@@ -7,19 +7,14 @@ import {
   type UserSubmitMessage,
 } from '../runtime/protocol';
 import { clearClaimedTab, getLocalState, getSessionState, setLocalState, upsertClaimedTab } from '../runtime/storage';
-import { bindWorkspaceMember, createPendingWorkspace, getDefaultEnabledProviderList, getWorkspacesOrdered, lookupWorkspaceBySession } from '../runtime/workspace';
+import { bindWorkspaceMember, createPendingWorkspace, getDefaultEnabledProviderList, getWorkspacesOrdered } from '../runtime/workspace';
 import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
 import { getClaimedTabByTabId, resolveDeliveryTarget } from '../runtime/recovery';
 import { cancelScheduledGroupGc } from './gc';
 import { logDebug } from './debug';
 import { notifySyncProgress } from './tabs';
 import { refreshPendingState } from './state';
-import {
-  detachClaimedTabForForeignSession,
-  detachClaimedTabForNewChat,
-  detachClaimedTabForUnresolvedExistingSession,
-  transferClaimedTabToWorkspace,
-} from './presence';
+import { reconcileClaimedTabContext } from './presence';
 import { buildWorkspaceSummary, canStartNewSet } from './status';
 
 export async function deliverPromptToWorkspaceTargets(
@@ -186,53 +181,32 @@ export async function deliverPromptToWorkspaceTargets(
 
 export async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runtime.MessageSender) {
   const tabId = sender.tab?.id;
-  let { localState, sessionState } = await refreshPendingState();
-  let workspaceLookup = lookupWorkspaceBySession(localState, message.provider, message.sessionId);
-
-  if (workspaceLookup && tabId) {
-    sessionState = await transferClaimedTabToWorkspace(
-      localState,
-      sessionState,
-      tabId,
-      message.provider,
-      workspaceLookup.workspaceId,
-    );
-  }
-
-  if (!workspaceLookup && tabId && message.sessionId) {
-    const detachResult = await detachClaimedTabForForeignSession(
-      localState,
-      sessionState,
-      tabId,
-      message.provider,
-      message.sessionId,
-      'Detached claimed tab from previous group on existing-session submit',
-    );
-    sessionState = detachResult.sessionState;
-  }
-
-  if (!workspaceLookup && tabId && message.pageKind === 'existing-session' && message.sessionId === null) {
-    const detachResult = await detachClaimedTabForUnresolvedExistingSession(
-      localState,
-      sessionState,
-      tabId,
-      message.provider,
-      'Detached claimed tab from previous group on unresolved existing-session submit',
-    );
-    sessionState = detachResult.sessionState;
-  }
-
-  if (!workspaceLookup && tabId && message.pageKind === 'new-chat' && message.sessionId === null) {
-    const detachResult = await detachClaimedTabForNewChat(
-      localState,
-      sessionState,
-      tabId,
-      message.provider,
-      message.currentUrl,
-      'Detached claimed tab from previous group on new-chat submit',
-    );
-    sessionState = detachResult.sessionState;
-  }
+  const refreshedState = await refreshPendingState();
+  let { localState } = refreshedState;
+  const reconciled = tabId
+    ? await reconcileClaimedTabContext({
+        localState,
+        sessionState: refreshedState.sessionState,
+        tabId,
+        provider: message.provider,
+        pageKind: message.pageKind,
+        sessionId: message.sessionId,
+        currentUrl: message.currentUrl,
+        allowClaimedFallback: false,
+        logMessages: {
+          newChat: 'Detached claimed tab from previous group on new-chat submit',
+          foreignSession: 'Detached claimed tab from previous group on existing-session submit',
+          unresolvedExistingSession:
+            'Detached claimed tab from previous group on unresolved existing-session submit',
+        },
+      })
+    : {
+        localState,
+        sessionState: refreshedState.sessionState,
+        workspaceLookup: null,
+      };
+  localState = reconciled.localState;
+  let workspaceLookup = reconciled.workspaceLookup;
 
   if (!workspaceLookup && canCreateWorkspaceFromSubmit(localState, message)) {
     const enabledProviders = getDefaultEnabledProviderList(localState, message.provider);

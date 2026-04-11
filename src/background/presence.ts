@@ -1,4 +1,4 @@
-import type { HelloMessage, HeartbeatMessage, Provider } from '../runtime/protocol';
+import type { HeartbeatMessage, HelloMessage, PageKind, Provider } from '../runtime/protocol';
 import { clearClaimedTab, getLocalState, getSessionState, setLocalState, upsertClaimedTab } from '../runtime/storage';
 import { bindWorkspaceMember, lookupWorkspaceBySession } from '../runtime/workspace';
 import { getClaimedTabByTabId } from '../runtime/recovery';
@@ -189,69 +189,74 @@ export async function transferClaimedTabToWorkspace(
   return nextSessionState;
 }
 
-export async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, sender: chrome.runtime.MessageSender) {
-  const tabId = sender.tab?.id;
-  if (!tabId) {
-    return { ok: false };
-  }
+type ClaimedTabReconciliationInput = {
+  localState: Awaited<ReturnType<typeof getLocalState>>;
+  sessionState: Awaited<ReturnType<typeof getSessionState>>;
+  tabId: number;
+  provider: Provider;
+  pageKind: PageKind;
+  sessionId: string | null;
+  currentUrl: string;
+  allowClaimedFallback: boolean;
+  logMessages: {
+    newChat: string;
+    foreignSession: string;
+    unresolvedExistingSession: string;
+  };
+};
 
-  const refreshedState = await refreshPendingState();
-  let localState = refreshedState.localState;
-  let sessionState = refreshedState.sessionState;
+export async function reconcileClaimedTabContext(input: ClaimedTabReconciliationInput) {
+  let { localState, sessionState } = input;
 
-  if (message.pageKind === 'new-chat' && message.sessionId === null) {
+  if (input.pageKind === 'new-chat' && input.sessionId === null) {
     const detachResult = await detachClaimedTabForNewChat(
       localState,
       sessionState,
-      tabId,
-      message.provider,
-      message.currentUrl,
-      'Detached claimed tab from previous group on new-chat navigation',
+      input.tabId,
+      input.provider,
+      input.currentUrl,
+      input.logMessages.newChat,
     );
     sessionState = detachResult.sessionState;
   }
 
-  let workspaceLookup = lookupWorkspaceBySession(localState, message.provider, message.sessionId);
+  let workspaceLookup = lookupWorkspaceBySession(localState, input.provider, input.sessionId);
 
   if (workspaceLookup) {
     sessionState = await transferClaimedTabToWorkspace(
       localState,
       sessionState,
-      tabId,
-      message.provider,
+      input.tabId,
+      input.provider,
       workspaceLookup.workspaceId,
     );
   }
 
-  if (!workspaceLookup && message.sessionId) {
+  if (!workspaceLookup && input.sessionId) {
     const detachResult = await detachClaimedTabForForeignSession(
       localState,
       sessionState,
-      tabId,
-      message.provider,
-      message.sessionId,
-      'Detached claimed tab from previous group on existing-session navigation',
+      input.tabId,
+      input.provider,
+      input.sessionId,
+      input.logMessages.foreignSession,
     );
     sessionState = detachResult.sessionState;
   }
 
-  if (
-    !workspaceLookup &&
-    message.pageKind === 'existing-session' &&
-    message.sessionId === null
-  ) {
+  if (!workspaceLookup && input.pageKind === 'existing-session' && input.sessionId === null) {
     const detachResult = await detachClaimedTabForUnresolvedExistingSession(
       localState,
       sessionState,
-      tabId,
-      message.provider,
-      'Detached claimed tab from previous group on unresolved existing-session navigation',
+      input.tabId,
+      input.provider,
+      input.logMessages.unresolvedExistingSession,
     );
     sessionState = detachResult.sessionState;
   }
 
-  if (!workspaceLookup) {
-    const claimedTab = getClaimedTabByTabId(sessionState, tabId, message.provider);
+  if (!workspaceLookup && input.allowClaimedFallback) {
+    const claimedTab = getClaimedTabByTabId(sessionState, input.tabId, input.provider);
     const claimedWorkspace = claimedTab ? localState.workspaces[claimedTab.workspaceId] : null;
 
     if (claimedTab && claimedWorkspace) {
@@ -261,6 +266,39 @@ export async function handlePresenceMessage(message: HelloMessage | HeartbeatMes
       };
     }
   }
+
+  return {
+    localState,
+    sessionState,
+    workspaceLookup,
+  };
+}
+
+export async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, sender: chrome.runtime.MessageSender) {
+  const tabId = sender.tab?.id;
+  if (!tabId) {
+    return { ok: false };
+  }
+
+  const refreshedState = await refreshPendingState();
+  let localState = refreshedState.localState;
+  const reconciled = await reconcileClaimedTabContext({
+    localState,
+    sessionState: refreshedState.sessionState,
+    tabId,
+    provider: message.provider,
+    pageKind: message.pageKind,
+    sessionId: message.sessionId,
+    currentUrl: message.currentUrl,
+    allowClaimedFallback: true,
+    logMessages: {
+      newChat: 'Detached claimed tab from previous group on new-chat navigation',
+      foreignSession: 'Detached claimed tab from previous group on existing-session navigation',
+      unresolvedExistingSession: 'Detached claimed tab from previous group on unresolved existing-session navigation',
+    },
+  });
+  let sessionState = reconciled.sessionState;
+  const workspaceLookup = reconciled.workspaceLookup;
 
   if (!workspaceLookup?.workspace) {
     return {
