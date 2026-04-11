@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_SHORTCUTS } from './protocol';
 import type { LocalState, SessionState, UserSubmitMessage } from './protocol';
+import {
+  makeClaimedTab,
+  makeConversationRef,
+  makeLocalState,
+  makeSessionState,
+  makeSubmitMessage,
+  makeWorkspace,
+} from '../test/builders';
 
 const storageMocks = vi.hoisted(() => ({
   appendDebugLog: vi.fn().mockResolvedValue(undefined),
@@ -14,37 +21,6 @@ const storageMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./storage', () => storageMocks);
-
-function createLocalState(): LocalState {
-  return {
-    globalSyncEnabled: true,
-    debugLoggingEnabled: false,
-    closeTabsOnDeleteSet: false,
-    defaultEnabledProviders: {
-      claude: true,
-      chatgpt: true,
-      gemini: true,
-      deepseek: true,
-    },
-    shortcuts: DEFAULT_SHORTCUTS,
-    workspaces: {},
-    workspaceIndex: {},
-    debugLogs: [],
-  };
-}
-
-function createSubmitMessage(overrides: Partial<UserSubmitMessage> = {}): UserSubmitMessage {
-  return {
-    type: 'USER_SUBMIT',
-    provider: 'claude',
-    currentUrl: 'https://claude.ai/chat/c-set',
-    sessionId: 'c-set',
-    pageKind: 'existing-session',
-    content: 'hello',
-    timestamp: 100,
-    ...overrides,
-  };
-}
 
 describe('background new-chat detachment', () => {
   beforeEach(() => {
@@ -71,26 +47,16 @@ describe('background new-chat detachment', () => {
 
   it('detaches the claimed tab but keeps the previous member binding intact', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
-        w1: {
+        w1: makeWorkspace({
           id: 'w1',
           members: {
-            claude: {
-              provider: 'claude',
-              sessionId: 'c-1',
-              url: 'https://claude.ai/chat/c-1',
-            },
-            chatgpt: {
-              provider: 'chatgpt',
-              sessionId: 'g-1',
-              url: 'https://chatgpt.com/c/g-1',
-            },
+            claude: makeConversationRef('claude', 'c-1', 'https://claude.ai/chat/c-1'),
+            chatgpt: makeConversationRef('chatgpt', 'g-1', 'https://chatgpt.com/c/g-1'),
           },
           enabledProviders: ['claude', 'chatgpt'],
-          createdAt: 1,
-          updatedAt: 1,
-        },
+        }),
       },
       workspaceIndex: {
         'claude:c-1': 'w1',
@@ -98,28 +64,22 @@ describe('background new-chat detachment', () => {
       },
     };
 
-    const sessionState: SessionState = {
-      claimedTabs: {
-        'w1:claude': {
-          provider: 'claude',
-          workspaceId: 'w1',
-          tabId: 9,
-          currentUrl: 'https://claude.ai/chat/c-1',
-          sessionId: 'c-1',
-          pageState: 'ready',
-          lastSeenAt: 10,
-        },
-        'w1:chatgpt': {
-          provider: 'chatgpt',
-          workspaceId: 'w1',
-          tabId: 10,
-          currentUrl: 'https://chatgpt.com/c/g-1',
-          sessionId: 'g-1',
-          pageState: 'ready',
-          lastSeenAt: 10,
-        },
-      },
-    };
+    const sessionState: SessionState = makeSessionState({
+      'w1:claude': makeClaimedTab({
+        provider: 'claude',
+        workspaceId: 'w1',
+        tabId: 9,
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+      }),
+      'w1:chatgpt': makeClaimedTab({
+        provider: 'chatgpt',
+        workspaceId: 'w1',
+        tabId: 10,
+        currentUrl: 'https://chatgpt.com/c/g-1',
+        sessionId: 'g-1',
+      }),
+    });
 
     const nextSessionState: SessionState = {
       claimedTabs: {
@@ -158,7 +118,7 @@ describe('background new-chat detachment', () => {
 
   it('does not detach the pending source tab before its first session is bound', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -211,7 +171,7 @@ describe('background new-chat detachment', () => {
 
   it('does not detach a target tab that has not bound a session yet', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -271,7 +231,7 @@ describe('background new-chat detachment', () => {
 
   it('detaches a claimed tab when it navigates to an existing session outside the workspace', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -347,7 +307,7 @@ describe('background new-chat detachment', () => {
 
   it('does not detach a claimed tab that is still on its bound session', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -401,7 +361,7 @@ describe('background new-chat detachment', () => {
 
   it('does not detach an unbound target when it receives its first session', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -479,7 +439,7 @@ describe('background claimed-tab reconciliation', () => {
 
   it('falls back to the claimed workspace when presence allows it', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -538,7 +498,7 @@ describe('background claimed-tab reconciliation', () => {
 
   it('transfers a claimed tab to the matching workspace session', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -615,7 +575,7 @@ describe('background claimed-tab reconciliation', () => {
 
   it('detaches a claimed tab on a foreign existing session when no workspace matches', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -675,7 +635,7 @@ describe('background claimed-tab reconciliation', () => {
 
   it('detaches a claimed tab on unresolved existing-session pages', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -759,7 +719,7 @@ describe('background submit routing', () => {
 
   it('does not fan out when submit comes from a claimed tab on an unrelated existing session', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -806,7 +766,7 @@ describe('background submit routing', () => {
 
     const { handleUserSubmit } = await import('../entrypoints/background');
     const result = await handleUserSubmit(
-      createSubmitMessage({
+      makeSubmitMessage({
         currentUrl: 'https://claude.ai/chat/c-old',
         sessionId: 'c-old',
         content: 'old session prompt',
@@ -828,7 +788,7 @@ describe('background submit routing', () => {
 
   it('routes a claimed tab to the matching workspace when the existing session belongs to another group', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -883,7 +843,7 @@ describe('background submit routing', () => {
 
     const { handleUserSubmit } = await import('../entrypoints/background');
     const result = await handleUserSubmit(
-      createSubmitMessage({
+      makeSubmitMessage({
         currentUrl: 'https://claude.ai/chat/c-b',
         sessionId: 'c-b',
         content: 'workspace b prompt',
@@ -914,7 +874,7 @@ describe('background submit routing', () => {
 
   it('does not fan out from a claimed existing-session page when the session id cannot be resolved', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -961,7 +921,7 @@ describe('background submit routing', () => {
 
     const { handleUserSubmit } = await import('../entrypoints/background');
     const result = await handleUserSubmit(
-      createSubmitMessage({
+      makeSubmitMessage({
         currentUrl: 'https://claude.ai/chat/unknown',
         sessionId: null,
         pageKind: 'existing-session',
@@ -984,7 +944,7 @@ describe('background submit routing', () => {
 
   it('keeps routing when the same bound session is seen at a changed url', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -1024,7 +984,7 @@ describe('background submit routing', () => {
 
     const { handleUserSubmit } = await import('../entrypoints/background');
     const result = await handleUserSubmit(
-      createSubmitMessage({
+      makeSubmitMessage({
         currentUrl: 'https://claude.ai/chat/c-set?model=sonnet',
         sessionId: 'c-set',
         content: 'same session prompt',
@@ -1070,7 +1030,7 @@ describe('background submit routing', () => {
 
   it('switches to the next claimed provider tab in workspace order', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -1142,7 +1102,7 @@ describe('background submit routing', () => {
 
   it('switches to the previous claimed provider tab with wraparound', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -1214,7 +1174,7 @@ describe('background submit routing', () => {
 
   it('does not switch when the current tab has no other claimed provider tab in its set', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -1264,7 +1224,7 @@ describe('background submit routing', () => {
 
   it('sends sync progress updates back to the source tab during fan-out', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       workspaces: {
         w1: {
           id: 'w1',
@@ -1355,7 +1315,7 @@ describe('background submit routing', () => {
 
     const { handleUserSubmit } = await import('../entrypoints/background');
     await handleUserSubmit(
-      createSubmitMessage({
+      makeSubmitMessage({
         currentUrl: 'https://claude.ai/chat/c-1',
         sessionId: 'c-1',
         content: 'fan out',
@@ -1395,7 +1355,7 @@ describe('background submit routing', () => {
 
   it('closes claimed provider tabs when deleting a workspace and the setting is enabled', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       closeTabsOnDeleteSet: true,
       workspaces: {
         w1: {
@@ -1471,7 +1431,7 @@ describe('background submit routing', () => {
 
   it('refreshes claimed provider tabs when deleting a workspace and the setting is disabled', async () => {
     const localState: LocalState = {
-      ...createLocalState(),
+      ...makeLocalState(),
       closeTabsOnDeleteSet: false,
       workspaces: {
         w1: {

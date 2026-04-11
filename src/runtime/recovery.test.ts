@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SessionState, Workspace } from './protocol';
 import { reconcileClaimedTabsWithBrowser, resolveDeliveryTarget } from './recovery';
+import {
+  makeClaimedTab,
+  makeConversationRef,
+  makeSessionState,
+  makeWorkspace,
+} from '../test/builders';
 
 describe('recovery', () => {
   afterEach(() => {
@@ -23,33 +29,24 @@ describe('recovery', () => {
       },
     });
 
-    const workspace: Workspace = {
+    const workspace: Workspace = makeWorkspace({
       id: 'w1',
       members: {
-        deepseek: {
-          provider: 'deepseek',
-          sessionId: 'd-1',
-          url: 'https://chat.deepseek.com/a/chat/s/d-1',
-        },
+        deepseek: makeConversationRef('deepseek', 'd-1', 'https://chat.deepseek.com/a/chat/s/d-1'),
       },
       enabledProviders: ['deepseek'],
-      createdAt: 1,
-      updatedAt: 1,
-    };
+    });
 
-    const sessionState: SessionState = {
-      claimedTabs: {
-        'w1:deepseek': {
-          provider: 'deepseek',
-          workspaceId: 'w1',
-          tabId: 9,
-          currentUrl: 'https://chat.deepseek.com/a/chat/s/d-1',
-          sessionId: 'd-1',
-          pageState: 'ready',
-          lastSeenAt: Date.now() - 240_001,
-        },
-      },
-    };
+    const sessionState: SessionState = makeSessionState({
+      'w1:deepseek': makeClaimedTab({
+        provider: 'deepseek',
+        workspaceId: 'w1',
+        tabId: 9,
+        currentUrl: 'https://chat.deepseek.com/a/chat/s/d-1',
+        sessionId: 'd-1',
+        lastSeenAt: Date.now() - 240_001,
+      }),
+    });
 
     const target = await resolveDeliveryTarget(workspace, 'deepseek', sessionState);
 

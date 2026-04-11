@@ -8,6 +8,13 @@ import {
   type SessionState,
 } from './protocol';
 import {
+  makeClaimedTab,
+  makeConversationRef,
+  makeLocalState,
+  makeSessionState,
+  makeWorkspace,
+} from '../test/builders';
+import {
   bindWorkspaceMember,
   cleanupPendingWorkspaces,
   clearWorkspace,
@@ -23,22 +30,14 @@ import {
 import { countClaimedTabsForWorkspace, isClaimedTabStale, removeClaimedTabsForTabId } from './recovery';
 
 function createEmptyState(): LocalState {
-  return {
-    globalSyncEnabled: true,
-    debugLoggingEnabled: false,
-    closeTabsOnDeleteSet: false,
+  return makeLocalState({
     defaultEnabledProviders: createDefaultEnabledProviders(),
     shortcuts: DEFAULT_SHORTCUTS,
-    workspaces: {},
-    workspaceIndex: {},
-    debugLogs: [],
-  };
+  });
 }
 
 function createEmptySessionState(): SessionState {
-  return {
-    claimedTabs: {},
-  };
+  return makeSessionState();
 }
 
 describe('workspace state', () => {
@@ -170,20 +169,8 @@ describe('workspace state', () => {
     const state: LocalState = {
       ...createEmptyState(),
       workspaces: {
-        w1: {
-          id: 'w1',
-          members: {},
-          enabledProviders: [],
-          createdAt: 10,
-          updatedAt: 200,
-        },
-        w2: {
-          id: 'w2',
-          members: {},
-          enabledProviders: [],
-          createdAt: 20,
-          updatedAt: 100,
-        },
+        w1: makeWorkspace({ id: 'w1', createdAt: 10, updatedAt: 200 }),
+        w2: makeWorkspace({ id: 'w2', createdAt: 20, updatedAt: 100 }),
       },
     };
 

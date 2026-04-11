@@ -135,10 +135,10 @@ Success criteria:
 
 Goal: make tests cheaper to extend.
 
-- [ ] Add `LocalState` / `SessionState` / workspace builders for tests.
-- [ ] Remove repeated fixture setup in large test files.
-- [ ] Keep behavior-focused tests readable.
-- [ ] Fill any gaps created by earlier refactors.
+- [x] Add `LocalState` / `SessionState` / workspace builders for tests.
+- [x] Remove repeated fixture setup in large test files.
+- [x] Keep behavior-focused tests readable.
+- [x] Fill any gaps created by earlier refactors.
 
 Success criteria:
 
