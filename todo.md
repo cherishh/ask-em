@@ -77,10 +77,10 @@ Success criteria:
 
 Goal: reduce fragility in `content-ui.ts`.
 
-- [ ] Split injected styles, pill rendering, tooltip rendering, and panel rendering.
-- [ ] Replace the largest `innerHTML` blocks with smaller render helpers or DOM builders.
-- [ ] Add an explicit `destroy()` path for listeners if useful.
-- [ ] Keep the current UX exactly the same.
+- [x] Split injected styles, pill rendering, tooltip rendering, and panel rendering.
+- [x] Replace the largest `innerHTML` blocks with smaller render helpers or DOM builders.
+- [x] Add an explicit `destroy()` path for listeners if useful.
+- [x] Keep the current UX exactly the same.
 
 Success criteria:
 

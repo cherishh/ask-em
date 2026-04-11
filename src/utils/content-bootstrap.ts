@@ -103,5 +103,6 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
   window.addEventListener('beforeunload', () => {
     unsubscribe?.();
     presenceController.destroy();
+    ui.destroy?.();
   });
 }
