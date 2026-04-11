@@ -9,6 +9,7 @@ import {
   type RuntimeMessage,
   type StatusResponseMessage,
   type SwitchProviderTabMessage,
+  type SyncProgressMessage,
   type UserSubmitMessage,
 } from '../runtime/protocol';
 import {
@@ -54,6 +55,14 @@ async function notifyTabsToRefreshContext(tabIds: number[]) {
       });
     }),
   );
+}
+
+async function notifySyncProgress(tabId: number, progress: SyncProgressMessage) {
+  try {
+    await chrome.tabs.sendMessage(tabId, progress);
+  } catch {
+    // Ignore source-tab progress update failures. The final submit response still carries the terminal state.
+  }
 }
 
 function getClaimedTabIdsForWorkspace(sessionState: Awaited<ReturnType<typeof getSessionState>>, workspaceId: string) {
@@ -447,6 +456,7 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
       globalSyncEnabled: localState.globalSyncEnabled,
       canStartNewSet: canStartNewSet(localState),
       shortcuts: localState.shortcuts,
+      workspaceSummary: null,
     };
   }
 
@@ -487,20 +497,24 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
     await setLocalState(localState);
   }
 
+  const workspace = localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace;
+
   return {
     ok: true,
     workspaceId: workspaceLookup.workspaceId,
     providerEnabled: isProviderEnabled(workspaceLookup.workspace.enabledProviders, message.provider),
     globalSyncEnabled: localState.globalSyncEnabled,
     canStartNewSet: canStartNewSet(localState),
-    enabledProviders: workspaceLookup.workspace.enabledProviders,
+    enabledProviders: workspace.enabledProviders,
     shortcuts: localState.shortcuts,
+    workspaceSummary: buildWorkspaceSummary(workspace, await getSessionState()),
   };
 }
 
 async function deliverPromptToWorkspaceTargets(
   workspaceId: string,
   message: UserSubmitMessage,
+  sourceTabId?: number,
 ): Promise<ProviderDeliveryResult[]> {
   const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
   const workspace = localState.workspaces[workspaceId];
@@ -515,8 +529,24 @@ async function deliverPromptToWorkspaceTargets(
     shouldSyncWorkspaceProvider(message.provider, provider, workspace.enabledProviders),
   );
 
+  let completed = 0;
+  let succeeded = 0;
+  let failed = 0;
+
+  if (sourceTabId && providers.length > 0) {
+    await notifySyncProgress(sourceTabId, {
+      type: 'SYNC_PROGRESS',
+      workspaceId,
+      total: providers.length,
+      completed: 0,
+      succeeded: 0,
+      failed: 0,
+    });
+  }
+
   const settledResults = await Promise.allSettled(
     providers.map(async (provider) => {
+      let deliveryResult: ProviderDeliveryResult;
       try {
         const target = await resolveDeliveryTarget(workspace, provider, sessionState);
         await upsertClaimedTab(workspaceId, provider, {
@@ -568,27 +598,27 @@ async function deliverPromptToWorkspaceTargets(
             message: payload?.blocked ? 'Prompt delivery blocked' : 'Prompt delivery failed',
             detail: reason,
           });
-          return {
+          deliveryResult = {
             provider,
             ok: false,
             blocked: payload?.blocked,
             reason,
           } satisfies ProviderDeliveryResult;
+        } else {
+          await logDebug({
+            level: 'info',
+            scope: 'background',
+            provider,
+            workspaceId,
+            message: 'Prompt delivery accepted',
+            detail: `${message.provider} -> ${provider}`,
+          });
+
+          deliveryResult = {
+            provider,
+            ok: true,
+          } satisfies ProviderDeliveryResult;
         }
-
-        await logDebug({
-          level: 'info',
-          scope: 'background',
-          provider,
-          workspaceId,
-          message: 'Prompt delivery accepted',
-          detail: `${message.provider} -> ${provider}`,
-        });
-
-        return {
-          provider,
-          ok: true,
-        } satisfies ProviderDeliveryResult;
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
         const isLoginRequired = reason.toLowerCase().includes('login required');
@@ -600,12 +630,32 @@ async function deliverPromptToWorkspaceTargets(
           message: isLoginRequired ? 'Prompt delivery login required' : 'Prompt delivery threw',
           detail: reason,
         });
-        return {
+        deliveryResult = {
           provider,
           ok: false,
           reason,
         } satisfies ProviderDeliveryResult;
       }
+
+      completed += 1;
+      if (deliveryResult.ok) {
+        succeeded += 1;
+      } else {
+        failed += 1;
+      }
+
+      if (sourceTabId) {
+        await notifySyncProgress(sourceTabId, {
+          type: 'SYNC_PROGRESS',
+          workspaceId,
+          total: providers.length,
+          completed,
+          succeeded,
+          failed,
+        });
+      }
+
+      return deliveryResult;
     }),
   );
 
@@ -710,6 +760,7 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
       workspaceId: null,
       globalSyncEnabled: localState.globalSyncEnabled,
       canStartNewSet: canStartNewSet(localState),
+      workspaceSummary: null,
     };
   }
 
@@ -730,6 +781,10 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
       providerEnabled: false,
       globalSyncEnabled: localState.globalSyncEnabled,
       canStartNewSet: canStartNewSet(localState),
+      workspaceSummary: buildWorkspaceSummary(
+        localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
+        await getSessionState(),
+      ),
     };
   }
 
@@ -781,10 +836,18 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
       providerEnabled: true,
       globalSyncEnabled: false,
       canStartNewSet: canStartNewSet(localState),
+      workspaceSummary: buildWorkspaceSummary(
+        localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
+        await getSessionState(),
+      ),
     };
   }
 
-  const deliveryResults = await deliverPromptToWorkspaceTargets(workspaceLookup.workspaceId, message);
+  const deliveryResults = await deliverPromptToWorkspaceTargets(
+    workspaceLookup.workspaceId,
+    message,
+    tabId,
+  );
   if (deliveryResults.length > 0) {
     const succeeded = deliveryResults.filter((result) => result.ok);
     const failed = deliveryResults.filter((result) => !result.ok);
@@ -819,6 +882,10 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
     globalSyncEnabled: true,
     canStartNewSet: canStartNewSet(localState),
     deliveryResults,
+    workspaceSummary: buildWorkspaceSummary(
+      localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
+      await getSessionState(),
+    ),
   };
 }
 

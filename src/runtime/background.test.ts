@@ -956,4 +956,135 @@ describe('background new-chat detachment', () => {
       reason: 'No other provider tab',
     });
   });
+
+  it('sends sync progress updates back to the source tab during fan-out', async () => {
+    const localState: LocalState = {
+      ...createLocalState(),
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {
+            claude: {
+              provider: 'claude',
+              sessionId: 'c-1',
+              url: 'https://claude.ai/chat/c-1',
+            },
+            chatgpt: {
+              provider: 'chatgpt',
+              sessionId: 'g-1',
+              url: 'https://chatgpt.com/c/g-1',
+            },
+          },
+          enabledProviders: ['claude', 'chatgpt'],
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+        'chatgpt:g-1': 'w1',
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': {
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-1',
+          sessionId: 'c-1',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+        'w1:chatgpt': {
+          provider: 'chatgpt',
+          workspaceId: 'w1',
+          tabId: 10,
+          currentUrl: 'https://chatgpt.com/c/g-1',
+          sessionId: 'g-1',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+      },
+    };
+
+    storageMocks.getLocalState.mockResolvedValue(localState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const sendMessage = vi.fn().mockImplementation((tabId: number, message: { type: string }) => {
+      if (message.type === 'PING') {
+        return Promise.resolve({
+          type: 'PING_RESPONSE',
+          provider: 'chatgpt',
+          currentUrl: 'https://chatgpt.com/c/g-1',
+          sessionId: 'g-1',
+          pageState: 'ready',
+          pageKind: 'existing-session',
+        });
+      }
+
+      if (message.type === 'DELIVER_PROMPT') {
+        return Promise.resolve({ ok: true });
+      }
+
+      if (message.type === 'SYNC_PROGRESS') {
+        return Promise.resolve({ ok: true });
+      }
+
+      return Promise.resolve({ ok: true, tabId });
+    });
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 9 }),
+        sendMessage,
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    await handleUserSubmit(
+      createSubmitMessage({
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+        content: 'fan out',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    const syncProgressCalls = sendMessage.mock.calls.filter(
+      ([tabId, message]) => tabId === 9 && message.type === 'SYNC_PROGRESS',
+    );
+
+    expect(syncProgressCalls).toEqual([
+      [
+        9,
+        {
+          type: 'SYNC_PROGRESS',
+          workspaceId: 'w1',
+          total: 1,
+          completed: 0,
+          succeeded: 0,
+          failed: 0,
+        },
+      ],
+      [
+        9,
+        {
+          type: 'SYNC_PROGRESS',
+          workspaceId: 'w1',
+          total: 1,
+          completed: 1,
+          succeeded: 1,
+          failed: 0,
+        },
+      ],
+    ]);
+  });
 });

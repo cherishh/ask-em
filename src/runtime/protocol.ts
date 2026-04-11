@@ -149,6 +149,15 @@ export type ProviderDeliveryResult = {
   reason?: string;
 };
 
+export type SyncProgressMessage = {
+  type: 'SYNC_PROGRESS';
+  workspaceId: string;
+  total: number;
+  completed: number;
+  succeeded: number;
+  failed: number;
+};
+
 export type PingMessage = {
   type: 'PING';
 };
@@ -276,6 +285,7 @@ export type RuntimeMessage =
   | HeartbeatMessage
   | UserSubmitMessage
   | DeliverPromptMessage
+  | SyncProgressMessage
   | PingMessage
   | PingResponseMessage
   | GetStatusMessage

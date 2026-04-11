@@ -9,10 +9,9 @@ import type {
 } from '../runtime/protocol';
 import { DEFAULT_SHORTCUTS, resolveShortcutConfig } from '../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../runtime/workspace';
+import type { IndicatorAlertLevel, IndicatorUiState, SyncIndicatorTone } from './content-indicator';
 
-export type UiState = 'idle' | 'listening' | 'syncing' | 'blocked';
-
-export type SyncIndicatorTone = 'neutral' | 'success' | 'warning';
+export type UiState = IndicatorUiState | 'listening';
 
 export type UiContext = {
   workspaceId: string | null;
@@ -194,6 +193,21 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         border-color: rgba(22, 163, 74, 0.2);
       }
 
+      .ask-em-sync-pill[data-alert-level="set-warning"] {
+        border-color: rgba(217, 119, 6, 0.34);
+        --ask-em-accent: rgba(245, 158, 11, 0.96);
+      }
+
+      .ask-em-sync-pill[data-alert-level="current-warning"] {
+        border-color: rgba(217, 119, 6, 0.42);
+        background: rgba(255, 249, 235, 0.98);
+        color: rgba(120, 53, 15, 0.94);
+        --ask-em-accent: rgba(245, 158, 11, 0.98);
+        box-shadow:
+          0 14px 34px rgba(146, 64, 14, 0.16),
+          inset 0 1px 0 rgba(255, 255, 255, 0.72);
+      }
+
       .ask-em-sync-pill[data-state="idle"][data-provider-enabled="true"]::before,
       .ask-em-sync-pill[data-state="listening"][data-provider-enabled="true"]::before,
       .ask-em-sync-pill[data-state="syncing"][data-provider-enabled="true"]::before {
@@ -224,16 +238,6 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         border-color: rgba(22, 163, 74, 0.26);
         background: rgba(243, 252, 245, 0.98);
         --ask-em-accent: rgba(22, 163, 74, 0.95);
-      }
-
-      .ask-em-sync-pill[data-sync-tone="warning"] {
-        border-color: rgba(217, 119, 6, 0.42);
-        background: rgba(255, 249, 235, 0.98);
-        color: rgba(120, 53, 15, 0.94);
-        --ask-em-accent: rgba(245, 158, 11, 0.98);
-        box-shadow:
-          0 14px 34px rgba(146, 64, 14, 0.16),
-          inset 0 1px 0 rgba(255, 255, 255, 0.72);
       }
 
       .ask-em-sync-pill[data-provider-enabled="false"] {
@@ -703,10 +707,11 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     mount.dataset.interactive = 'false';
     mount.dataset.visible = 'false';
     mount.dataset.syncTone = 'neutral';
+    mount.dataset.alertLevel = 'normal';
     mount.innerHTML = `
       <span class="ask-em-pill-copy">
         <span class="ask-em-pill-label">ready</span>
-        <span class="ask-em-pill-sync">No sync yet</span>
+        <span class="ask-em-pill-sync">next prompt stays here</span>
       </span>
     `;
     shell.appendChild(mount);
@@ -716,10 +721,11 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
   if (!mount.querySelector('.ask-em-pill-sync')) {
     mount.dataset.syncTone = 'neutral';
+    mount.dataset.alertLevel = 'normal';
     mount.innerHTML = `
       <span class="ask-em-pill-copy">
         <span class="ask-em-pill-label">ready</span>
-        <span class="ask-em-pill-sync">No sync yet</span>
+        <span class="ask-em-pill-sync">next prompt stays here</span>
       </span>
     `;
   }
@@ -754,19 +760,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
   const getDefaultLabel = () => {
     if (!context.workspaceId) {
-      if (!context.globalSyncEnabled) {
-        return 'global sync off';
-      }
-
-      if (!context.canStartNewSet) {
-        return 'set limit reached';
-      }
-
-      if (!context.standaloneCreateSetEnabled) {
-        return 'fan-out off';
-      }
-
-      return 'fan-out on';
+      return 'ready';
     }
 
     if (!context.globalSyncEnabled || !context.providerEnabled) {
@@ -1217,6 +1211,9 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     },
     setSyncStatus(text: string, tone: SyncIndicatorTone = 'neutral') {
       updateSyncLabel(text, tone);
+    },
+    setAlertLevel(level: IndicatorAlertLevel) {
+      mount.dataset.alertLevel = level;
     },
     setContext(nextContext: UiContext) {
       context.workspaceId = nextContext.workspaceId;
