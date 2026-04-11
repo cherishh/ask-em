@@ -66,7 +66,11 @@ export function createSubmitController(
 
     state.setSyncing();
 
-    const response = await sendRuntimeMessage<SubmitResponse>(buildUserSubmitMessage(status, content));
+    const response = await sendRuntimeMessage<SubmitResponse>(buildUserSubmitMessage(status, content), {
+      onError(error) {
+        console.warn('ask-em: failed to report user submit', error);
+      },
+    });
     state.applySubmitResponse(response);
     state.applyIndicatorPresentation();
   };

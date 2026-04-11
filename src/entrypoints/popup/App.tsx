@@ -699,9 +699,14 @@ function normalizeShortcutKey(event: KeyboardEvent): string {
 }
 
 function pickRandomProviders(providers: Provider[], limit: number): Provider[] {
-  return [...providers]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, limit);
+  const shuffled = [...providers];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled.slice(0, limit);
 }
 
 function ShortcutRecorder({

@@ -39,7 +39,11 @@ export function createPresenceController(
     const status = adapter.session.getStatus();
     const response =
       kind === 'HELLO'
-        ? await sendRuntimeMessage<PresenceResponse>(buildHelloMessage(adapter))
+        ? await sendRuntimeMessage<PresenceResponse>(buildHelloMessage(adapter), {
+            onError(error) {
+              console.warn('ask-em: failed to report content presence', error);
+            },
+          })
         : await sendRuntimeMessage<PresenceResponse>(buildHeartbeatMessage(adapter));
 
     state.applyPresenceResponse(response);

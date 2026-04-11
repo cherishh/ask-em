@@ -149,9 +149,9 @@ Success criteria:
 
 Goal: clear smaller non-best-practices once the structural work is done.
 
-- [ ] Replace `sort(() => Math.random() - 0.5)` with Fisher-Yates.
-- [ ] Review swallowed runtime-message errors and improve observability where useful.
-- [ ] Re-scan styles and small utilities for duplicated patterns after code refactors settle.
+- [x] Replace `sort(() => Math.random() - 0.5)` with Fisher-Yates.
+- [x] Review swallowed runtime-message errors and improve observability where useful.
+- [x] Re-scan styles and small utilities for duplicated patterns after code refactors settle.
 
 Success criteria:
 

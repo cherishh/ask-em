@@ -49,10 +49,16 @@ export function buildUserSubmitMessage(
   };
 }
 
-export async function sendRuntimeMessage<T = unknown>(message: RuntimeMessage): Promise<T | null> {
+export async function sendRuntimeMessage<T = unknown>(
+  message: RuntimeMessage,
+  options?: {
+    onError?: (error: unknown) => void;
+  },
+): Promise<T | null> {
   try {
     return (await chrome.runtime.sendMessage(message)) as T;
-  } catch {
+  } catch (error) {
+    options?.onError?.(error);
     return null;
   }
 }

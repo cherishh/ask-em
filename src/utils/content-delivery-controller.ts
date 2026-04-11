@@ -116,7 +116,11 @@ export function createDeliveryController(
               detail: ref.url,
               workspaceId: message.workspaceId,
             });
-            return sendRuntimeMessage(buildHeartbeatMessage(adapter));
+            return sendRuntimeMessage(buildHeartbeatMessage(adapter), {
+              onError(error) {
+                console.warn('ask-em: failed to report post-delivery heartbeat', error);
+              },
+            });
           }).catch(async (error) => {
             await dependencies.logDebug({
               level: 'warn',
