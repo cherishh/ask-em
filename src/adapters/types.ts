@@ -21,14 +21,9 @@ export interface ProviderUiSpec {
   className: string;
 }
 
-export interface SiteAdapter {
-  name: Provider;
+export interface ProviderSessionAdapter {
   getCurrentUrl(): string;
   getStatus(): ProviderStatus;
-  getUiSpec(): ProviderUiSpec;
-  subscribeToUserSubmissions?(onSubmit: (content: string) => void): () => void;
-  setComposerText?(content: string): Promise<void> | void;
-  submit?(): Promise<void> | void;
   waitForSessionRefUpdate?(
     baselineUrl: string,
   ): Promise<{ sessionId: string | null; url: string }>;
@@ -36,4 +31,17 @@ export interface SiteAdapter {
     message: DeliverPromptMessage,
     snapshot: AdapterSnapshot,
   ): boolean;
+}
+
+export interface ProviderComposerAdapter {
+  subscribeToUserSubmissions?(onSubmit: (content: string) => void): () => void;
+  setComposerText(content: string): Promise<void> | void;
+  submit(): Promise<void> | void;
+}
+
+export interface ProviderAdapter {
+  name: Provider;
+  getUiSpec(): ProviderUiSpec;
+  session: ProviderSessionAdapter;
+  composer?: ProviderComposerAdapter;
 }

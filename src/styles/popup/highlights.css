@@ -1,0 +1,330 @@
+.askem-settings-section {
+  padding: 18px;
+  background: var(--askem-card-surface);
+}
+
+.askem-facts-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(201, 100, 66, 0.12);
+  border-radius: 18px;
+  padding: 14px 16px 15px;
+  background:
+    linear-gradient(180deg, rgba(253, 251, 246, 0.96), rgba(246, 242, 233, 0.92)),
+    radial-gradient(circle at top right, rgba(201, 100, 66, 0.14), transparent 32%);
+  box-shadow:
+    0 16px 30px rgba(55, 35, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.68);
+}
+
+.askem-facts-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(201, 100, 66, 0.14), transparent 26%),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(201, 100, 66, 0.035) 0,
+      rgba(201, 100, 66, 0.035) 10px,
+      transparent 10px,
+      transparent 20px
+    );
+  pointer-events: none;
+}
+
+.askem-facts-top,
+.askem-facts-copy {
+  position: relative;
+}
+
+.askem-facts-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.askem-facts-top .askem-card-label {
+  margin-bottom: 0;
+}
+
+.askem-facts-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.askem-facts-dots button {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--askem-radius-pill);
+  background: var(--askem-accent-surface);
+  cursor: pointer;
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.askem-facts-dots button.is-active {
+  background: rgba(201, 100, 66, 0.76);
+  transform: scale(1.15);
+}
+
+.askem-facts-dots button:hover {
+  background: rgba(201, 100, 66, 0.42);
+}
+
+.askem-facts-copy {
+  margin: 10px 0 0;
+  max-width: 48ch;
+  color: var(--askem-body);
+  font-size: 13px;
+  line-height: 1.56;
+  animation: askem-fact-in 220ms ease;
+}
+
+@keyframes askem-fact-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.askem-warning-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(184, 78, 24, 0.22);
+  border-radius: 20px;
+  padding: 16px 16px 16px 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 249, 244, 0.98), rgba(255, 241, 229, 0.96)),
+    radial-gradient(circle at top right, rgba(255, 163, 92, 0.18), transparent 32%);
+  box-shadow:
+    var(--askem-card-shadow),
+    var(--askem-card-inset);
+}
+
+.askem-warning-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(191, 74, 0, 0.06) 0,
+      rgba(191, 74, 0, 0.06) 8px,
+      transparent 8px,
+      transparent 16px
+    );
+  pointer-events: none;
+}
+
+.askem-warning-kicker,
+.askem-warning-headline,
+.askem-warning-card p {
+  position: relative;
+}
+
+.askem-warning-kicker {
+  display: inline-flex;
+  margin-bottom: 8px;
+  color: var(--askem-accent);
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.askem-warning-headline {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.askem-warning-card strong {
+  display: block;
+  margin: 0;
+  color: var(--askem-accent);
+  font-family: var(--askem-font-serif);
+  font-size: 25px;
+  line-height: 1.02;
+}
+
+.askem-warning-card p {
+  margin: 10px 0 0;
+  max-width: 40ch;
+  color: var(--askem-accent);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.askem-premium-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(156, 107, 0, 0.22);
+  border-radius: 20px;
+  padding: 15px 16px 16px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 211, 125, 0.38), transparent 30%),
+    linear-gradient(145deg, rgba(255, 250, 238, 0.96), rgba(255, 244, 213, 0.94));
+  box-shadow:
+    0 18px 32px rgba(156, 107, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.askem-premium-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    115deg,
+    transparent 0,
+    transparent 14px,
+    rgba(156, 107, 0, 0.045) 14px,
+    rgba(156, 107, 0, 0.045) 15px
+  );
+  pointer-events: none;
+}
+
+.askem-premium-kicker {
+  position: relative;
+  display: inline-flex;
+  margin-bottom: 8px;
+  color: #815400;
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.askem-premium-card strong,
+.askem-premium-card p {
+  position: relative;
+}
+
+.askem-premium-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #5c3b00;
+  font-family: var(--askem-font-serif);
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.askem-premium-card p {
+  margin: 0;
+  color: #7a5600;
+  font-size: 13px;
+  line-height: 1.48;
+}
+
+.askem-defaults-card {
+  padding: 13px 14px;
+}
+
+.askem-dm-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.askem-dm-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--askem-border-soft);
+  border-radius: 12px;
+  background: var(--askem-white-surface-muted);
+  padding: 9px 11px;
+  color: rgba(107, 100, 89, 0.52);
+  cursor: pointer;
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.askem-dm-item:hover {
+  border-color: rgba(35, 25, 8, 0.14);
+  background: var(--askem-white-surface-soft);
+}
+
+.askem-dm-item.is-active {
+  color: var(--askem-ink);
+  border-color: var(--askem-border-accent-soft);
+  background: rgba(255, 249, 244, 0.82);
+}
+
+.askem-dm-check {
+  color: var(--askem-accent);
+  font-size: 12px;
+  line-height: 1;
+  min-width: 14px;
+  text-align: center;
+}
+
+.askem-request-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: rgba(107, 100, 89, 0.48);
+  cursor: pointer;
+  font: 600 9px/1 var(--askem-font-sans);
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: color 140ms ease;
+}
+
+.askem-request-link:hover {
+  color: var(--askem-muted);
+}
+
+.askem-defaults-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.askem-defaults-copy {
+  min-width: 0;
+}
+
+.askem-defaults-copy .askem-card-label {
+  margin-bottom: 10px;
+}
+
+.askem-defaults-title {
+  margin: 0;
+  color: var(--askem-ink);
+  font-size: 13px;
+  line-height: 1.42;
+}
+
+.askem-defaults-meta {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--askem-radius-pill);
+  padding: 4px 7px;
+  background: var(--askem-accent-surface-subtle);
+  color: var(--askem-accent);
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.askem-defaults-note {
+  margin: 8px 0 0;
+  color: var(--askem-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}

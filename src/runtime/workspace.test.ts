@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createDefaultEnabledProviders, HEARTBEAT_STALE_MS, type LocalState, type SessionState } from './protocol';
+import {
+  createDefaultEnabledProviders,
+  DEFAULT_SHORTCUTS,
+  HEARTBEAT_STALE_MS,
+  MAX_WORKSPACES,
+  type LocalState,
+  type SessionState,
+} from './protocol';
 import {
   bindWorkspaceMember,
   cleanupPendingWorkspaces,
@@ -19,7 +26,9 @@ function createEmptyState(): LocalState {
   return {
     globalSyncEnabled: true,
     debugLoggingEnabled: false,
+    closeTabsOnDeleteSet: false,
     defaultEnabledProviders: createDefaultEnabledProviders(),
+    shortcuts: DEFAULT_SHORTCUTS,
     workspaces: {},
     workspaceIndex: {},
     debugLogs: [],
@@ -248,15 +257,28 @@ describe('workspace state', () => {
     expect(nextState.workspaceIndex['claude:c-1']).toBeUndefined();
   });
 
-  it('enforces the workspace limit of two', () => {
+  it('enforces the configured workspace limit', () => {
     const state: LocalState = {
       globalSyncEnabled: true,
       debugLoggingEnabled: false,
+      closeTabsOnDeleteSet: false,
       defaultEnabledProviders: createDefaultEnabledProviders(),
-      workspaces: {
-        w1: { id: 'w1', members: {}, enabledProviders: [], createdAt: 1, updatedAt: 1 },
-        w2: { id: 'w2', members: {}, enabledProviders: [], createdAt: 2, updatedAt: 2 },
-      },
+      shortcuts: DEFAULT_SHORTCUTS,
+      workspaces: Object.fromEntries(
+        Array.from({ length: MAX_WORKSPACES }, (_, index) => {
+          const id = `w${index + 1}`;
+          return [
+            id,
+            {
+              id,
+              members: {},
+              enabledProviders: [],
+              createdAt: index + 1,
+              updatedAt: index + 1,
+            },
+          ];
+        }),
+      ),
       workspaceIndex: {},
       debugLogs: [],
     };

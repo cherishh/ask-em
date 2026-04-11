@@ -1,5 +1,6 @@
 import {
   createDefaultEnabledProviders,
+  DEFAULT_SHORTCUTS,
   type DebugLogEntry,
   STORAGE_KEYS,
   type ClaimedTab,
@@ -13,7 +14,9 @@ import { rebuildWorkspaceIndex } from './workspace';
 export const DEFAULT_LOCAL_STATE: LocalState = {
   globalSyncEnabled: true,
   debugLoggingEnabled: false,
+  closeTabsOnDeleteSet: false,
   defaultEnabledProviders: createDefaultEnabledProviders(),
+  shortcuts: DEFAULT_SHORTCUTS,
   workspaces: {},
   workspaceIndex: {},
   debugLogs: [],
@@ -22,6 +25,8 @@ export const DEFAULT_LOCAL_STATE: LocalState = {
 export const DEFAULT_SESSION_STATE: SessionState = {
   claimedTabs: {},
 };
+
+const DEBUG_LOG_LIMIT = 350;
 
 type StorageArea = Pick<
   chrome.storage.StorageArea,
@@ -50,16 +55,15 @@ function isWorkspaceIndexEqual(left: LocalState['workspaceIndex'], right: LocalS
 }
 
 function normalizeLocalState(state: LocalState): LocalState {
-  const workspaceIndex = rebuildWorkspaceIndex(state.workspaces);
+  let normalized = state;
 
-  if (isWorkspaceIndexEqual(state.workspaceIndex, workspaceIndex)) {
-    return state;
+  const workspaceIndex = rebuildWorkspaceIndex(normalized.workspaces);
+
+  if (!isWorkspaceIndexEqual(normalized.workspaceIndex, workspaceIndex)) {
+    normalized = { ...normalized, workspaceIndex };
   }
 
-  return {
-    ...state,
-    workspaceIndex,
-  };
+  return normalized;
 }
 
 export async function getLocalState(): Promise<LocalState> {
@@ -128,7 +132,7 @@ export async function appendDebugLog(entry: Omit<DebugLogEntry, 'id' | 'timestam
 
     return {
       ...state,
-      debugLogs: [...state.debugLogs, debugLog].slice(-1000),
+      debugLogs: [...state.debugLogs, debugLog].slice(-DEBUG_LOG_LIMIT),
     };
   });
 }

@@ -1,0 +1,64 @@
+.askem-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 2px 2px 8px;
+  color: var(--askem-muted);
+  text-align: center;
+  font: 600 12px/1.4 var(--askem-font-sans);
+}
+
+.askem-footer a {
+  color: var(--askem-link);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(143, 71, 0, 0.22);
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.askem-footer a:hover {
+  color: var(--askem-link-hover);
+  border-color: rgba(105, 49, 0, 0.44);
+}
+
+.askem-legal-links {
+  margin: 0;
+}
+
+.askem-author {
+  margin-top: 14px;
+  color: rgba(107, 100, 89, 0.48);
+  font-size: 11px;
+}
+
+.askem-author a {
+  color: rgba(143, 71, 0, 0.52);
+  border-bottom-color: rgba(143, 71, 0, 0.12);
+}
+
+.askem-author a:hover {
+  color: rgba(143, 71, 0, 0.8);
+  border-bottom-color: rgba(143, 71, 0, 0.3);
+}
+
+.askem-legal-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--askem-muted);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(107, 100, 89, 0.24);
+  text-underline-offset: 0.2em;
+  transition: color 140ms ease;
+}
+
+.askem-legal-link:hover {
+  color: var(--askem-ink);
+}
+
+.askem-legal-sep {
+  margin: 0 6px;
+  color: rgba(107, 100, 89, 0.4);
+}

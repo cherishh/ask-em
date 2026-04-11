@@ -1,0 +1,152 @@
+.askem-logs-card {
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 247, 0.96), rgba(246, 241, 234, 0.92)),
+    radial-gradient(circle at top right, rgba(143, 71, 0, 0.08), transparent 30%);
+}
+
+.askem-debug-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 252px);
+  gap: 18px;
+  align-items: start;
+}
+
+.askem-debug-copy h2 {
+  max-width: 8ch;
+}
+
+.askem-debug-copy .askem-card-copy {
+  max-width: 32ch;
+  margin-top: 8px;
+}
+
+.askem-logs-panel {
+  margin-top: 16px;
+  border: 1px solid var(--askem-border-soft);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(249, 244, 235, 0.72)),
+    var(--askem-fine-stripe);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.66);
+}
+
+.askem-logs-list {
+  display: grid;
+  gap: 8px;
+  max-height: 570px;
+  overflow: auto;
+  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 96, 76, 0.4) transparent;
+}
+
+.askem-logs-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.askem-logs-list::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--askem-radius-pill);
+  background: rgba(110, 96, 76, 0.32);
+  background-clip: padding-box;
+}
+
+.askem-logs-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.askem-log-row {
+  border-top: 1px solid var(--askem-border-soft);
+  padding-top: 10px;
+}
+
+.askem-log-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.askem-log-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--askem-muted);
+  font: 700 10px/1 var(--askem-font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.askem-log-level.is-info {
+  color: var(--askem-accent);
+}
+
+.askem-log-level.is-warn {
+  color: var(--askem-warn);
+}
+
+.askem-log-level.is-error {
+  color: var(--askem-danger);
+}
+
+.askem-log-row p {
+  margin: 6px 0 0;
+  font: 600 12px/1.55 var(--askem-font-sans);
+  letter-spacing: 0.01em;
+}
+
+.askem-log-row code,
+.askem-logs-empty {
+  display: block;
+  margin-top: 6px;
+  color: var(--askem-muted);
+  font: 600 11px/1.4 var(--askem-font-sans);
+}
+
+.askem-log-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.askem-log-toggle {
+  grid-column: 1 / -1;
+  min-width: 0;
+  justify-content: center;
+}
+
+.askem-log-toggle.is-active {
+  border-color: #b05638;
+  background: #b05638;
+  color: #f5f4ed;
+  box-shadow: 0 0 0 1px #b05638;
+}
+
+.askem-log-toggle.is-active:hover {
+  background: #9a4a30;
+  border-color: #9a4a30;
+}
+
+.askem-logs-empty {
+  margin: 0;
+}
+
+.askem-settings-note {
+  margin: 14px 0 0;
+  color: var(--askem-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 440px) {
+  .askem-debug-top {
+    grid-template-columns: 1fr;
+  }
+
+  .askem-debug-copy h2 {
+    max-width: none;
+  }
+
+  .askem-log-actions {
+    grid-template-columns: 1fr;
+  }
+}

@@ -4,9 +4,12 @@ import {
   type GetWorkspaceContextMessage,
   type HeartbeatMessage,
   type HelloMessage,
+  type ProviderDeliveryResult,
   type Provider,
   type RuntimeMessage,
   type StatusResponseMessage,
+  type SwitchProviderTabMessage,
+  type SyncProgressMessage,
   type UserSubmitMessage,
 } from '../runtime/protocol';
 import {
@@ -34,7 +37,6 @@ import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspacePro
 import {
   countClaimedTabsForWorkspace,
   getClaimedTabByTabId,
-  isClaimedTabStale,
   reconcileClaimedTabsWithBrowser,
   removeClaimedTabsForTabId,
   removeClaimedTabsForWorkspace,
@@ -53,6 +55,14 @@ async function notifyTabsToRefreshContext(tabIds: number[]) {
       });
     }),
   );
+}
+
+async function notifySyncProgress(tabId: number, progress: SyncProgressMessage) {
+  try {
+    await chrome.tabs.sendMessage(tabId, progress);
+  } catch {
+    // Ignore source-tab progress update failures. The final submit response still carries the terminal state.
+  }
 }
 
 function getClaimedTabIdsForWorkspace(sessionState: Awaited<ReturnType<typeof getSessionState>>, workspaceId: string) {
@@ -233,6 +243,138 @@ export async function detachClaimedTabForNewChat(
   };
 }
 
+export async function detachClaimedTabForForeignSession(
+  localState: Awaited<ReturnType<typeof getLocalState>>,
+  sessionState: Awaited<ReturnType<typeof getSessionState>>,
+  tabId: number,
+  provider: Provider,
+  sessionId: string | null,
+  logMessage: string,
+) {
+  if (!sessionId) {
+    return {
+      sessionState,
+      detachedWorkspaceId: null,
+    };
+  }
+
+  const claimedTab = getClaimedTabByTabId(sessionState, tabId, provider);
+  const claimedWorkspace = claimedTab ? localState.workspaces[claimedTab.workspaceId] : null;
+  const member = claimedWorkspace?.members[provider];
+  const isPendingSourceBinding = Boolean(
+    claimedWorkspace &&
+    claimedWorkspace.pendingSource === provider &&
+    claimedWorkspace.members[provider]?.sessionId === null,
+  );
+  const hasBoundMemberSession = Boolean(member?.sessionId);
+  const isStillOnBoundSession = member?.sessionId === sessionId;
+
+  if (
+    !claimedTab ||
+    !claimedWorkspace ||
+    isPendingSourceBinding ||
+    !hasBoundMemberSession ||
+    isStillOnBoundSession
+  ) {
+    return {
+      sessionState,
+      detachedWorkspaceId: null,
+    };
+  }
+
+  const nextSessionState = await clearClaimedTab(claimedTab.workspaceId, provider);
+
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    workspaceId: claimedTab.workspaceId,
+    provider,
+    message: logMessage,
+    detail: `${member?.sessionId ?? 'unbound'} -> ${sessionId}`,
+  });
+
+  await scheduleGroupGcIfEmpty(claimedTab.workspaceId);
+
+  return {
+    sessionState: nextSessionState,
+    detachedWorkspaceId: claimedTab.workspaceId,
+  };
+}
+
+export async function detachClaimedTabForUnresolvedExistingSession(
+  localState: Awaited<ReturnType<typeof getLocalState>>,
+  sessionState: Awaited<ReturnType<typeof getSessionState>>,
+  tabId: number,
+  provider: Provider,
+  logMessage: string,
+) {
+  const claimedTab = getClaimedTabByTabId(sessionState, tabId, provider);
+  const claimedWorkspace = claimedTab ? localState.workspaces[claimedTab.workspaceId] : null;
+  const member = claimedWorkspace?.members[provider];
+  const isPendingSourceBinding = Boolean(
+    claimedWorkspace &&
+    claimedWorkspace.pendingSource === provider &&
+    claimedWorkspace.members[provider]?.sessionId === null,
+  );
+  const hasBoundMemberSession = Boolean(member?.sessionId);
+
+  if (!claimedTab || !claimedWorkspace || isPendingSourceBinding || !hasBoundMemberSession) {
+    return {
+      sessionState,
+      detachedWorkspaceId: null,
+    };
+  }
+
+  const nextSessionState = await clearClaimedTab(claimedTab.workspaceId, provider);
+
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    workspaceId: claimedTab.workspaceId,
+    provider,
+    message: logMessage,
+    detail: `${member?.sessionId ?? 'unbound'} -> unresolved existing-session`,
+  });
+
+  await scheduleGroupGcIfEmpty(claimedTab.workspaceId);
+
+  return {
+    sessionState: nextSessionState,
+    detachedWorkspaceId: claimedTab.workspaceId,
+  };
+}
+
+export async function transferClaimedTabToWorkspace(
+  localState: Awaited<ReturnType<typeof getLocalState>>,
+  sessionState: Awaited<ReturnType<typeof getSessionState>>,
+  tabId: number,
+  provider: Provider,
+  targetWorkspaceId: string,
+) {
+  const claimedTab = getClaimedTabByTabId(sessionState, tabId, provider);
+
+  if (!claimedTab || claimedTab.workspaceId === targetWorkspaceId) {
+    return sessionState;
+  }
+
+  const nextSessionState = await clearClaimedTab(claimedTab.workspaceId, provider);
+
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    workspaceId: claimedTab.workspaceId,
+    provider,
+    message: 'Transferred claimed tab to matching workspace session',
+    detail: `${claimedTab.workspaceId} -> ${targetWorkspaceId}`,
+  });
+
+  if (localState.workspaces[claimedTab.workspaceId]) {
+    await scheduleGroupGcIfEmpty(claimedTab.workspaceId);
+  }
+
+  return nextSessionState;
+}
+
 async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, sender: chrome.runtime.MessageSender) {
   const tabId = sender.tab?.id;
   if (!tabId) {
@@ -257,6 +399,43 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
 
   let workspaceLookup = lookupWorkspaceBySession(localState, message.provider, message.sessionId);
 
+  if (workspaceLookup) {
+    sessionState = await transferClaimedTabToWorkspace(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      workspaceLookup.workspaceId,
+    );
+  }
+
+  if (!workspaceLookup && message.sessionId) {
+    const detachResult = await detachClaimedTabForForeignSession(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      message.sessionId,
+      'Detached claimed tab from previous group on existing-session navigation',
+    );
+    sessionState = detachResult.sessionState;
+  }
+
+  if (
+    !workspaceLookup &&
+    message.pageKind === 'existing-session' &&
+    message.sessionId === null
+  ) {
+    const detachResult = await detachClaimedTabForUnresolvedExistingSession(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      'Detached claimed tab from previous group on unresolved existing-session navigation',
+    );
+    sessionState = detachResult.sessionState;
+  }
+
   if (!workspaceLookup) {
     const claimedTab = getClaimedTabByTabId(sessionState, tabId, message.provider);
     const claimedWorkspace = claimedTab ? localState.workspaces[claimedTab.workspaceId] : null;
@@ -276,10 +455,24 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
       providerEnabled: false,
       globalSyncEnabled: localState.globalSyncEnabled,
       canStartNewSet: canStartNewSet(localState),
+      shortcuts: localState.shortcuts,
+      workspaceSummary: null,
     };
   }
 
   cancelScheduledGroupGc(workspaceLookup.workspaceId);
+
+  const previousClaimedTab = sessionState.claimedTabs[`${workspaceLookup.workspaceId}:${message.provider}`];
+  if (message.pageState === 'login-required' && previousClaimedTab?.pageState !== 'login-required') {
+    await logDebug({
+      level: 'warn',
+      scope: 'background',
+      workspaceId: workspaceLookup.workspaceId,
+      provider: message.provider,
+      message: 'Provider login required',
+      detail: `${previousClaimedTab?.pageState ?? 'unknown'} -> login-required @ ${message.currentUrl}`,
+    });
+  }
 
   await upsertClaimedTab(workspaceLookup.workspaceId, message.provider, {
     provider: message.provider,
@@ -304,25 +497,30 @@ async function handlePresenceMessage(message: HelloMessage | HeartbeatMessage, s
     await setLocalState(localState);
   }
 
+  const workspace = localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace;
+
   return {
     ok: true,
     workspaceId: workspaceLookup.workspaceId,
     providerEnabled: isProviderEnabled(workspaceLookup.workspace.enabledProviders, message.provider),
     globalSyncEnabled: localState.globalSyncEnabled,
     canStartNewSet: canStartNewSet(localState),
-    enabledProviders: workspaceLookup.workspace.enabledProviders,
+    enabledProviders: workspace.enabledProviders,
+    shortcuts: localState.shortcuts,
+    workspaceSummary: buildWorkspaceSummary(workspace, await getSessionState()),
   };
 }
 
 async function deliverPromptToWorkspaceTargets(
   workspaceId: string,
   message: UserSubmitMessage,
-): Promise<void> {
+  sourceTabId?: number,
+): Promise<ProviderDeliveryResult[]> {
   const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
   const workspace = localState.workspaces[workspaceId];
 
   if (!workspace) {
-    return;
+    return [];
   }
 
   cancelScheduledGroupGc(workspaceId);
@@ -331,8 +529,24 @@ async function deliverPromptToWorkspaceTargets(
     shouldSyncWorkspaceProvider(message.provider, provider, workspace.enabledProviders),
   );
 
-  await Promise.allSettled(
+  let completed = 0;
+  let succeeded = 0;
+  let failed = 0;
+
+  if (sourceTabId && providers.length > 0) {
+    await notifySyncProgress(sourceTabId, {
+      type: 'SYNC_PROGRESS',
+      workspaceId,
+      total: providers.length,
+      completed: 0,
+      succeeded: 0,
+      failed: 0,
+    });
+  }
+
+  const settledResults = await Promise.allSettled(
     providers.map(async (provider) => {
+      let deliveryResult: ProviderDeliveryResult;
       try {
         const target = await resolveDeliveryTarget(workspace, provider, sessionState);
         await upsertClaimedTab(workspaceId, provider, {
@@ -375,33 +589,127 @@ async function deliverPromptToWorkspaceTargets(
 
         const payload = response as { ok?: boolean; blocked?: boolean; error?: string } | undefined;
         if (!payload?.ok) {
+          const reason = payload?.error ?? (payload?.blocked ? 'Prompt delivery blocked' : 'Prompt delivery failed');
           await logDebug({
             level: payload?.blocked ? 'warn' : 'error',
             scope: 'background',
             provider,
             workspaceId,
             message: payload?.blocked ? 'Prompt delivery blocked' : 'Prompt delivery failed',
-            detail: payload?.error,
+            detail: reason,
           });
+          deliveryResult = {
+            provider,
+            ok: false,
+            blocked: payload?.blocked,
+            reason,
+          } satisfies ProviderDeliveryResult;
+        } else {
+          await logDebug({
+            level: 'info',
+            scope: 'background',
+            provider,
+            workspaceId,
+            message: 'Prompt delivery accepted',
+            detail: `${message.provider} -> ${provider}`,
+          });
+
+          deliveryResult = {
+            provider,
+            ok: true,
+          } satisfies ProviderDeliveryResult;
         }
       } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        const isLoginRequired = reason.toLowerCase().includes('login required');
         await logDebug({
-          level: 'error',
+          level: isLoginRequired ? 'warn' : 'error',
           scope: 'background',
           provider,
           workspaceId,
-          message: 'Prompt delivery threw',
-          detail: error instanceof Error ? error.message : String(error),
+          message: isLoginRequired ? 'Prompt delivery login required' : 'Prompt delivery threw',
+          detail: reason,
+        });
+        deliveryResult = {
+          provider,
+          ok: false,
+          reason,
+        } satisfies ProviderDeliveryResult;
+      }
+
+      completed += 1;
+      if (deliveryResult.ok) {
+        succeeded += 1;
+      } else {
+        failed += 1;
+      }
+
+      if (sourceTabId) {
+        await notifySyncProgress(sourceTabId, {
+          type: 'SYNC_PROGRESS',
+          workspaceId,
+          total: providers.length,
+          completed,
+          succeeded,
+          failed,
         });
       }
+
+      return deliveryResult;
     }),
   );
+
+  return settledResults.map((result, index) => {
+    if (result.status === 'fulfilled') {
+      return result.value;
+    }
+
+    const provider = providers[index];
+    return {
+      provider,
+      ok: false,
+      reason: result.reason instanceof Error ? result.reason.message : String(result.reason),
+    } satisfies ProviderDeliveryResult;
+  });
 }
 
-async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runtime.MessageSender) {
+export async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runtime.MessageSender) {
   const tabId = sender.tab?.id;
   let { localState, sessionState } = await refreshPendingState();
   let workspaceLookup = lookupWorkspaceBySession(localState, message.provider, message.sessionId);
+
+  if (workspaceLookup && tabId) {
+    sessionState = await transferClaimedTabToWorkspace(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      workspaceLookup.workspaceId,
+    );
+  }
+
+  if (!workspaceLookup && tabId && message.sessionId) {
+    const detachResult = await detachClaimedTabForForeignSession(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      message.sessionId,
+      'Detached claimed tab from previous group on existing-session submit',
+    );
+    sessionState = detachResult.sessionState;
+  }
+
+  if (!workspaceLookup && tabId && message.pageKind === 'existing-session' && message.sessionId === null) {
+    const detachResult = await detachClaimedTabForUnresolvedExistingSession(
+      localState,
+      sessionState,
+      tabId,
+      message.provider,
+      'Detached claimed tab from previous group on unresolved existing-session submit',
+    );
+    sessionState = detachResult.sessionState;
+  }
 
   if (!workspaceLookup && tabId && message.pageKind === 'new-chat' && message.sessionId === null) {
     const detachResult = await detachClaimedTabForNewChat(
@@ -417,10 +725,12 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
 
   if (!workspaceLookup && canCreateWorkspaceFromSubmit(localState, message)) {
     const enabledProviders = getDefaultEnabledProviderList(localState, message.provider);
+    const label = message.content.trim().slice(0, 80) || undefined;
     localState = createPendingWorkspace(localState, {
       sourceProvider: message.provider,
       sourceUrl: message.currentUrl,
       enabledProviders,
+      label,
     });
 
     const workspace = getWorkspacesOrdered(localState)[0];
@@ -437,12 +747,20 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
   }
 
   if (!workspaceLookup?.workspace) {
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      provider: message.provider,
+      message: 'Ignored submit without workspace',
+      detail: `${message.pageKind}: ${message.sessionId ?? 'no-session'} @ ${message.currentUrl}`,
+    });
     return {
       ok: true,
       synced: false,
       workspaceId: null,
       globalSyncEnabled: localState.globalSyncEnabled,
       canStartNewSet: canStartNewSet(localState),
+      workspaceSummary: null,
     };
   }
 
@@ -463,6 +781,10 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
       providerEnabled: false,
       globalSyncEnabled: localState.globalSyncEnabled,
       canStartNewSet: canStartNewSet(localState),
+      workspaceSummary: buildWorkspaceSummary(
+        localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
+        await getSessionState(),
+      ),
     };
   }
 
@@ -514,10 +836,43 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
       providerEnabled: true,
       globalSyncEnabled: false,
       canStartNewSet: canStartNewSet(localState),
+      workspaceSummary: buildWorkspaceSummary(
+        localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
+        await getSessionState(),
+      ),
     };
   }
 
-  await deliverPromptToWorkspaceTargets(workspaceLookup.workspaceId, message);
+  const deliveryResults = await deliverPromptToWorkspaceTargets(
+    workspaceLookup.workspaceId,
+    message,
+    tabId,
+  );
+  if (deliveryResults.length > 0) {
+    const succeeded = deliveryResults.filter((result) => result.ok);
+    const failed = deliveryResults.filter((result) => !result.ok);
+    await logDebug({
+      level: failed.length > 0 ? 'warn' : 'info',
+      scope: 'background',
+      provider: message.provider,
+      workspaceId: workspaceLookup.workspaceId,
+      message: 'Sync fan-out completed',
+      detail: failed.length > 0
+        ? `${succeeded.length}/${deliveryResults.length} ok; failed: ${failed
+            .map((result) => `${result.provider}${result.reason ? ` (${result.reason})` : ''}`)
+            .join(', ')}`
+        : `${succeeded.length}/${deliveryResults.length} ok`,
+    });
+  } else {
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      provider: message.provider,
+      workspaceId: workspaceLookup.workspaceId,
+      message: 'No sync fan-out targets',
+      detail: workspaceLookup.workspace.enabledProviders.join(', '),
+    });
+  }
 
   return {
     ok: true,
@@ -526,7 +881,103 @@ async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runti
     providerEnabled: true,
     globalSyncEnabled: true,
     canStartNewSet: canStartNewSet(localState),
+    deliveryResults,
+    workspaceSummary: buildWorkspaceSummary(
+      localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
+      await getSessionState(),
+    ),
   };
+}
+
+export async function handleSwitchProviderTab(
+  message: SwitchProviderTabMessage,
+  sender: chrome.runtime.MessageSender,
+) {
+  const tabId = sender.tab?.id;
+  if (!tabId) {
+    return {
+      ok: false,
+      switched: false,
+      reason: 'No active provider tab',
+    };
+  }
+
+  const { localState, sessionState } = await refreshPendingState();
+  const currentClaimedTab = getClaimedTabByTabId(sessionState, tabId, message.provider);
+  const workspace = currentClaimedTab ? localState.workspaces[currentClaimedTab.workspaceId] : null;
+
+  if (!currentClaimedTab || !workspace) {
+    return {
+      ok: true,
+      switched: false,
+      reason: 'Not in a set',
+    };
+  }
+
+  const providerOrder = ALL_PROVIDERS.filter(
+    (provider) => sessionState.claimedTabs[`${currentClaimedTab.workspaceId}:${provider}`],
+  );
+  const currentIndex = providerOrder.indexOf(message.provider);
+
+  if (providerOrder.length < 2 || currentIndex === -1) {
+    return {
+      ok: true,
+      switched: false,
+      reason: 'No other provider tab',
+    };
+  }
+
+  const offset = message.direction === 'next' ? 1 : -1;
+  const targetIndex = (currentIndex + offset + providerOrder.length) % providerOrder.length;
+  const targetProvider = providerOrder[targetIndex];
+  const targetClaimedTab = sessionState.claimedTabs[`${currentClaimedTab.workspaceId}:${targetProvider}`];
+
+  if (!targetClaimedTab) {
+    return {
+      ok: true,
+      switched: false,
+      reason: 'No other provider tab',
+    };
+  }
+
+  try {
+    const targetTab = await chrome.tabs.update(targetClaimedTab.tabId, { active: true });
+    if (typeof targetTab?.windowId === 'number') {
+      await chrome.windows.update(targetTab.windowId, { focused: true });
+    }
+
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      workspaceId: currentClaimedTab.workspaceId,
+      provider: targetProvider,
+      message: 'Switched provider tab',
+      detail: `${message.provider} -> ${targetProvider}`,
+    });
+
+    return {
+      ok: true,
+      switched: true,
+      provider: targetProvider,
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    await clearClaimedTab(currentClaimedTab.workspaceId, targetProvider);
+    await logDebug({
+      level: 'warn',
+      scope: 'background',
+      workspaceId: currentClaimedTab.workspaceId,
+      provider: targetProvider,
+      message: 'Provider tab switch target unavailable',
+      detail: reason,
+    });
+
+    return {
+      ok: false,
+      switched: false,
+      reason: 'Provider tab unavailable',
+    };
+  }
 }
 
 async function handleGetStatus(): Promise<StatusResponseMessage> {
@@ -540,8 +991,10 @@ async function handleGetStatus(): Promise<StatusResponseMessage> {
     type: 'STATUS_RESPONSE',
     globalSyncEnabled: localState.globalSyncEnabled,
     debugLoggingEnabled: localState.debugLoggingEnabled,
+    closeTabsOnDeleteSet: localState.closeTabsOnDeleteSet ?? false,
     workspaceLimit: MAX_WORKSPACES,
     defaultEnabledProviders: localState.defaultEnabledProviders,
+    shortcuts: localState.shortcuts,
     workspaces,
     recentLogs: localState.debugLogs.slice(-20).reverse(),
   };
@@ -568,7 +1021,7 @@ function buildWorkspaceSummary(
         return [provider, 'inactive'];
       }
 
-      return [provider, isClaimedTabStale(claimedTab) ? 'stale' : 'active'];
+      return [provider, claimedTab.pageState === 'ready' ? 'ready' : claimedTab.pageState];
     }),
   );
 
@@ -601,21 +1054,38 @@ async function handleGetDebugLogs() {
   };
 }
 
-async function handleWorkspaceClear(
+export async function handleWorkspaceClear(
   message: Extract<RuntimeMessage, { type: 'CLEAR_WORKSPACE' | 'CLEAR_WORKSPACE_PROVIDER' }>,
 ) {
   const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
 
   if (message.type === 'CLEAR_WORKSPACE') {
-    const targetTabIds = Object.values(sessionState.claimedTabs)
+    const targetTabIds = Array.from(
+      new Set(
+        Object.values(sessionState.claimedTabs)
       .filter((claimedTab) => claimedTab.workspaceId === message.workspaceId)
-      .map((claimedTab) => claimedTab.tabId);
+          .map((claimedTab) => claimedTab.tabId),
+      ),
+    );
 
     await Promise.all([
       setLocalState(clearWorkspace(localState, message.workspaceId)),
       setSessionState(removeClaimedTabsForWorkspace(sessionState, message.workspaceId)),
     ]);
-    await notifyTabsToRefreshContext(targetTabIds);
+    if ((localState.closeTabsOnDeleteSet ?? false) && targetTabIds.length > 0) {
+      await Promise.allSettled(targetTabIds.map(async (tabId) => chrome.tabs.remove(tabId)));
+    } else {
+      await notifyTabsToRefreshContext(targetTabIds);
+    }
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      workspaceId: message.workspaceId,
+      message: 'Cleared workspace',
+      detail: `${targetTabIds.length} claimed tabs ${
+        localState.closeTabsOnDeleteSet ?? false ? 'closed' : 'refreshed'
+      }`,
+    });
 
     return { ok: true };
   }
@@ -636,6 +1106,14 @@ async function handleWorkspaceClear(
   if (claimedTab) {
     await notifyTabsToRefreshContext([claimedTab.tabId]);
   }
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    workspaceId: message.workspaceId,
+    provider: message.provider,
+    message: 'Removed provider from workspace',
+    detail: claimedTab ? `refreshed tab ${claimedTab.tabId}` : 'no claimed tab',
+  });
 
   const nextLocalState = clearWorkspaceProvider(localState, message.workspaceId, message.provider);
   const nextWorkspace = nextLocalState.workspaces[message.workspaceId];
@@ -691,6 +1169,18 @@ async function handleSetWorkspaceProviderEnabled(
   return { ok: true };
 }
 
+async function handleSetShortcuts(
+  message: Extract<RuntimeMessage, { type: 'SET_SHORTCUTS' }>,
+) {
+  const localState = await getLocalState();
+  await setLocalState({
+    ...localState,
+    shortcuts: message.shortcuts,
+  });
+  await notifyAllTabsToRefreshContext();
+  return { ok: true };
+}
+
 async function handleSetGlobalSyncEnabled(
   message: Extract<RuntimeMessage, { type: 'SET_GLOBAL_SYNC_ENABLED' }>,
 ) {
@@ -726,6 +1216,17 @@ async function handleSetDebugLoggingEnabled(
     });
   }
 
+  return { ok: true };
+}
+
+async function handleSetCloseTabsOnDeleteSet(
+  message: Extract<RuntimeMessage, { type: 'SET_CLOSE_TABS_ON_DELETE_SET' }>,
+) {
+  const localState = await getLocalState();
+  await setLocalState({
+    ...localState,
+    closeTabsOnDeleteSet: message.enabled,
+  });
   return { ok: true };
 }
 
@@ -776,6 +1277,9 @@ export default defineBackground(() => {
         case 'USER_SUBMIT':
           sendResponse(await handleUserSubmit(message, sender));
           return;
+        case 'SWITCH_PROVIDER_TAB':
+          sendResponse(await handleSwitchProviderTab(message, sender));
+          return;
         case 'GET_STATUS':
           sendResponse(await handleGetStatus());
           return;
@@ -793,6 +1297,12 @@ export default defineBackground(() => {
           return;
         case 'SET_GLOBAL_SYNC_ENABLED':
           sendResponse(await handleSetGlobalSyncEnabled(message));
+          return;
+        case 'SET_CLOSE_TABS_ON_DELETE_SET':
+          sendResponse(await handleSetCloseTabsOnDeleteSet(message));
+          return;
+        case 'SET_SHORTCUTS':
+          sendResponse(await handleSetShortcuts(message));
           return;
         case 'SET_DEBUG_LOGGING_ENABLED':
           sendResponse(await handleSetDebugLoggingEnabled(message));

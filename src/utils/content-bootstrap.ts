@@ -1,11 +1,15 @@
-import type { SiteAdapter } from '../adapters/types';
+import type { ProviderAdapter } from '../adapters/types';
 import type {
   DeliverPromptMessage,
   PingMessage,
   PingResponseMessage,
   RuntimeMessage,
+  ShortcutConfig,
+  SyncProgressMessage,
+  WorkspaceSummary,
   WorkspaceContextResponseMessage,
 } from '../runtime/protocol';
+import { DEFAULT_SHORTCUTS, resolveShortcutConfig } from '../runtime/protocol';
 import {
   buildHeartbeatMessage,
   buildHelloMessage,
@@ -13,30 +17,57 @@ import {
   observeUrlChanges,
   sendRuntimeMessage,
 } from './content-routing';
-import { createContentUi, type UiContext } from './content-ui';
+import {
+  createContentUi,
+  type UiContext,
+} from './content-ui';
+import {
+  getContentIndicatorPresentation,
+  type SyncProgressSnapshot,
+} from './content-indicator';
 
 const STARTUP_PRESENCE_POLL_MS = 1_000;
 const STARTUP_PRESENCE_DURATION_MS = 10_000;
+const PROGRAMMATIC_SUBMIT_SUPPRESS_MS = 30_000;
 
-function shouldShowStandaloneIndicator(adapter: SiteAdapter): boolean {
-  const status = adapter.getStatus();
+function shouldShowStandaloneIndicator(adapter: ProviderAdapter): boolean {
+  const status = adapter.session.getStatus();
   return status.pageKind === 'new-chat' && status.pageState === 'ready';
 }
 
-export function bootstrapContentScript(adapter: SiteAdapter): void {
+type PresenceResponse = {
+  workspaceId?: string | null;
+  providerEnabled?: boolean;
+  globalSyncEnabled?: boolean;
+  canStartNewSet?: boolean;
+  shortcuts?: ShortcutConfig;
+  workspaceSummary?: WorkspaceSummary | null;
+};
+
+type SubmitResponse = PresenceResponse & {
+  synced?: boolean;
+};
+
+export function bootstrapContentScript(adapter: ProviderAdapter): void {
   let uiContext: UiContext = {
     workspaceId: null,
     providerEnabled: true,
     globalSyncEnabled: true,
     standaloneReady: false,
+    standaloneCreateSetEnabled: true,
     canStartNewSet: true,
+    shortcuts: DEFAULT_SHORTCUTS,
   };
 
   let suppressSubmissionsUntil = 0;
   let lastFingerprint = '';
   let lastFingerprintAt = 0;
+  const recentProgrammaticSubmits = new Map<string, number>();
   let startupPresenceInterval: number | null = null;
   let startupPresenceDeadline = 0;
+  let workspaceSummary: WorkspaceSummary | null = null;
+  let syncProgress: SyncProgressSnapshot | null = null;
+  let pendingSyncProgress: SyncProgressSnapshot | null = null;
 
   const stopStartupPresencePolling = () => {
     if (startupPresenceInterval !== null) {
@@ -81,45 +112,104 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
     });
   };
 
-  const getStandaloneUiState = (context: UiContext): 'idle' | 'blocked' => {
-    if (!context.standaloneReady || context.workspaceId) {
-      return 'idle';
+  const syncPendingProgress = () => {
+    if (pendingSyncProgress && pendingSyncProgress.workspaceId === uiContext.workspaceId) {
+      syncProgress = pendingSyncProgress.completed < pendingSyncProgress.total ? pendingSyncProgress : null;
+      pendingSyncProgress = null;
+      return;
     }
 
-    if (!context.globalSyncEnabled || !context.canStartNewSet) {
-      return 'blocked';
+    if (syncProgress && syncProgress.workspaceId !== uiContext.workspaceId) {
+      syncProgress = null;
+    }
+  };
+
+  const applyIndicatorPresentation = (status = adapter.session.getStatus()) => {
+    syncPendingProgress();
+    const presentation = getContentIndicatorPresentation({
+      hasWorkspace: Boolean(uiContext.workspaceId),
+      globalSyncEnabled: uiContext.globalSyncEnabled,
+      providerEnabled: uiContext.providerEnabled,
+      standaloneReady: uiContext.standaloneReady,
+      standaloneCreateSetEnabled: uiContext.standaloneCreateSetEnabled,
+      canStartNewSet: uiContext.canStartNewSet,
+      pageState: status.pageState,
+      workspaceSummary,
+      syncProgress:
+        syncProgress && syncProgress.workspaceId === uiContext.workspaceId ? syncProgress : null,
+    });
+
+    ui.setState(presentation.state, presentation.label);
+    ui.setSyncStatus(presentation.syncLabel, presentation.syncTone);
+    ui.setAlertLevel(presentation.alertLevel);
+  };
+
+  const getCurrentIndicatorLabel = (pageState: ReturnType<ProviderAdapter['session']['getStatus']>['pageState']) =>
+    getContentIndicatorPresentation({
+      hasWorkspace: Boolean(uiContext.workspaceId),
+      globalSyncEnabled: uiContext.globalSyncEnabled,
+      providerEnabled: uiContext.providerEnabled,
+      standaloneReady: uiContext.standaloneReady,
+      standaloneCreateSetEnabled: uiContext.standaloneCreateSetEnabled,
+      canStartNewSet: uiContext.canStartNewSet,
+      pageState,
+      workspaceSummary,
+      syncProgress: null,
+    }).label;
+
+  const getSubmitContentFingerprint = (content: string) => content.trim();
+
+  const rememberProgrammaticSubmit = (content: string) => {
+    recentProgrammaticSubmits.set(
+      getSubmitContentFingerprint(content),
+      Date.now() + PROGRAMMATIC_SUBMIT_SUPPRESS_MS,
+    );
+  };
+
+  const shouldSuppressProgrammaticSubmit = (content: string) => {
+    const now = Date.now();
+
+    for (const [fingerprint, expiresAt] of recentProgrammaticSubmits) {
+      if (expiresAt <= now) {
+        recentProgrammaticSubmits.delete(fingerprint);
+      }
     }
 
-    return 'idle';
+    const fingerprint = getSubmitContentFingerprint(content);
+    const expiresAt = recentProgrammaticSubmits.get(fingerprint);
+
+    if (!expiresAt || expiresAt <= now) {
+      return false;
+    }
+
+    recentProgrammaticSubmits.delete(fingerprint);
+    return true;
   };
 
   const reportPresence = async (kind: 'HELLO' | 'HEARTBEAT') => {
-    const status = adapter.getStatus();
+    const status = adapter.session.getStatus();
     const response =
       kind === 'HELLO'
-        ? await sendRuntimeMessage<{
-            workspaceId?: string | null;
-            providerEnabled?: boolean;
-            globalSyncEnabled?: boolean;
-            canStartNewSet?: boolean;
-          }>(buildHelloMessage(adapter))
-        : await sendRuntimeMessage<{
-            workspaceId?: string | null;
-            providerEnabled?: boolean;
-            globalSyncEnabled?: boolean;
-            canStartNewSet?: boolean;
-          }>(buildHeartbeatMessage(adapter));
+        ? await sendRuntimeMessage<PresenceResponse>(buildHelloMessage(adapter))
+        : await sendRuntimeMessage<PresenceResponse>(buildHeartbeatMessage(adapter));
 
     const standaloneVisible = shouldShowStandaloneIndicator(adapter);
+    const standaloneCreateSetEnabled = response?.workspaceId
+      ? true
+      : uiContext.standaloneCreateSetEnabled;
+    workspaceSummary = response?.workspaceSummary ?? null;
     uiContext = {
       workspaceId: response?.workspaceId ?? null,
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? false) : true,
       globalSyncEnabled: response?.globalSyncEnabled ?? true,
       standaloneReady: standaloneVisible,
+      standaloneCreateSetEnabled,
       canStartNewSet: response?.canStartNewSet ?? true,
+      shortcuts: resolveShortcutConfig(response?.shortcuts ?? uiContext.shortcuts),
     };
     ui.setContext(uiContext);
     ui.setVisible(Boolean(response?.workspaceId) || standaloneVisible);
+    applyIndicatorPresentation(status);
 
     if (!shouldContinueStartupPresencePolling()) {
       stopStartupPresencePolling();
@@ -127,10 +217,6 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
 
     if (!response?.workspaceId && !standaloneVisible) {
       return;
-    }
-
-    if (!response?.workspaceId && status.pageKind === 'new-chat') {
-      ui.setState(getStandaloneUiState(uiContext));
     }
   };
 
@@ -147,27 +233,41 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
         enabled: nextEnabled,
       });
 
+      const response = await sendRuntimeMessage<WorkspaceContextResponseMessage>({
+        type: 'GET_WORKSPACE_CONTEXT',
+        workspaceId: uiContext.workspaceId,
+      });
+      workspaceSummary = response?.workspaceSummary ?? workspaceSummary;
+
       if (provider === adapter.name) {
         uiContext = {
           ...uiContext,
           providerEnabled: nextEnabled,
         };
         ui.setContext(uiContext);
-        ui.setState('idle');
       }
-    },
-    async onGlobalSyncToggle(nextEnabled) {
-      await sendRuntimeMessage({
-        type: 'SET_GLOBAL_SYNC_ENABLED',
-        enabled: nextEnabled,
-      });
 
+      applyIndicatorPresentation();
+    },
+    onStandaloneSetCreationToggle(nextEnabled) {
       uiContext = {
         ...uiContext,
-        globalSyncEnabled: nextEnabled,
+        standaloneCreateSetEnabled: nextEnabled,
       };
       ui.setContext(uiContext);
-      ui.setState(getStandaloneUiState(uiContext));
+      applyIndicatorPresentation();
+    },
+    async onProviderTabSwitch(direction) {
+      return await sendRuntimeMessage<{
+        ok?: boolean;
+        switched?: boolean;
+        provider?: typeof adapter.name;
+        reason?: string;
+      }>({
+        type: 'SWITCH_PROVIDER_TAB',
+        provider: adapter.name,
+        direction,
+      });
     },
     async loadWorkspaceContext(workspaceId) {
       return await sendRuntimeMessage<WorkspaceContextResponseMessage>({
@@ -186,7 +286,16 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
       return;
     }
 
-    const status = adapter.getStatus();
+    if (shouldSuppressProgrammaticSubmit(content)) {
+      await logDebug({
+        level: 'info',
+        message: 'Skipped programmatic submit echo',
+        detail: content.slice(0, 120),
+      });
+      return;
+    }
+
+    const status = adapter.session.getStatus();
     const fingerprint = `${status.currentUrl}::${content}`;
 
     if (fingerprint === lastFingerprint && Date.now() - lastFingerprintAt < 1_500) {
@@ -195,46 +304,66 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
 
     lastFingerprint = fingerprint;
     lastFingerprintAt = Date.now();
-    ui.setState('listening', 'sync');
+
+    if (
+      !uiContext.workspaceId &&
+      status.pageKind === 'new-chat' &&
+      status.sessionId === null &&
+      !uiContext.standaloneCreateSetEnabled
+    ) {
+      applyIndicatorPresentation(status);
+      await logDebug({
+        level: 'info',
+        message: 'Skipped new set creation for standalone chat',
+        detail: content.slice(0, 120),
+      });
+      return;
+    }
+
     await logDebug({
       level: 'info',
       message: 'Detected user submit',
       detail: content.slice(0, 120),
     });
 
-    const response = await sendRuntimeMessage<{
-      workspaceId?: string | null;
-      synced?: boolean;
-      providerEnabled?: boolean;
-      globalSyncEnabled?: boolean;
-      canStartNewSet?: boolean;
-    }>(buildUserSubmitMessage(status, content));
+    const immediatePresentation = getContentIndicatorPresentation({
+      hasWorkspace: Boolean(uiContext.workspaceId),
+      globalSyncEnabled: uiContext.globalSyncEnabled,
+      providerEnabled: uiContext.providerEnabled,
+      standaloneReady: uiContext.standaloneReady,
+      standaloneCreateSetEnabled: uiContext.standaloneCreateSetEnabled,
+      canStartNewSet: uiContext.canStartNewSet,
+      pageState: status.pageState,
+      workspaceSummary,
+      syncProgress: null,
+    });
 
+    ui.setState('syncing', getCurrentIndicatorLabel(status.pageState));
+    ui.setSyncStatus('syncing…');
+    ui.setAlertLevel(immediatePresentation.alertLevel);
+
+    const response = await sendRuntimeMessage<SubmitResponse>(buildUserSubmitMessage(status, content));
+
+    const standaloneReady = shouldShowStandaloneIndicator(adapter);
+    workspaceSummary = response?.workspaceSummary ?? null;
     uiContext = {
       workspaceId: response?.workspaceId ?? null,
       providerEnabled: response?.workspaceId ? (response.providerEnabled ?? true) : true,
       globalSyncEnabled: response?.globalSyncEnabled ?? uiContext.globalSyncEnabled,
-      standaloneReady: shouldShowStandaloneIndicator(adapter),
+      standaloneReady,
+      standaloneCreateSetEnabled: response?.workspaceId
+        ? true
+        : uiContext.standaloneCreateSetEnabled,
       canStartNewSet: response?.canStartNewSet ?? uiContext.canStartNewSet,
+      shortcuts: uiContext.shortcuts,
     };
     ui.setContext(uiContext);
-    ui.setVisible(Boolean(uiContext.workspaceId) || shouldShowStandaloneIndicator(adapter));
-    ui.setState(getStandaloneUiState(uiContext));
-
-    window.setTimeout(
-      () =>
-        ui.setState(
-          uiContext.workspaceId
-            ? uiContext.providerEnabled
-              ? 'idle'
-              : 'blocked'
-            : getStandaloneUiState(uiContext),
-        ),
-      1_500,
-    );
+    ui.setVisible(Boolean(uiContext.workspaceId) || standaloneReady);
+    syncProgress = null;
+    applyIndicatorPresentation();
   };
 
-  const unsubscribe = adapter.subscribeToUserSubmissions?.((content) => {
+  const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.((content) => {
     void reportUserSubmit(content);
   });
 
@@ -257,7 +386,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
   chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
     void (async () => {
       if ((message as PingMessage).type === 'PING') {
-        const status = adapter.getStatus();
+        const status = adapter.session.getStatus();
         const response: PingResponseMessage = {
           type: 'PING_RESPONSE',
           provider: status.provider,
@@ -276,27 +405,62 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
         return;
       }
 
+      if (message.type === 'SYNC_PROGRESS') {
+        const progress: SyncProgressSnapshot = {
+          workspaceId: message.workspaceId,
+          total: message.total,
+          completed: message.completed,
+          succeeded: message.succeeded,
+          failed: message.failed,
+        };
+
+        if (uiContext.workspaceId === progress.workspaceId) {
+          syncProgress = progress.completed < progress.total ? progress : null;
+          pendingSyncProgress = null;
+          applyIndicatorPresentation();
+        } else {
+          pendingSyncProgress = progress;
+        }
+
+        sendResponse({ ok: true });
+        return;
+      }
+
       if (message.type !== 'DELIVER_PROMPT' || message.provider !== adapter.name) {
         sendResponse({ ok: false, ignored: true });
         return;
       }
 
-      const snapshot = adapter.getStatus();
-      if (!adapter.canDeliverPrompt?.(message as DeliverPromptMessage, snapshot)) {
+      const snapshot = adapter.session.getStatus();
+      if (!adapter.session.canDeliverPrompt?.(message as DeliverPromptMessage, snapshot)) {
         await logDebug({
           level: 'warn',
           message: 'Blocked prompt delivery in content',
           detail: JSON.stringify(snapshot),
           workspaceId: message.workspaceId,
         });
-        ui.setState('blocked', 'paused');
+        ui.setState('blocked', getCurrentIndicatorLabel(snapshot.pageState));
+        ui.setSyncStatus('Delivery blocked', 'warning');
+        ui.setAlertLevel('current-warning');
         sendResponse({ ok: false, blocked: true, snapshot });
+        return;
+      }
+
+      if (!adapter.composer) {
+        await logDebug({
+          level: 'warn',
+          message: 'Blocked prompt delivery because provider has no composer adapter',
+          workspaceId: message.workspaceId,
+        });
+        ui.setState('blocked', getCurrentIndicatorLabel(adapter.session.getStatus().pageState));
+        ui.setSyncStatus('Delivery blocked', 'warning');
+        ui.setAlertLevel('current-warning');
+        sendResponse({ ok: false, blocked: true, error: 'Provider does not support prompt delivery' });
         return;
       }
 
       try {
         suppressSubmissionsUntil = Date.now() + 2_500;
-        ui.setState('syncing', 'sync');
         await logDebug({
           level: 'info',
           message: 'Starting prompt delivery in content',
@@ -304,9 +468,10 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
           workspaceId: message.workspaceId,
         });
 
-        const baselineUrl = adapter.getCurrentUrl();
-        await adapter.setComposerText?.(message.content);
-        await adapter.submit?.();
+        const baselineUrl = adapter.session.getCurrentUrl();
+        await adapter.composer.setComposerText(message.content);
+        rememberProgrammaticSubmit(message.content);
+        await adapter.composer.submit();
 
         const shouldAwaitSessionRef =
           snapshot.sessionId === null ||
@@ -315,7 +480,7 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
 
         if (shouldAwaitSessionRef) {
           void adapter
-            .waitForSessionRefUpdate?.(baselineUrl)
+            .session.waitForSessionRefUpdate?.(baselineUrl)
             .then(async (ref) => {
               await logDebug({
                 level: 'info',
@@ -335,8 +500,8 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
             });
         }
 
-        window.setTimeout(() => ui.setState('idle'), 1_500);
         sendResponse({ ok: true });
+        void reportPresence('HELLO');
       } catch (error) {
         await logDebug({
           level: 'error',
@@ -344,7 +509,9 @@ export function bootstrapContentScript(adapter: SiteAdapter): void {
           detail: error instanceof Error ? error.message : String(error),
           workspaceId: message.workspaceId,
         });
-        ui.setState('blocked', 'paused');
+        ui.setState('blocked', getCurrentIndicatorLabel(adapter.session.getStatus().pageState));
+        ui.setSyncStatus('Delivery failed', 'warning');
+        ui.setAlertLevel('current-warning');
         sendResponse({
           ok: false,
           error: error instanceof Error ? error.message : String(error),

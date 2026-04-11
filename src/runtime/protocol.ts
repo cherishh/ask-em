@@ -20,6 +20,7 @@ export type ConversationRef = {
 
 export type Workspace = {
   id: string;
+  label?: string;
   members: Partial<Record<Provider, ConversationRef>>;
   enabledProviders: Provider[];
   createdAt: number;
@@ -28,6 +29,42 @@ export type Workspace = {
 };
 
 export type DefaultEnabledProviders = Record<Provider, boolean>;
+
+export type ShortcutBinding = {
+  key: string;
+  meta: boolean;
+  ctrl: boolean;
+  shift: boolean;
+  alt: boolean;
+};
+
+export type ShortcutId = 'togglePageParticipation' | 'nextProviderTab' | 'previousProviderTab';
+
+export type ShortcutConfig = Record<ShortcutId, ShortcutBinding>;
+
+export const DEFAULT_SHORTCUTS: ShortcutConfig = {
+  togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false },
+  nextProviderTab: { key: '.', meta: false, ctrl: true, shift: true, alt: false },
+  previousProviderTab: { key: ',', meta: false, ctrl: true, shift: true, alt: false },
+};
+
+export function resolveShortcutConfig(
+  shortcuts?: Partial<Record<ShortcutId, ShortcutBinding>> | null,
+): ShortcutConfig {
+  return {
+    ...DEFAULT_SHORTCUTS,
+    ...shortcuts,
+  };
+}
+
+export function formatShortcutDisplay(binding: ShortcutBinding, isApple: boolean): string {
+  const parts: string[] = [];
+  if (binding.ctrl || binding.meta) parts.push(isApple ? '⌘' : 'Ctrl');
+  if (binding.alt) parts.push(isApple ? '⌥' : 'Alt');
+  if (binding.shift) parts.push('Shift');
+  parts.push(binding.key === ' ' ? 'Space' : binding.key.length === 1 ? binding.key.toUpperCase() : binding.key);
+  return parts.join(' + ');
+}
 
 export type DebugLogEntry = {
   id: string;
@@ -55,7 +92,9 @@ export type ClaimedTab = {
 export type LocalState = {
   globalSyncEnabled: boolean;
   debugLoggingEnabled: boolean;
+  closeTabsOnDeleteSet: boolean;
   defaultEnabledProviders: DefaultEnabledProviders;
+  shortcuts: ShortcutConfig;
   workspaces: Record<string, Workspace>;
   workspaceIndex: WorkspaceIndex;
   debugLogs: DebugLogEntry[];
@@ -104,6 +143,22 @@ export type DeliverPromptMessage = {
   timestamp: number;
 };
 
+export type ProviderDeliveryResult = {
+  provider: Provider;
+  ok: boolean;
+  blocked?: boolean;
+  reason?: string;
+};
+
+export type SyncProgressMessage = {
+  type: 'SYNC_PROGRESS';
+  workspaceId: string;
+  total: number;
+  completed: number;
+  succeeded: number;
+  failed: number;
+};
+
 export type PingMessage = {
   type: 'PING';
 };
@@ -126,14 +181,21 @@ export type WorkspaceSummary = {
   memberStates: Partial<Record<Provider, GroupMemberState>>;
 };
 
-export type GroupMemberState = 'active' | 'stale' | 'inactive' | 'pending';
+export type GroupMemberState =
+  | 'ready'
+  | 'login-required'
+  | 'not-ready'
+  | 'inactive'
+  | 'pending';
 
 export type StatusResponseMessage = {
   type: 'STATUS_RESPONSE';
   globalSyncEnabled: boolean;
   debugLoggingEnabled: boolean;
+  closeTabsOnDeleteSet: boolean;
   workspaceLimit: number;
   defaultEnabledProviders: DefaultEnabledProviders;
+  shortcuts: ShortcutConfig;
   workspaces: WorkspaceSummary[];
   recentLogs: DebugLogEntry[];
 };
@@ -190,9 +252,25 @@ export type SetDebugLoggingEnabledMessage = {
   enabled: boolean;
 };
 
+export type SetCloseTabsOnDeleteSetMessage = {
+  type: 'SET_CLOSE_TABS_ON_DELETE_SET';
+  enabled: boolean;
+};
+
 export type SetGlobalSyncEnabledMessage = {
   type: 'SET_GLOBAL_SYNC_ENABLED';
   enabled: boolean;
+};
+
+export type SetShortcutsMessage = {
+  type: 'SET_SHORTCUTS';
+  shortcuts: ShortcutConfig;
+};
+
+export type SwitchProviderTabMessage = {
+  type: 'SWITCH_PROVIDER_TAB';
+  provider: Provider;
+  direction: 'next' | 'previous';
 };
 
 export type DebugLogMessage = {
@@ -214,6 +292,7 @@ export type RuntimeMessage =
   | HeartbeatMessage
   | UserSubmitMessage
   | DeliverPromptMessage
+  | SyncProgressMessage
   | PingMessage
   | PingResponseMessage
   | GetStatusMessage
@@ -225,6 +304,9 @@ export type RuntimeMessage =
   | SetDefaultEnabledProvidersMessage
   | SetWorkspaceProviderEnabledMessage
   | SetGlobalSyncEnabledMessage
+  | SetCloseTabsOnDeleteSetMessage
+  | SetShortcutsMessage
+  | SwitchProviderTabMessage
   | SetDebugLoggingEnabledMessage
   | DebugLogMessage
   | RefreshContentContextMessage
@@ -232,7 +314,7 @@ export type RuntimeMessage =
   | WorkspaceContextResponseMessage
   | StatusResponseMessage;
 
-export const MAX_WORKSPACES = 2;
+export const MAX_WORKSPACES = 3;
 
 export const PENDING_WORKSPACE_TIMEOUT_MS = 30_000;
 

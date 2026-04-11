@@ -1,41 +1,105 @@
-import type { SiteAdapter } from '../adapters/types';
+import type { ProviderAdapter } from '../adapters/types';
 import type {
   GroupMemberState,
   Provider,
+  ShortcutBinding,
+  ShortcutConfig,
   WorkspaceContextResponseMessage,
   WorkspaceSummary,
 } from '../runtime/protocol';
+import { DEFAULT_SHORTCUTS, resolveShortcutConfig } from '../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../runtime/workspace';
+import { renderContentTooltipHtml, type ContentTooltipSpec } from './content-tooltip';
+import type { IndicatorAlertLevel, IndicatorUiState, SyncIndicatorTone } from './content-indicator';
 
-export type UiState = 'idle' | 'listening' | 'syncing' | 'blocked';
+export type UiState = IndicatorUiState | 'listening';
 
 export type UiContext = {
   workspaceId: string | null;
   providerEnabled: boolean;
   globalSyncEnabled: boolean;
   standaloneReady: boolean;
+  standaloneCreateSetEnabled: boolean;
   canStartNewSet: boolean;
+  shortcuts: ShortcutConfig;
 };
 
 export type UiHandlers = {
   onWorkspaceProviderToggle: (provider: Provider, nextEnabled: boolean) => Promise<void>;
-  onGlobalSyncToggle: (nextEnabled: boolean) => Promise<void>;
+  onStandaloneSetCreationToggle: (nextEnabled: boolean) => void;
+  onProviderTabSwitch: (direction: 'next' | 'previous') => Promise<{
+    ok?: boolean;
+    switched?: boolean;
+    provider?: Provider;
+    reason?: string;
+  } | null>;
   loadWorkspaceContext: (workspaceId: string) => Promise<WorkspaceContextResponseMessage | null>;
   onRefreshContext: () => Promise<void>;
 };
-
-const TOGGLE_SHORTCUT_KEY = '.';
 
 function isApplePlatform(): boolean {
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 }
 
-function getToggleShortcutKeys(): string[] {
-  return isApplePlatform() ? ['Cmd', '.'] : ['Ctrl', '.'];
+function matchesShortcut(event: KeyboardEvent, binding: ShortcutBinding): boolean {
+  const apple = isApplePlatform();
+  let modifierMatch: boolean;
+  if (apple) {
+    // On Apple: if binding has meta or ctrl (but not both), treat it as "primary modifier" = Cmd
+    // If binding explicitly has ctrl only (recorded via physical Ctrl), match Ctrl exactly
+    if (binding.meta && !binding.ctrl) {
+      modifierMatch = event.metaKey && !event.ctrlKey;
+    } else if (binding.ctrl && !binding.meta) {
+      // Default shortcuts use ctrl=true for cross-platform compat → map to Cmd on Apple
+      modifierMatch = event.metaKey && !event.ctrlKey;
+    } else {
+      modifierMatch = event.metaKey === binding.meta && event.ctrlKey === binding.ctrl;
+    }
+  } else {
+    // On non-Apple: if binding has meta or ctrl, treat as Ctrl
+    if (binding.meta && !binding.ctrl) {
+      modifierMatch = event.ctrlKey && !event.metaKey;
+    } else if (binding.ctrl && !binding.meta) {
+      modifierMatch = event.ctrlKey && !event.metaKey;
+    } else {
+      modifierMatch = event.ctrlKey === binding.ctrl && event.metaKey === binding.meta;
+    }
+  }
+  return (
+    matchesShortcutKey(event, binding) &&
+    modifierMatch &&
+    event.shiftKey === binding.shift &&
+    event.altKey === binding.alt
+  );
 }
 
-function getGlobalToggleShortcutKeys(): string[] {
-  return isApplePlatform() ? ['Cmd', 'Shift', '.'] : ['Ctrl', 'Shift', '.'];
+function matchesShortcutKey(event: KeyboardEvent, binding: ShortcutBinding): boolean {
+  const eventKey = event.key.toLowerCase();
+  const bindingKey = binding.key.toLowerCase();
+
+  if (eventKey === bindingKey) {
+    return true;
+  }
+
+  if (bindingKey === '.' && (event.code === 'Period' || eventKey === '>')) {
+    return true;
+  }
+
+  if (bindingKey === ',' && (event.code === 'Comma' || eventKey === '<')) {
+    return true;
+  }
+
+  return false;
+}
+
+function formatBindingKeys(binding: ShortcutBinding): string[] {
+  const apple = isApplePlatform();
+  const keys: string[] = [];
+  if (binding.ctrl || binding.meta) keys.push(apple ? 'Cmd' : 'Ctrl');
+  if (binding.alt) keys.push(apple ? 'Opt' : 'Alt');
+  if (binding.shift) keys.push('Shift');
+  keys.push(binding.key === ' ' ? 'Space' : binding.key.length === 1 ? binding.key.toUpperCase() : binding.key);
+  return keys;
 }
 
 function renderShortcutKeysHtml(keys: string[]): string {
@@ -53,12 +117,16 @@ function renderShortcutKeysHtml(keys: string[]): string {
   `;
 }
 
-// 用户不需要知道 stale 状态，直接显示为 active。stale 仅用于 debug，不承担功能性职责
-function getDisplayMemberState(state: GroupMemberState): Exclude<GroupMemberState, 'stale'> {
-  return state === 'stale' ? 'active' : state;
+function renderTooltipShortcutHtml(label: string, keys: string[]): string {
+  return `
+    <div class="ask-em-panel-shortcut is-standalone">
+      <span class="ask-em-panel-shortcut-label">${label}</span>
+      ${renderShortcutKeysHtml(keys)}
+    </div>
+  `;
 }
 
-export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
+export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) {
   const { mountId, className } = adapter.getUiSpec();
   const shellId = `${mountId}-shell`;
 
@@ -81,8 +149,8 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        min-height: 30px;
-        padding: 0 12px;
+        min-height: 44px;
+        padding: 10px 16px;
         border-radius: 999px;
         border: 1px solid rgba(15, 23, 42, 0.22);
         background: rgba(255, 252, 246, 0.96);
@@ -91,7 +159,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
           0 14px 34px rgba(15, 23, 42, 0.18),
           inset 0 1px 0 rgba(255, 255, 255, 0.72);
         color: rgba(15, 23, 42, 0.84);
-        font: 700 11px/1.1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, Consolas, monospace;
+        font: 500 11px/1.1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.11em;
         text-transform: uppercase;
         opacity: 0.96;
@@ -120,6 +188,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
 
       .ask-em-sync-pill::before {
         content: "";
+        flex: 0 0 auto;
         width: 6px;
         height: 6px;
         border-radius: 999px;
@@ -132,6 +201,21 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       .ask-em-sync-pill[data-state="idle"] {
         --ask-em-accent: rgba(22, 163, 74, 0.95);
         border-color: rgba(22, 163, 74, 0.2);
+      }
+
+      .ask-em-sync-pill[data-alert-level="set-warning"] {
+        border-color: rgba(217, 119, 6, 0.34);
+        --ask-em-accent: rgba(245, 158, 11, 0.96);
+      }
+
+      .ask-em-sync-pill[data-alert-level="current-warning"] {
+        border-color: rgba(217, 119, 6, 0.42);
+        background: rgba(255, 249, 235, 0.98);
+        color: rgba(120, 53, 15, 0.94);
+        --ask-em-accent: rgba(245, 158, 11, 0.98);
+        box-shadow:
+          0 14px 34px rgba(146, 64, 14, 0.16),
+          inset 0 1px 0 rgba(255, 255, 255, 0.72);
       }
 
       .ask-em-sync-pill[data-state="idle"][data-provider-enabled="true"]::before,
@@ -160,11 +244,28 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         --ask-em-accent: rgba(245, 158, 11, 0.96);
       }
 
+      .ask-em-sync-pill[data-sync-tone="success"] {
+        border-color: rgba(22, 163, 74, 0.26);
+        background: rgba(243, 252, 245, 0.98);
+        --ask-em-accent: rgba(22, 163, 74, 0.95);
+      }
+
       .ask-em-sync-pill[data-provider-enabled="false"] {
         border-color: rgba(120, 113, 108, 0.2);
         background: rgba(246, 244, 241, 0.98);
         color: rgba(68, 64, 60, 0.88);
         --ask-em-accent: rgba(120, 113, 108, 0.84);
+      }
+
+      .ask-em-sync-pill[data-standalone-create-set-enabled="false"] {
+        border-color: rgba(120, 113, 108, 0.2);
+        background: rgba(246, 244, 241, 0.98);
+        color: rgba(68, 64, 60, 0.88);
+        --ask-em-accent: rgba(120, 113, 108, 0.84);
+      }
+
+      .ask-em-sync-pill[data-standalone-create-set-enabled="false"]::before {
+        animation: none;
       }
 
       .ask-em-sync-pill[data-global-sync-enabled="false"] {
@@ -183,8 +284,41 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         cursor: progress;
       }
 
-      .ask-em-pill-label {
+      .ask-em-pill-copy {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .ask-em-pill-label,
+      .ask-em-pill-sync {
+        display: block;
+        max-width: 230px;
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .ask-em-pill-label {
+        line-height: 1;
+      }
+
+      .ask-em-pill-sync {
+        color: rgba(82, 77, 72, 0.74);
+        font: 600 10px/1.1 "Avenir Next", "Segoe UI", sans-serif;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .ask-em-sync-pill[data-sync-tone="success"] .ask-em-pill-sync {
+        color: rgba(21, 128, 61, 0.84);
+      }
+
+      .ask-em-sync-pill[data-sync-tone="warning"] .ask-em-pill-sync {
+        color: rgba(146, 64, 14, 0.9);
+        font-weight: 700;
       }
 
       .ask-em-sync-panel {
@@ -216,15 +350,13 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
 
       .ask-em-sync-panel[data-mode="tooltip"] {
         width: auto;
-        max-width: 240px;
-        padding: 10px 12px 11px;
-        border-radius: 14px;
-        border: 1px solid rgba(15, 23, 42, 0.1);
-        background: rgba(255, 252, 246, 0.98);
-        box-shadow:
-          0 12px 26px rgba(15, 23, 42, 0.1),
-          0 2px 8px rgba(15, 23, 42, 0.04);
-        backdrop-filter: blur(10px) saturate(1.08);
+        max-width: 220px;
+        padding: 7px 10px 8px;
+        border-radius: 8px;
+        border: 0;
+        background: rgba(20, 20, 19, 0.88);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        backdrop-filter: blur(8px);
       }
 
       .ask-em-sync-panel::before {
@@ -261,17 +393,24 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       .ask-em-panel-kicker {
         margin: 0 0 6px;
         color: rgba(107, 100, 89, 0.92);
-        font: 700 9px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 700 9px/1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.18em;
         text-transform: uppercase;
       }
 
       .ask-em-panel-title {
         margin: 0;
-        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
-        font-size: 21px;
-        line-height: 1;
-        letter-spacing: -0.04em;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.3;
+        letter-spacing: -0.01em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        word-break: break-word;
       }
 
       .ask-em-panel-badge {
@@ -282,7 +421,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         border-radius: 999px;
         background: rgba(37, 87, 214, 0.08);
         color: rgba(37, 87, 214, 0.82);
-        font: 700 9px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 700 9px/1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         white-space: nowrap;
@@ -301,9 +440,13 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
 
       .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-note {
         margin: 0;
-        color: rgba(53, 49, 44, 0.88);
-        font: 600 13px/1.3 "Avenir Next", "Segoe UI", sans-serif;
-        letter-spacing: -0.01em;
+        color: rgba(245, 244, 237, 0.92);
+        font: 500 11.5px/1.35 "Avenir Next", "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      .ask-em-panel-tooltip-secondary {
+        margin-top: 5px;
       }
 
       .ask-em-panel-shortcut {
@@ -315,9 +458,14 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         padding-top: 10px;
         border-top: 1px solid rgba(15, 23, 42, 0.08);
         color: rgba(82, 77, 72, 0.8);
-        font: 600 10px/1.35 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 600 10px/1.35 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.08em;
         text-transform: uppercase;
+      }
+
+      .ask-em-panel-shortcut-label {
+        flex: 1 1 auto;
+        min-width: 0;
       }
 
       .ask-em-panel-shortcut.is-standalone {
@@ -328,12 +476,12 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
 
       .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut {
         justify-content: flex-start;
-        gap: 8px;
-        margin-top: 8px;
+        gap: 6px;
+        margin-top: 5px;
         padding-top: 0;
         border-top: 0;
-        color: rgba(107, 100, 89, 0.72);
-        font: 600 10px/1.2 "Avenir Next", "Segoe UI", sans-serif;
+        color: rgba(245, 244, 237, 0.45);
+        font: 500 9px/1.2 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0;
         text-transform: none;
       }
@@ -343,30 +491,38 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       }
 
       .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut-keys {
-        gap: 4px;
+        gap: 3px;
       }
 
       .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut-plus {
-        color: rgba(120, 113, 108, 0.54);
+        color: rgba(245, 244, 237, 0.3);
       }
 
       .ask-em-sync-panel[data-mode="tooltip"] .ask-em-panel-shortcut kbd {
-        min-width: 18px;
-        min-height: 18px;
-        padding: 0 6px;
-        border-radius: 6px;
-        border-color: rgba(15, 23, 42, 0.1);
-        background: rgba(255, 255, 255, 0.96);
-        box-shadow:
-          0 1px 0 rgba(255, 255, 255, 0.9),
-          0 2px 4px rgba(15, 23, 42, 0.06);
-        font-size: 10px;
+        min-width: 16px;
+        min-height: 16px;
+        padding: 0 5px;
+        border-radius: 4px;
+        border-color: rgba(245, 244, 237, 0.15);
+        background: rgba(255, 255, 255, 0.12);
+        box-shadow: none;
+        color: rgba(245, 244, 237, 0.6);
+        font-size: 9px;
       }
 
       .ask-em-panel-shortcut-keys {
         display: inline-flex;
         align-items: center;
         gap: 5px;
+        flex-shrink: 0;
+      }
+
+      .ask-em-panel-shortcut-combo-group {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        flex-wrap: wrap;
       }
 
       .ask-em-panel-shortcut-plus {
@@ -389,9 +545,11 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
           0 2px 6px rgba(15, 23, 42, 0.08),
           inset 0 -1px 0 rgba(15, 23, 42, 0.06);
         color: rgba(15, 23, 42, 0.86);
-        font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.02em;
         text-transform: none;
+        white-space: nowrap;
+        flex-shrink: 0;
       }
 
       .ask-em-panel-list {
@@ -435,9 +593,19 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
       }
 
+      .ask-em-panel-status-dot[data-state="warning"] {
+        background: rgba(245, 158, 11, 0.96);
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
+      }
+
       .ask-em-panel-status-dot[data-state="pending"] {
         background: rgba(59, 130, 246, 0.88);
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      .ask-em-panel-status-dot[data-state="frozen"] {
+        background: rgba(120, 113, 108, 0.72);
+        box-shadow: 0 0 0 3px rgba(120, 113, 108, 0.1);
       }
 
       .ask-em-panel-provider {
@@ -445,14 +613,14 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         align-items: center;
         gap: 6px;
         min-width: 0;
-        font: 700 10px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 700 10px/1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.14em;
         text-transform: uppercase;
       }
 
       .ask-em-panel-current {
         color: rgba(37, 87, 214, 0.78);
-        font: 700 8px/1 "SF Mono", "IBM Plex Mono", Menlo, Monaco, monospace;
+        font: 700 8px/1 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0.16em;
         text-transform: uppercase;
       }
@@ -549,29 +717,47 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     mount.dataset.state = 'idle';
     mount.dataset.providerEnabled = 'true';
     mount.dataset.globalSyncEnabled = 'true';
+    mount.dataset.standaloneCreateSetEnabled = 'true';
     mount.dataset.interactive = 'false';
     mount.dataset.visible = 'false';
-    mount.innerHTML = `<span class="ask-em-pill-label">ready</span>`;
+    mount.dataset.syncTone = 'neutral';
+    mount.dataset.alertLevel = 'normal';
+    mount.innerHTML = `
+      <span class="ask-em-pill-copy">
+        <span class="ask-em-pill-label">ready</span>
+        <span class="ask-em-pill-sync">next prompt stays here</span>
+      </span>
+    `;
     shell.appendChild(mount);
   } else if (mount.parentElement !== shell) {
     shell.appendChild(mount);
   }
 
+  if (!mount.querySelector('.ask-em-pill-sync')) {
+    mount.dataset.syncTone = 'neutral';
+    mount.dataset.alertLevel = 'normal';
+    mount.innerHTML = `
+      <span class="ask-em-pill-copy">
+        <span class="ask-em-pill-label">ready</span>
+        <span class="ask-em-pill-sync">next prompt stays here</span>
+      </span>
+    `;
+  }
+
   const label = mount.querySelector('.ask-em-pill-label');
+  const syncLabel = mount.querySelector('.ask-em-pill-sync');
   const context: UiContext = {
     workspaceId: null,
     providerEnabled: true,
     globalSyncEnabled: true,
     standaloneReady: false,
+    standaloneCreateSetEnabled: true,
     canStartNewSet: true,
+    shortcuts: DEFAULT_SHORTCUTS,
   };
-  const toggleShortcutKeys = getToggleShortcutKeys();
-  const globalToggleShortcutKeys = getGlobalToggleShortcutKeys();
 
   let panelPinned = false;
   let currentProviderToggleBusy = false;
-  let transientLabel: string | null = null;
-  let transientLabelTimeout: number | null = null;
 
   const updateLabel = (text: string) => {
     if (label) {
@@ -579,17 +765,16 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     }
   };
 
+  const updateSyncLabel = (text: string, tone: SyncIndicatorTone = 'neutral') => {
+    mount.dataset.syncTone = tone;
+    if (syncLabel) {
+      syncLabel.textContent = text;
+    }
+  };
+
   const getDefaultLabel = () => {
     if (!context.workspaceId) {
-      if (!context.globalSyncEnabled) {
-        return 'sync off';
-      }
-
-      if (!context.canStartNewSet) {
-        return 'set limit reached';
-      }
-
-      return 'sync ready';
+      return 'ready';
     }
 
     if (!context.globalSyncEnabled || !context.providerEnabled) {
@@ -599,69 +784,135 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     return 'current model is in sync';
   };
 
-  const syncLabel = (nextLabel?: string) => {
-    updateLabel(transientLabel ?? nextLabel ?? getDefaultLabel());
+  const syncPrimaryLabel = () => {
+    updateLabel(getDefaultLabel());
   };
 
-  const setTransientLabel = (nextLabel: string, durationMs = 1_500) => {
-    transientLabel = nextLabel;
-    updateLabel(nextLabel);
-
-    if (transientLabelTimeout !== null) {
-      window.clearTimeout(transientLabelTimeout);
+  const syncStandaloneStatusLabel = () => {
+    if (context.workspaceId || !context.standaloneReady) {
+      return;
     }
 
-    transientLabelTimeout = window.setTimeout(() => {
-      transientLabel = null;
-      transientLabelTimeout = null;
-      syncLabel();
-    }, durationMs);
+    if (!context.globalSyncEnabled) {
+      updateSyncLabel('Prompt stays here');
+      return;
+    }
+
+    if (!context.canStartNewSet) {
+      updateSyncLabel('Set limit reached', 'warning');
+      return;
+    }
+
+    updateSyncLabel(
+      context.standaloneCreateSetEnabled ? 'Next prompt will fan out' : 'Next prompt stays here',
+    );
   };
 
   const setPanelVisible = (visible: boolean) => {
     panel.dataset.visible = String(visible && Boolean(context.workspaceId || context.standaloneReady));
   };
 
-  const renderTooltip = (message: string, shortcutKeys?: string[]) => {
+  const renderTooltip = (spec: ContentTooltipSpec) => {
     panel.dataset.mode = 'tooltip';
-    panel.innerHTML = `
-      <p class="ask-em-panel-note">${message}</p>
-      ${
-        shortcutKeys
-          ? `<div class="ask-em-panel-shortcut is-standalone">
-              <span class="ask-em-panel-shortcut-label">Shortcut</span>
-              ${renderShortcutKeysHtml(shortcutKeys)}
-            </div>`
-          : ''
-      }
-    `;
+    panel.innerHTML = renderContentTooltipHtml(spec);
     setPanelVisible(true);
+  };
+
+  const getStandaloneTooltipSpec = (): ContentTooltipSpec => {
+    if (!context.globalSyncEnabled) {
+      return {
+        message: 'Global sync is off in the popup.',
+      };
+    }
+
+    if (!context.canStartNewSet) {
+      return {
+        message: 'Set limit reached. Clear a set in the popup first.',
+      };
+    }
+
+    return {
+      message: context.standaloneCreateSetEnabled
+        ? 'Click to stop fan-out. Becomes normal single chat.'
+        : 'Click to enable fan-out. Power on!',
+      secondaryHtml: renderTooltipShortcutHtml(
+        'Shortcut',
+        formatBindingKeys(context.shortcuts.togglePageParticipation),
+      ),
+    };
+  };
+
+  const renderStandaloneTooltip = () => {
+    renderTooltip(getStandaloneTooltipSpec());
   };
 
   const getProviderMeta = (
     provider: Provider,
     workspaceSummary: WorkspaceSummary,
     memberState: GroupMemberState,
+    globalSyncEnabled: boolean,
   ) => {
-    const displayState = getDisplayMemberState(memberState);
     const member = workspaceSummary.workspace.members[provider];
 
-    if (displayState === 'pending') {
-      return 'pending';
+    if (memberState === 'pending') {
+      return 'connecting';
     }
 
     if (!member) {
       return 'not connected';
     }
 
-    return displayState;
+    if (memberState === 'inactive') {
+      return 'no live tab';
+    }
+
+    if (!globalSyncEnabled) {
+      return 'frozen';
+    }
+
+    if (memberState === 'ready') {
+      return 'ready';
+    }
+
+    if (memberState === 'login-required') {
+      return 'needs login';
+    }
+
+    if (memberState === 'not-ready') {
+      return 'loading';
+    }
+
+    return 'not connected';
+  };
+
+  const getProviderDotState = (
+    memberState: GroupMemberState,
+    globalSyncEnabled: boolean,
+  ): 'active' | 'pending' | 'frozen' | 'warning' | 'inactive' => {
+    if (!globalSyncEnabled && memberState === 'ready') {
+      return 'frozen';
+    }
+
+    if (memberState === 'ready') {
+      return 'active';
+    }
+
+    if (memberState === 'pending') {
+      return 'pending';
+    }
+
+    if (memberState === 'login-required' || memberState === 'not-ready') {
+      return 'warning';
+    }
+
+    return 'inactive';
   };
 
   const renderPanel = (response: WorkspaceContextResponseMessage | null) => {
     const workspaceSummary = response?.workspaceSummary;
     if (!workspaceSummary || !context.workspaceId) {
       if (context.standaloneReady && !context.workspaceId) {
-        renderTooltip('Click to toggle global sync.', globalToggleShortcutKeys);
+        renderStandaloneTooltip();
         return;
       }
 
@@ -673,36 +924,36 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
 
     panel.dataset.mode = '';
     const visibleProviders = getVisibleWorkspaceProviders(workspaceSummary.workspace);
-    const badgeClass = response.globalSyncEnabled ? 'ask-em-panel-badge' : 'ask-em-panel-badge is-paused';
-    const badgeLabel = response.globalSyncEnabled ? 'Live Group' : 'Global Pause';
     const globalNote = response.globalSyncEnabled
       ? ''
-      : '<p class="ask-em-panel-note">Global sync is paused. Changes here stay queued until sync resumes.</p>';
+      : '<p class="ask-em-panel-note">Freeze the world is on. Prompts stay local.</p>';
+    const badgeHtml = response.globalSyncEnabled
+      ? ''
+      : '<span class="ask-em-panel-badge is-paused">Paused</span>';
 
     panel.innerHTML = `
       <div class="ask-em-panel-top">
         <div>
-          <p class="ask-em-panel-kicker">Current Group</p>
-          <h3 class="ask-em-panel-title">#${workspaceSummary.workspace.id.slice(0, 8)}</h3>
+          <p class="ask-em-panel-kicker">Current Set</p>
+          <h3 class="ask-em-panel-title"></h3>
         </div>
-        <span class="${badgeClass}">${badgeLabel}</span>
+        ${badgeHtml}
       </div>
       ${globalNote}
       <div class="ask-em-panel-list">
         ${visibleProviders
           .map((provider) => {
-            const memberState = getDisplayMemberState(
-              workspaceSummary.memberStates[provider] ?? 'inactive',
-            );
+            const memberState = workspaceSummary.memberStates[provider] ?? 'inactive';
             const enabled = workspaceSummary.workspace.enabledProviders.includes(provider);
-            const meta = getProviderMeta(provider, workspaceSummary, memberState);
+            const dotState = getProviderDotState(memberState, response.globalSyncEnabled);
+            const meta = getProviderMeta(provider, workspaceSummary, memberState, response.globalSyncEnabled);
             const isCurrent = provider === adapter.name;
 
             return `
               <div class="ask-em-panel-row" data-current="${String(isCurrent)}">
                 <div>
                   <div class="ask-em-panel-row-top">
-                    <span class="ask-em-panel-status-dot" data-state="${memberState}"></span>
+                    <span class="ask-em-panel-status-dot" data-state="${dotState}"></span>
                     <span class="ask-em-panel-provider">
                       ${provider}
                       ${isCurrent ? '<span class="ask-em-panel-current">this tab</span>' : ''}
@@ -723,10 +974,25 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
           .join('')}
       </div>
       <div class="ask-em-panel-shortcut">
-        <span>Pause/restart sync for this tab</span>
-        ${renderShortcutKeysHtml(toggleShortcutKeys)}
+        <span class="ask-em-panel-shortcut-label">Pause/restart sync for this tab</span>
+        ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.togglePageParticipation))}
+      </div>
+      <div class="ask-em-panel-shortcut">
+        <span class="ask-em-panel-shortcut-label">Switch tabs</span>
+        <span class="ask-em-panel-shortcut-combo-group">
+          ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.previousProviderTab))}
+          ${renderShortcutKeysHtml(formatBindingKeys(context.shortcuts.nextProviderTab))}
+        </span>
       </div>
     `;
+
+    const titleEl = panel.querySelector('.ask-em-panel-title');
+    if (titleEl) {
+      const label = workspaceSummary.workspace.label;
+      titleEl.textContent = label
+        ? label.length > 40 ? label.slice(0, 40) + '…' : label
+        : '#' + workspaceSummary.workspace.id.slice(0, 8);
+    }
   };
 
   const setCurrentProviderToggleBusy = (busy: boolean) => {
@@ -754,27 +1020,25 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
       context.providerEnabled = nextEnabled;
       mount.dataset.providerEnabled = String(nextEnabled);
       await refreshPanel();
-      setTransientLabel(nextEnabled ? 'current model sync resumed' : 'current model sync paused', 2_000);
+      updateSyncLabel(nextEnabled ? 'Ready for next prompt' : 'This tab is paused');
     } finally {
       setCurrentProviderToggleBusy(false);
     }
   };
 
-  const toggleGlobalSync = async () => {
-    if (currentProviderToggleBusy) {
+  const toggleStandaloneSetCreation = () => {
+    if (currentProviderToggleBusy || !context.globalSyncEnabled || !context.canStartNewSet) {
       return;
     }
 
-    const nextEnabled = !context.globalSyncEnabled;
-    setCurrentProviderToggleBusy(true);
+    const nextEnabled = !context.standaloneCreateSetEnabled;
+    handlers.onStandaloneSetCreationToggle(nextEnabled);
+    context.standaloneCreateSetEnabled = nextEnabled;
+    mount.dataset.standaloneCreateSetEnabled = String(nextEnabled);
+    updateSyncLabel(nextEnabled ? 'Next prompt will fan out' : 'Next prompt stays here');
 
-    try {
-      await handlers.onGlobalSyncToggle(nextEnabled);
-      context.globalSyncEnabled = nextEnabled;
-      mount.dataset.globalSyncEnabled = String(nextEnabled);
-      setTransientLabel(nextEnabled ? 'global sync ready' : 'global sync off');
-    } finally {
-      setCurrentProviderToggleBusy(false);
+    if (panel.dataset.visible === 'true' && panel.dataset.mode === 'tooltip') {
+      renderStandaloneTooltip();
     }
   };
 
@@ -793,7 +1057,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
 
     context.globalSyncEnabled = response.globalSyncEnabled;
     mount.dataset.globalSyncEnabled = String(context.globalSyncEnabled);
-    syncLabel();
+    syncPrimaryLabel();
     renderPanel(response);
   };
 
@@ -819,7 +1083,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     event.stopPropagation();
 
     if (!context.workspaceId && context.standaloneReady) {
-      void toggleGlobalSync();
+      toggleStandaloneSetCreation();
       return;
     }
 
@@ -838,11 +1102,13 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     }
 
     if (context.workspaceId) {
-      renderTooltip('Click to manage set.');
+      renderTooltip({
+        message: 'Click to manage set.',
+      });
       return;
     }
 
-    renderTooltip('Click to toggle global sync.', globalToggleShortcutKeys);
+    renderStandaloneTooltip();
   });
 
   shell.addEventListener('mouseleave', () => {
@@ -879,7 +1145,7 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         }
         await refreshPanel();
         if (provider === adapter.name) {
-          setTransientLabel(nextEnabled ? 'current model sync resumed' : 'current model sync paused', 2_000);
+          updateSyncLabel(nextEnabled ? 'Ready for next prompt' : 'This tab is paused');
         }
       })
       .finally(() => {
@@ -899,28 +1165,38 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
   });
 
   document.addEventListener('keydown', (event) => {
-    const providerShortcutPressed =
-      event.key.toLowerCase() === TOGGLE_SHORTCUT_KEY &&
-      (event.metaKey || event.ctrlKey) &&
-      !event.altKey &&
-      !event.shiftKey;
-    const globalShortcutPressed =
-      event.key.toLowerCase() === TOGGLE_SHORTCUT_KEY &&
-      (event.metaKey || event.ctrlKey) &&
-      !event.altKey &&
-      event.shiftKey;
+    const switchDirection = matchesShortcut(event, context.shortcuts.previousProviderTab)
+      ? 'previous'
+      : matchesShortcut(event, context.shortcuts.nextProviderTab)
+        ? 'next'
+        : null;
 
-    if (providerShortcutPressed && context.workspaceId) {
+    if (switchDirection && context.workspaceId) {
+      event.preventDefault();
+      event.stopPropagation();
+      void handlers.onProviderTabSwitch(switchDirection).then((response) => {
+        if (response?.switched === false && response.reason) {
+          updateSyncLabel(response.reason, 'neutral');
+        }
+      });
+      return;
+    }
+
+    if (!matchesShortcut(event, context.shortcuts.togglePageParticipation)) {
+      return;
+    }
+
+    if (context.workspaceId) {
       event.preventDefault();
       event.stopPropagation();
       void toggleCurrentProvider();
       return;
     }
 
-    if (globalShortcutPressed) {
+    if (context.standaloneReady) {
       event.preventDefault();
       event.stopPropagation();
-      void toggleGlobalSync();
+      toggleStandaloneSetCreation();
     }
   });
 
@@ -935,25 +1211,31 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
     setState(state: UiState, labelText?: string) {
       mount.dataset.state = state;
       if (labelText) {
-        transientLabel = null;
-        if (transientLabelTimeout !== null) {
-          window.clearTimeout(transientLabelTimeout);
-          transientLabelTimeout = null;
-        }
         updateLabel(labelText);
         return;
       }
 
-      syncLabel();
+      syncPrimaryLabel();
+    },
+    setSyncStatus(text: string, tone: SyncIndicatorTone = 'neutral') {
+      updateSyncLabel(text, tone);
+    },
+    setAlertLevel(level: IndicatorAlertLevel) {
+      mount.dataset.alertLevel = level;
     },
     setContext(nextContext: UiContext) {
       context.workspaceId = nextContext.workspaceId;
       context.providerEnabled = nextContext.providerEnabled;
       context.globalSyncEnabled = nextContext.globalSyncEnabled;
       context.standaloneReady = nextContext.standaloneReady;
+      context.standaloneCreateSetEnabled = nextContext.standaloneCreateSetEnabled;
       context.canStartNewSet = nextContext.canStartNewSet;
+      context.shortcuts = resolveShortcutConfig(nextContext.shortcuts);
       mount.dataset.providerEnabled = String(nextContext.providerEnabled);
       mount.dataset.globalSyncEnabled = String(nextContext.globalSyncEnabled);
+      mount.dataset.standaloneCreateSetEnabled = String(
+        nextContext.workspaceId ? true : nextContext.standaloneCreateSetEnabled,
+      );
       mount.dataset.interactive = String(Boolean(nextContext.workspaceId || nextContext.standaloneReady));
 
       if (!nextContext.workspaceId && !nextContext.standaloneReady) {
@@ -961,7 +1243,8 @@ export function createContentUi(adapter: SiteAdapter, handlers: UiHandlers) {
         renderPanel(null);
       }
 
-      syncLabel();
+      syncPrimaryLabel();
+      syncStandaloneStatusLabel();
     },
   };
 }

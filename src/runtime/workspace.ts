@@ -18,6 +18,7 @@ export type CreatePendingWorkspaceInput = {
   enabledProviders?: Provider[];
   now?: number;
   workspaceId?: string;
+  label?: string;
 };
 
 export type BindWorkspaceMemberInput = {
@@ -60,6 +61,7 @@ export function createPendingWorkspace(
 
   const workspace: Workspace = {
     id: workspaceId,
+    label: input.label,
     members: {
       [input.sourceProvider]: {
         provider: input.sourceProvider,
