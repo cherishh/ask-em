@@ -312,6 +312,15 @@ export default function App() {
     await refresh({ silent: true });
   };
 
+  const toggleCloseTabsOnDeleteSet = async () => {
+    const nextEnabled = !status?.closeTabsOnDeleteSet;
+    await chrome.runtime.sendMessage({
+      type: 'SET_CLOSE_TABS_ON_DELETE_SET',
+      enabled: nextEnabled,
+    });
+    await refresh({ silent: true });
+  };
+
   const updateShortcut = async (id: ShortcutId, binding: ShortcutBinding) => {
     const next = { ...resolvedShortcuts, [id]: binding };
     setShortcuts(next);
@@ -541,6 +550,33 @@ export default function App() {
                     onClick={() => void toggleGlobalSync()}
                     disabled={loading}
                     aria-label={globalSyncEnabled ? 'Disable auto-sync' : 'Enable auto-sync'}
+                  />
+                </div>
+              </div>
+
+              <div className="askem-us-divider" />
+
+              <div className="askem-us-group">
+                <div className="askem-us-toggle-row">
+                  <div>
+                    <span className="askem-us-row-title">Close tabs when deleting a set</span>
+                    <span className="askem-us-row-sub">
+                      {status?.closeTabsOnDeleteSet
+                        ? "Delete Set also closes set's tabs."
+                        : 'Delete Set keeps provider tabs open.'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="askem-us-switch"
+                    data-enabled={String(Boolean(status?.closeTabsOnDeleteSet))}
+                    onClick={() => void toggleCloseTabsOnDeleteSet()}
+                    disabled={loading}
+                    aria-label={
+                      status?.closeTabsOnDeleteSet
+                        ? 'Disable closing provider tabs when deleting a set'
+                        : 'Enable closing provider tabs when deleting a set'
+                    }
                   />
                 </div>
               </div>

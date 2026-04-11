@@ -14,6 +14,7 @@ import { rebuildWorkspaceIndex } from './workspace';
 export const DEFAULT_LOCAL_STATE: LocalState = {
   globalSyncEnabled: true,
   debugLoggingEnabled: false,
+  closeTabsOnDeleteSet: false,
   defaultEnabledProviders: createDefaultEnabledProviders(),
   shortcuts: DEFAULT_SHORTCUTS,
   workspaces: {},

@@ -26,6 +26,7 @@ function createEmptyState(): LocalState {
   return {
     globalSyncEnabled: true,
     debugLoggingEnabled: false,
+    closeTabsOnDeleteSet: false,
     defaultEnabledProviders: createDefaultEnabledProviders(),
     shortcuts: DEFAULT_SHORTCUTS,
     workspaces: {},
@@ -260,6 +261,7 @@ describe('workspace state', () => {
     const state: LocalState = {
       globalSyncEnabled: true,
       debugLoggingEnabled: false,
+      closeTabsOnDeleteSet: false,
       defaultEnabledProviders: createDefaultEnabledProviders(),
       shortcuts: DEFAULT_SHORTCUTS,
       workspaces: Object.fromEntries(

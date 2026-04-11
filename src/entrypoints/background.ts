@@ -991,6 +991,7 @@ async function handleGetStatus(): Promise<StatusResponseMessage> {
     type: 'STATUS_RESPONSE',
     globalSyncEnabled: localState.globalSyncEnabled,
     debugLoggingEnabled: localState.debugLoggingEnabled,
+    closeTabsOnDeleteSet: localState.closeTabsOnDeleteSet ?? false,
     workspaceLimit: MAX_WORKSPACES,
     defaultEnabledProviders: localState.defaultEnabledProviders,
     shortcuts: localState.shortcuts,
@@ -1053,27 +1054,37 @@ async function handleGetDebugLogs() {
   };
 }
 
-async function handleWorkspaceClear(
+export async function handleWorkspaceClear(
   message: Extract<RuntimeMessage, { type: 'CLEAR_WORKSPACE' | 'CLEAR_WORKSPACE_PROVIDER' }>,
 ) {
   const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
 
   if (message.type === 'CLEAR_WORKSPACE') {
-    const targetTabIds = Object.values(sessionState.claimedTabs)
+    const targetTabIds = Array.from(
+      new Set(
+        Object.values(sessionState.claimedTabs)
       .filter((claimedTab) => claimedTab.workspaceId === message.workspaceId)
-      .map((claimedTab) => claimedTab.tabId);
+          .map((claimedTab) => claimedTab.tabId),
+      ),
+    );
 
     await Promise.all([
       setLocalState(clearWorkspace(localState, message.workspaceId)),
       setSessionState(removeClaimedTabsForWorkspace(sessionState, message.workspaceId)),
     ]);
-    await notifyTabsToRefreshContext(targetTabIds);
+    if ((localState.closeTabsOnDeleteSet ?? false) && targetTabIds.length > 0) {
+      await Promise.allSettled(targetTabIds.map(async (tabId) => chrome.tabs.remove(tabId)));
+    } else {
+      await notifyTabsToRefreshContext(targetTabIds);
+    }
     await logDebug({
       level: 'info',
       scope: 'background',
       workspaceId: message.workspaceId,
       message: 'Cleared workspace',
-      detail: `${targetTabIds.length} claimed tabs refreshed`,
+      detail: `${targetTabIds.length} claimed tabs ${
+        localState.closeTabsOnDeleteSet ?? false ? 'closed' : 'refreshed'
+      }`,
     });
 
     return { ok: true };
@@ -1208,6 +1219,17 @@ async function handleSetDebugLoggingEnabled(
   return { ok: true };
 }
 
+async function handleSetCloseTabsOnDeleteSet(
+  message: Extract<RuntimeMessage, { type: 'SET_CLOSE_TABS_ON_DELETE_SET' }>,
+) {
+  const localState = await getLocalState();
+  await setLocalState({
+    ...localState,
+    closeTabsOnDeleteSet: message.enabled,
+  });
+  return { ok: true };
+}
+
 async function handleDebugLog(
   message: Extract<RuntimeMessage, { type: 'LOG_DEBUG' }>,
 ) {
@@ -1275,6 +1297,9 @@ export default defineBackground(() => {
           return;
         case 'SET_GLOBAL_SYNC_ENABLED':
           sendResponse(await handleSetGlobalSyncEnabled(message));
+          return;
+        case 'SET_CLOSE_TABS_ON_DELETE_SET':
+          sendResponse(await handleSetCloseTabsOnDeleteSet(message));
           return;
         case 'SET_SHORTCUTS':
           sendResponse(await handleSetShortcuts(message));

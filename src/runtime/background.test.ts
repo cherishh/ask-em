@@ -19,6 +19,7 @@ function createLocalState(): LocalState {
   return {
     globalSyncEnabled: true,
     debugLoggingEnabled: false,
+    closeTabsOnDeleteSet: false,
     defaultEnabledProviders: {
       claude: true,
       chatgpt: true,
@@ -1086,5 +1087,143 @@ describe('background new-chat detachment', () => {
         },
       ],
     ]);
+  });
+
+  it('closes claimed provider tabs when deleting a workspace and the setting is enabled', async () => {
+    const localState: LocalState = {
+      ...createLocalState(),
+      closeTabsOnDeleteSet: true,
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {
+            claude: { provider: 'claude', sessionId: 'c-1', url: 'https://claude.ai/chat/c-1' },
+            chatgpt: { provider: 'chatgpt', sessionId: 'g-1', url: 'https://chatgpt.com/c/g-1' },
+          },
+          enabledProviders: ['claude', 'chatgpt'],
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+        'chatgpt:g-1': 'w1',
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': {
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-1',
+          sessionId: 'c-1',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+        'w1:chatgpt': {
+          provider: 'chatgpt',
+          workspaceId: 'w1',
+          tabId: 10,
+          currentUrl: 'https://chatgpt.com/c/g-1',
+          sessionId: 'g-1',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+      },
+    };
+
+    storageMocks.getLocalState.mockResolvedValue(localState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const remove = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 9 }),
+        sendMessage: vi.fn().mockResolvedValue({ ok: true }),
+        remove,
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { handleWorkspaceClear } = await import('../entrypoints/background');
+    const result = await handleWorkspaceClear({ type: 'CLEAR_WORKSPACE', workspaceId: 'w1' });
+
+    expect(result).toEqual({ ok: true });
+    expect(remove).toHaveBeenCalledTimes(2);
+    expect(remove).toHaveBeenCalledWith(9);
+    expect(remove).toHaveBeenCalledWith(10);
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({ type: 'REFRESH_CONTENT_CONTEXT' }),
+    );
+  });
+
+  it('refreshes claimed provider tabs when deleting a workspace and the setting is disabled', async () => {
+    const localState: LocalState = {
+      ...createLocalState(),
+      closeTabsOnDeleteSet: false,
+      workspaces: {
+        w1: {
+          id: 'w1',
+          members: {
+            claude: { provider: 'claude', sessionId: 'c-1', url: 'https://claude.ai/chat/c-1' },
+          },
+          enabledProviders: ['claude'],
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': {
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-1',
+          sessionId: 'c-1',
+          pageState: 'ready',
+          lastSeenAt: 10,
+        },
+      },
+    };
+
+    storageMocks.getLocalState.mockResolvedValue(localState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const remove = vi.fn().mockResolvedValue(undefined);
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 9 }),
+        sendMessage,
+        remove,
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { handleWorkspaceClear } = await import('../entrypoints/background');
+    await handleWorkspaceClear({ type: 'CLEAR_WORKSPACE', workspaceId: 'w1' });
+
+    expect(remove).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith(9, {
+      type: 'REFRESH_CONTENT_CONTEXT',
+    });
   });
 });

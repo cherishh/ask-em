@@ -92,6 +92,7 @@ export type ClaimedTab = {
 export type LocalState = {
   globalSyncEnabled: boolean;
   debugLoggingEnabled: boolean;
+  closeTabsOnDeleteSet: boolean;
   defaultEnabledProviders: DefaultEnabledProviders;
   shortcuts: ShortcutConfig;
   workspaces: Record<string, Workspace>;
@@ -191,6 +192,7 @@ export type StatusResponseMessage = {
   type: 'STATUS_RESPONSE';
   globalSyncEnabled: boolean;
   debugLoggingEnabled: boolean;
+  closeTabsOnDeleteSet: boolean;
   workspaceLimit: number;
   defaultEnabledProviders: DefaultEnabledProviders;
   shortcuts: ShortcutConfig;
@@ -250,6 +252,11 @@ export type SetDebugLoggingEnabledMessage = {
   enabled: boolean;
 };
 
+export type SetCloseTabsOnDeleteSetMessage = {
+  type: 'SET_CLOSE_TABS_ON_DELETE_SET';
+  enabled: boolean;
+};
+
 export type SetGlobalSyncEnabledMessage = {
   type: 'SET_GLOBAL_SYNC_ENABLED';
   enabled: boolean;
@@ -297,6 +304,7 @@ export type RuntimeMessage =
   | SetDefaultEnabledProvidersMessage
   | SetWorkspaceProviderEnabledMessage
   | SetGlobalSyncEnabledMessage
+  | SetCloseTabsOnDeleteSetMessage
   | SetShortcutsMessage
   | SwitchProviderTabMessage
   | SetDebugLoggingEnabledMessage
