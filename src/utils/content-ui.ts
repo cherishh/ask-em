@@ -9,6 +9,7 @@ import type {
 } from '../runtime/protocol';
 import { DEFAULT_SHORTCUTS, resolveShortcutConfig } from '../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../runtime/workspace';
+import { renderContentTooltipHtml, type ContentTooltipSpec } from './content-tooltip';
 import type { IndicatorAlertLevel, IndicatorUiState, SyncIndicatorTone } from './content-indicator';
 
 export type UiState = IndicatorUiState | 'listening';
@@ -113,6 +114,15 @@ function renderShortcutKeysHtml(keys: string[]): string {
         )
         .join('')}
     </span>
+  `;
+}
+
+function renderTooltipShortcutHtml(label: string, keys: string[]): string {
+  return `
+    <div class="ask-em-panel-shortcut is-standalone">
+      <span class="ask-em-panel-shortcut-label">${label}</span>
+      ${renderShortcutKeysHtml(keys)}
+    </div>
   `;
 }
 
@@ -433,6 +443,10 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         color: rgba(245, 244, 237, 0.92);
         font: 500 11.5px/1.35 "Avenir Next", "Segoe UI", sans-serif;
         letter-spacing: 0;
+      }
+
+      .ask-em-panel-tooltip-secondary {
+        margin-top: 5px;
       }
 
       .ask-em-panel-shortcut {
@@ -798,20 +812,38 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     panel.dataset.visible = String(visible && Boolean(context.workspaceId || context.standaloneReady));
   };
 
-  const renderTooltip = (message: string, shortcutKeys?: string[]) => {
+  const renderTooltip = (spec: ContentTooltipSpec) => {
     panel.dataset.mode = 'tooltip';
-    panel.innerHTML = `
-      <p class="ask-em-panel-note">${message}</p>
-      ${
-        shortcutKeys
-          ? `<div class="ask-em-panel-shortcut is-standalone">
-              <span class="ask-em-panel-shortcut-label">Shortcut</span>
-              ${renderShortcutKeysHtml(shortcutKeys)}
-            </div>`
-          : ''
-      }
-    `;
+    panel.innerHTML = renderContentTooltipHtml(spec);
     setPanelVisible(true);
+  };
+
+  const getStandaloneTooltipSpec = (): ContentTooltipSpec => {
+    if (!context.globalSyncEnabled) {
+      return {
+        message: 'Global sync is off in the popup.',
+      };
+    }
+
+    if (!context.canStartNewSet) {
+      return {
+        message: 'Set limit reached. Clear a set in the popup first.',
+      };
+    }
+
+    return {
+      message: context.standaloneCreateSetEnabled
+        ? 'Click to stop fan-out. Becomes normal single chat.'
+        : 'Click to enable fan-out. Power on!',
+      secondaryHtml: renderTooltipShortcutHtml(
+        'Shortcut',
+        formatBindingKeys(context.shortcuts.togglePageParticipation),
+      ),
+    };
+  };
+
+  const renderStandaloneTooltip = () => {
+    renderTooltip(getStandaloneTooltipSpec());
   };
 
   const getProviderMeta = (
@@ -880,22 +912,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     const workspaceSummary = response?.workspaceSummary;
     if (!workspaceSummary || !context.workspaceId) {
       if (context.standaloneReady && !context.workspaceId) {
-        if (!context.globalSyncEnabled) {
-          renderTooltip('Global sync is off in the popup.');
-          return;
-        }
-
-        if (!context.canStartNewSet) {
-          renderTooltip('Set limit reached. Clear a set in the popup first.');
-          return;
-        }
-
-        renderTooltip(
-          context.standaloneCreateSetEnabled
-            ? 'Click to stop fan-out. Becomes normal single chat.'
-            : 'Click to enable fan-out. Power on!',
-          formatBindingKeys(context.shortcuts.togglePageParticipation),
-        );
+        renderStandaloneTooltip();
         return;
       }
 
@@ -1019,6 +1036,10 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     context.standaloneCreateSetEnabled = nextEnabled;
     mount.dataset.standaloneCreateSetEnabled = String(nextEnabled);
     updateSyncLabel(nextEnabled ? 'Next prompt will fan out' : 'Next prompt stays here');
+
+    if (panel.dataset.visible === 'true' && panel.dataset.mode === 'tooltip') {
+      renderStandaloneTooltip();
+    }
   };
 
   const refreshPanel = async () => {
@@ -1081,26 +1102,13 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     }
 
     if (context.workspaceId) {
-      renderTooltip('Click to manage set.');
+      renderTooltip({
+        message: 'Click to manage set.',
+      });
       return;
     }
 
-    if (!context.globalSyncEnabled) {
-      renderTooltip('Global sync is off in the popup.');
-      return;
-    }
-
-    if (!context.canStartNewSet) {
-      renderTooltip('Set limit reached. Clear a set in the popup first.');
-      return;
-    }
-
-    renderTooltip(
-      context.standaloneCreateSetEnabled
-        ? 'Click to stop fan-out. Becomes normal single chat.'
-        : 'Click to enable fan-out. Power on!',
-      formatBindingKeys(context.shortcuts.togglePageParticipation),
-    );
+    renderStandaloneTooltip();
   });
 
   shell.addEventListener('mouseleave', () => {
