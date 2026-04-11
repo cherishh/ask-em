@@ -29,13 +29,13 @@ Success criteria:
 
 Goal: split the background god file by responsibility without changing behavior.
 
-- [ ] Extract message routing bootstrap from `src/entrypoints/background.ts`.
-- [ ] Extract presence/claim reconciliation.
-- [ ] Extract submit routing + workspace creation flow.
-- [ ] Extract delivery fan-out + sync progress notifications.
-- [ ] Extract workspace status builders and popup/settings handlers.
-- [ ] Extract GC / cleanup scheduling helpers.
-- [ ] Keep one thin `background.ts` entrypoint that wires modules together.
+- [x] Extract message routing bootstrap from `src/entrypoints/background.ts`.
+- [x] Extract presence/claim reconciliation.
+- [x] Extract submit routing + workspace creation flow.
+- [x] Extract delivery fan-out + sync progress notifications.
+- [x] Extract workspace status builders and popup/settings handlers.
+- [x] Extract GC / cleanup scheduling helpers.
+- [x] Keep one thin `background.ts` entrypoint that wires modules together.
 
 Success criteria:
 
