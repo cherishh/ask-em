@@ -16,7 +16,7 @@
 body {
   margin: 0;
   min-width: 396px;
-  min-height: 720px;
+  min-height: 360px;
   background:
     radial-gradient(circle at top left, rgba(201, 100, 66, 0.08), transparent 40%),
     #f5f4ed;
@@ -54,7 +54,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  min-height: 720px;
+  min-height: 360px;
   padding: 20px;
 }
 
@@ -1013,7 +1013,7 @@ body {
 .askem-logs-list {
   display: grid;
   gap: 8px;
-  max-height: 1080px;
+  max-height: 570px;
   overflow: auto;
   padding: 12px;
   scrollbar-width: thin;
@@ -1090,6 +1090,19 @@ body {
 .askem-log-toggle {
   grid-column: 1 / -1;
   min-width: 0;
+  justify-content: center;
+}
+
+.askem-log-toggle.is-active {
+  border-color: #b05638;
+  background: #b05638;
+  color: #f5f4ed;
+  box-shadow: 0 0 0 1px #b05638;
+}
+
+.askem-log-toggle.is-active:hover {
+  background: #9a4a30;
+  border-color: #9a4a30;
 }
 
 .askem-logs-empty {

@@ -244,8 +244,8 @@ export default function App() {
     [selectedProviderKey],
   );
 
-  const refresh = async () => {
-    setLoading(true);
+  const refresh = async (options: { silent?: boolean } = {}) => {
+    if (!options.silent) setLoading(true);
     const nextStatus = await requestStatus();
     startTransition(() => {
       setStatus(nextStatus);
@@ -255,7 +255,7 @@ export default function App() {
         );
         setShortcuts(resolveShortcutConfig(nextStatus.shortcuts));
       }
-      setLoading(false);
+      if (!options.silent) setLoading(false);
     });
   };
 
@@ -265,7 +265,7 @@ export default function App() {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      void refresh();
+      void refresh({ silent: true });
     }, 1200);
 
     return () => window.clearInterval(intervalId);
@@ -305,12 +305,11 @@ export default function App() {
 
   const toggleGlobalSync = async () => {
     const nextEnabled = !status?.globalSyncEnabled;
-    setLoading(true);
     await chrome.runtime.sendMessage({
       type: 'SET_GLOBAL_SYNC_ENABLED',
       enabled: nextEnabled,
     });
-    await refresh();
+    await refresh({ silent: true });
   };
 
   const updateShortcut = async (id: ShortcutId, binding: ShortcutBinding) => {
@@ -596,9 +595,9 @@ export default function App() {
                   </button>
                   {status?.debugLoggingEnabled ? (
                     <>
-                      <button className="askem-provider-clear" onClick={() => void copyLogs()} disabled={logActionBusy}>
+                      {/* <button className="askem-provider-clear" onClick={() => void copyLogs()} disabled={logActionBusy}>
                         Copy Logs
-                      </button>
+                      </button> */}
                       <button className="askem-provider-clear" onClick={() => void downloadLogs()} disabled={logActionBusy}>
                         Download Logs
                       </button>
@@ -923,7 +922,7 @@ function WorkspaceCard({
 const SHORTCUT_ROWS = [
   {
     id: 'togglePageParticipation',
-    label: 'Single page sync on/off',
+    label: 'Single tab sync on/off',
   },
   {
     id: 'previousProviderTab',
