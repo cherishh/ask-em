@@ -92,10 +92,10 @@ Success criteria:
 
 Goal: remove repetitive provider adapter boilerplate while keeping provider-specific selectors local.
 
-- [ ] Introduce a shared DOM adapter factory or shared composer/session helpers.
-- [ ] Move common submit subscription logic into shared code.
-- [ ] Keep provider-specific selectors, login keywords, and error heuristics configurable.
-- [ ] Add or update adapter-level tests where needed.
+- [x] Introduce a shared DOM adapter factory or shared composer/session helpers.
+- [x] Move common submit subscription logic into shared code.
+- [x] Keep provider-specific selectors, login keywords, and error heuristics configurable.
+- [x] Add or update adapter-level tests where needed.
 
 Success criteria:
 
