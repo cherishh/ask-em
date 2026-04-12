@@ -274,6 +274,7 @@ describe('content bootstrap wiring', () => {
       ),
     ).toBe(false);
     expect(ui.setState).toHaveBeenLastCalledWith('blocked', 'current model needs login');
+    expect(ui.setSyncStatus).toHaveBeenLastCalledWith('sign in to sync', 'warning');
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('current-warning');
   });
 

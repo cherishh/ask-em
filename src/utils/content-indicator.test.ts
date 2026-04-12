@@ -75,6 +75,22 @@ describe('content indicator presentation', () => {
     });
   });
 
+  it('shows standalone login-required pages as not sync-eligible', () => {
+    expect(
+      getContentIndicatorPresentation(
+        createInput({
+          pageState: 'login-required',
+        }),
+      ),
+    ).toEqual({
+      state: 'blocked',
+      label: 'needs login',
+      syncLabel: 'sign in to sync',
+      syncTone: 'warning',
+      alertLevel: 'current-warning',
+    });
+  });
+
   it('shows standalone set limit warning', () => {
     expect(
       getContentIndicatorPresentation(
@@ -164,7 +180,7 @@ describe('content indicator presentation', () => {
     ).toEqual({
       state: 'blocked',
       label: 'current model needs login',
-      syncLabel: '1 model needs attention',
+      syncLabel: 'sign in to sync',
       syncTone: 'warning',
       alertLevel: 'current-warning',
     });
@@ -190,7 +206,7 @@ describe('content indicator presentation', () => {
     ).toEqual({
       state: 'blocked',
       label: 'current model is loading',
-      syncLabel: '1 model needs attention',
+      syncLabel: 'wait for page to become ready',
       syncTone: 'warning',
       alertLevel: 'current-warning',
     });

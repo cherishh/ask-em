@@ -2,6 +2,7 @@ import type {
   GroupMemberState,
   Provider,
   ShortcutBinding,
+  WorkspaceIssue,
   WorkspaceContextResponseMessage,
   WorkspaceSummary,
 } from '../runtime/protocol';
@@ -84,6 +85,8 @@ function getProviderMeta(
   provider: Provider,
   workspaceSummary: WorkspaceSummary,
   memberState: GroupMemberState,
+  memberIssue: WorkspaceIssue | null,
+  enabled: boolean,
   globalSyncEnabled: boolean,
 ) {
   const member = workspaceSummary.workspace.members[provider];
@@ -92,39 +95,49 @@ function getProviderMeta(
     return 'connecting';
   }
 
-  if (!member) {
-    return 'not connected';
-  }
-
-  if (memberState === 'inactive') {
-    return 'no live tab';
-  }
-
   if (!globalSyncEnabled) {
-    return 'frozen';
+    return 'paused';
+  }
+
+  if (!enabled) {
+    return 'paused';
+  }
+
+  if (memberIssue === 'needs-login' || memberState === 'login-required') {
+    return 'needs login';
+  }
+
+  if (memberIssue === 'loading' || memberState === 'not-ready') {
+    return 'loading';
+  }
+
+  if (memberIssue === 'delivery-failed') {
+    return 'needs attention';
+  }
+
+  if (!member || memberState === 'inactive') {
+    return 'will reopen on next sync';
   }
 
   if (memberState === 'ready') {
     return 'ready';
   }
 
-  if (memberState === 'login-required') {
-    return 'needs login';
-  }
-
-  if (memberState === 'not-ready') {
-    return 'loading';
-  }
-
-  return 'not connected';
+  return 'will reopen on next sync';
 }
 
 function getProviderDotState(
   memberState: GroupMemberState,
+  memberIssue: WorkspaceIssue | null,
+  enabled: boolean,
   globalSyncEnabled: boolean,
 ): 'active' | 'pending' | 'frozen' | 'warning' | 'inactive' {
-  if (!globalSyncEnabled && memberState === 'ready') {
+  if ((!globalSyncEnabled || !enabled) && memberState === 'ready') {
     return 'frozen';
+  }
+
+  if (memberIssue === 'needs-login' || memberIssue === 'loading' || memberIssue === 'delivery-failed') {
+    return 'warning';
   }
 
   if (memberState === 'ready') {
@@ -185,8 +198,16 @@ export function renderWorkspacePanelHtml(input: {
         .map((provider) => {
           const memberState = workspaceSummary.memberStates[provider] ?? 'inactive';
           const enabled = workspaceSummary.workspace.enabledProviders.includes(provider);
-          const dotState = getProviderDotState(memberState, response.globalSyncEnabled);
-          const meta = getProviderMeta(provider, workspaceSummary, memberState, response.globalSyncEnabled);
+          const memberIssue = workspaceSummary.memberIssues[provider] ?? null;
+          const dotState = getProviderDotState(memberState, memberIssue, enabled, response.globalSyncEnabled);
+          const meta = getProviderMeta(
+            provider,
+            workspaceSummary,
+            memberState,
+            memberIssue,
+            enabled,
+            response.globalSyncEnabled,
+          );
           const isCurrent = provider === currentProvider;
 
           return `

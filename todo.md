@@ -21,10 +21,10 @@ Acceptance:
 - `all models synced` is impossible after a failed fan-out until the issue is cleared
 
 ## Phase 3 — Align Indicator And Popup / Pane Semantics
-- [ ] Make indicator derive set health from persistent issues plus current provider state
-- [ ] Replace internal terms like `no live tab` / `not connected` with user-facing semantics
-- [ ] Show recoverable missing tabs as `Will reopen on next sync`
-- [ ] Keep internal liveness states out of user-facing copy
+- [x] Make indicator derive set health from persistent issues plus current provider state
+- [x] Replace internal terms like `no live tab` / `not connected` with user-facing semantics
+- [x] Show recoverable missing tabs as `Will reopen on next sync`
+- [x] Keep internal liveness states out of user-facing copy
 
 Acceptance:
 - Indicator only shows conclusions

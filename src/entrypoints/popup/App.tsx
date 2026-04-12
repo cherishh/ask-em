@@ -14,6 +14,7 @@ import type {
   ShortcutConfig,
   ShortcutId,
   StatusResponseMessage,
+  WorkspaceIssue,
   WorkspaceSummary,
 } from '../../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../../runtime/workspace';
@@ -39,10 +40,15 @@ function formatTime(timestamp: number): string {
 
 function getDisplayMemberStateTone(
   state: GroupMemberState,
+  issue: WorkspaceIssue | null,
   enabled: boolean,
   globalSyncEnabled: boolean,
 ): 'active' | 'inactive' | 'pending' | 'sync-paused' | 'frozen' | 'warning' {
   if (state === 'inactive' || state === 'pending') {
+    if (issue === 'needs-login' || issue === 'loading' || issue === 'delivery-failed') {
+      return 'warning';
+    }
+
     return state;
   }
 
@@ -62,83 +68,93 @@ function getDisplayMemberStateTone(
     return 'warning';
   }
 
+  if (issue === 'needs-login' || issue === 'loading' || issue === 'delivery-failed') {
+    return 'warning';
+  }
+
   return 'inactive';
 }
 
 function getDisplayMemberStateLabel(
   state: GroupMemberState,
+  issue: WorkspaceIssue | null,
   enabled: boolean,
   globalSyncEnabled: boolean,
 ): string {
+  if (!globalSyncEnabled) {
+    return 'Paused';
+  }
+
+  if (!enabled) {
+    return 'Paused';
+  }
+
+  if (issue === 'needs-login' || state === 'login-required') {
+    return 'Needs Login';
+  }
+
+  if (issue === 'loading' || state === 'not-ready') {
+    return 'Loading';
+  }
+
+  if (issue === 'delivery-failed') {
+    return 'Needs Attention';
+  }
+
   if (state === 'inactive') {
-    return 'No Live Tab';
+    return 'Will Reopen';
   }
 
   if (state === 'pending') {
     return 'Connecting';
   }
 
-  if (!globalSyncEnabled) {
-    return 'Frozen';
-  }
-
-  if (!enabled) {
-    return 'Sync Paused';
-  }
-
   if (state === 'ready') {
     return 'Ready';
   }
 
-  if (state === 'login-required') {
-    return 'Needs Login';
-  }
-
-  if (state === 'not-ready') {
-    return 'Loading';
-  }
-
-  return 'No Live Tab';
+  return 'Will Reopen';
 }
 
 function getMemberOutcomeCopy(
   state: GroupMemberState,
+  issue: WorkspaceIssue | null,
   enabled: boolean,
   globalSyncEnabled: boolean,
 ): string {
-  if (state === 'inactive') {
-    if (!enabled) {
-      return 'This model has no open tab, and sync is paused, so it will not reopen on the next prompt.';
-    }
+  if (!globalSyncEnabled) {
+    return 'Global sync is paused.';
+  }
 
-    return 'Reopens on the next synced prompt';
+  if (!enabled) {
+    return 'Sync is paused for this model.';
+  }
+
+  if (issue === 'needs-login' || state === 'login-required') {
+    return 'Sign in before the next sync';
+  }
+
+  if (issue === 'loading' || state === 'not-ready') {
+    return 'Wait for this page to become ready';
+  }
+
+  if (issue === 'delivery-failed') {
+    return 'Last sync did not reach this model';
+  }
+
+  if (state === 'inactive') {
+    return 'Will reopen on the next sync';
   }
 
   if (state === 'pending') {
     return 'Waiting for this model to connect';
   }
 
-  if (!globalSyncEnabled) {
-    return 'Freeze the world is on. Prompts stay local.';
-  }
-
-  if (!enabled) {
-    return 'Sync is paused for this model, so the next prompt will not be sent to others.';
-  }
-
   if (state === 'ready') {
     return 'Next prompt will be synced';
   }
 
-  if (state === 'login-required') {
-    return 'Sign in before syncing';
-  }
-
-  if (state === 'not-ready') {
-    return 'Waiting for this model to become ready';
-  }
-
-  return 'Open this provider before syncing';
+  return 'Will reopen on the next sync';
 }
 
 export default function App() {
@@ -625,10 +641,11 @@ function WorkspaceCard({
           const member = workspace.members[provider];
           const enabled = workspace.enabledProviders.includes(provider);
           const rawState = memberStates[provider] ?? 'inactive';
-          const stateTone = getDisplayMemberStateTone(rawState, enabled, globalSyncEnabled);
-          const stateLabel = getDisplayMemberStateLabel(rawState, enabled, globalSyncEnabled);
-          const outcomeCopy = getMemberOutcomeCopy(rawState, enabled, globalSyncEnabled);
-          const showOpenLink = rawState === 'inactive' && !member?.sessionId;
+          const issue = workspace.memberIssues?.[provider] ?? null;
+          const stateTone = getDisplayMemberStateTone(rawState, issue, enabled, globalSyncEnabled);
+          const stateLabel = getDisplayMemberStateLabel(rawState, issue, enabled, globalSyncEnabled);
+          const outcomeCopy = getMemberOutcomeCopy(rawState, issue, enabled, globalSyncEnabled);
+          const showOpenLink = rawState === 'inactive' && !member?.sessionId && !issue;
 
           return (
             <div className="askem-provider-row" key={`${workspace.id}:${provider}`}>

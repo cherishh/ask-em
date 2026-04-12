@@ -89,6 +89,20 @@ function getCurrentTabLabel(input: ContentIndicatorInput): string {
 }
 
 function getStandaloneSyncStatus(input: ContentIndicatorInput) {
+  if (input.pageState === 'login-required') {
+    return {
+      label: 'sign in to sync',
+      tone: 'warning' as const,
+    };
+  }
+
+  if (input.pageState === 'not-ready') {
+    return {
+      label: 'wait for page to become ready',
+      tone: 'warning' as const,
+    };
+  }
+
   if (!input.globalSyncEnabled) {
     return {
       label: 'next prompt stays here',
@@ -135,6 +149,20 @@ function getProgressSyncStatus(progress: SyncProgressSnapshot) {
 }
 
 function getWorkspaceSyncStatus(input: ContentIndicatorInput) {
+  if (input.pageState === 'login-required') {
+    return {
+      label: 'sign in to sync',
+      tone: 'warning' as const,
+    };
+  }
+
+  if (input.pageState === 'not-ready') {
+    return {
+      label: 'wait for page to become ready',
+      tone: 'warning' as const,
+    };
+  }
+
   if (!input.globalSyncEnabled) {
     return {
       label: 'sync paused',
@@ -164,12 +192,7 @@ function getWorkspaceSyncStatus(input: ContentIndicatorInput) {
 }
 
 function getIndicatorAlertLevel(input: ContentIndicatorInput): IndicatorAlertLevel {
-  if (
-    input.hasWorkspace &&
-    input.globalSyncEnabled &&
-    input.providerEnabled &&
-    input.pageState !== 'ready'
-  ) {
+  if (input.globalSyncEnabled && input.providerEnabled && input.pageState !== 'ready') {
     return 'current-warning';
   }
 
@@ -185,12 +208,7 @@ function getIndicatorAlertLevel(input: ContentIndicatorInput): IndicatorAlertLev
 }
 
 function getIndicatorState(input: ContentIndicatorInput): IndicatorUiState {
-  if (
-    input.hasWorkspace &&
-    input.globalSyncEnabled &&
-    input.providerEnabled &&
-    input.pageState !== 'ready'
-  ) {
+  if (input.globalSyncEnabled && input.providerEnabled && input.pageState !== 'ready') {
     return 'blocked';
   }
 
