@@ -31,6 +31,22 @@ export const manusAdapter = createDomProviderAdapter({
   mountId: 'ask-em-manus-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-manus',
   prepareDom: dismissManusOverlay,
+  isLoginRequired() {
+    if (window.location.pathname.startsWith('/login')) {
+      return true;
+    }
+
+    const authCtas = Array.from(document.querySelectorAll<HTMLElement>('a, button')).filter((element) => {
+      if (!isVisible(element)) {
+        return false;
+      }
+
+      const text = (element.innerText || element.textContent || '').trim().toLowerCase();
+      return text === 'sign in' || text === 'sign up' || text.startsWith('continue with ');
+    });
+
+    return authCtas.length >= 2;
+  },
   composerSelectors: ['.tiptap.ProseMirror'],
   findSendButton(findComposer) {
     const composer = findComposer();
@@ -59,6 +75,8 @@ export const manusAdapter = createDomProviderAdapter({
   },
   loginKeywords: [
     'sign in or sign up',
+    'sign in',
+    'sign up',
     'continue with google',
     'continue with apple',
     'continue with microsoft',

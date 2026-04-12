@@ -5,6 +5,7 @@ describe('manus site info', () => {
   it('treats /app as a blank chat url', () => {
     const site = getSiteInfoByProvider('manus');
 
+    expect(site.isBlankChatUrl('https://manus.im/')).toBe(true);
     expect(site.isBlankChatUrl('https://manus.im/app')).toBe(true);
     expect(site.isBlankChatUrl('https://manus.im/app/')).toBe(true);
     expect(site.isBlankChatUrl('https://manus.im/app/WtMh6KGvNUEHcW7ctGo2Ko')).toBe(false);

@@ -248,6 +248,30 @@ describe('content bootstrap wiring', () => {
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('normal');
   });
 
+  it('does not report submit when the current page is not sync-eligible', async () => {
+    status = {
+      ...status,
+      pageState: 'login-required',
+      pageKind: 'new-chat',
+      sessionId: null,
+      currentUrl: 'https://claude.ai/login?returnTo=%2Fnew',
+    };
+
+    await bootstrap();
+    routingMocks.sendRuntimeMessage.mockClear();
+
+    submitHandler?.('hello world');
+    await flushMicrotasks();
+
+    expect(
+      routingMocks.sendRuntimeMessage.mock.calls.some(
+        ([message]) => message?.type === 'USER_SUBMIT',
+      ),
+    ).toBe(false);
+    expect(ui.setState).toHaveBeenLastCalledWith('blocked', 'current model needs login');
+    expect(ui.setAlertLevel).toHaveBeenLastCalledWith('current-warning');
+  });
+
   it('cleans up submit, url, timer, and event listeners on beforeunload', async () => {
     const unsubscribe = vi.fn();
     const stopObservingUrl = vi.fn();

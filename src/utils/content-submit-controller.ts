@@ -42,6 +42,16 @@ export function createSubmitController(
 
     state.setLastFingerprint(fingerprint, Date.now());
 
+    if (status.pageState !== 'ready') {
+      state.applyIndicatorPresentation(status);
+      await dependencies.logDebug({
+        level: 'info',
+        message: 'Skipped submit because current page is not sync-eligible',
+        detail: `${status.pageState}: ${content.slice(0, 120)}`,
+      });
+      return;
+    }
+
     const uiContext = state.getUiContext();
     if (
       !uiContext.workspaceId &&

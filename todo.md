@@ -1,180 +1,40 @@
-# Refactor Todo
+# Login / Sync State Redesign
 
-This branch is for structural cleanup. Default rule: behavior-preserving refactors first, feature work second.
+## Phase 1 — Login Detection And Source Gating
+- [x] Tighten provider login detection for real-world logged-out variants
+- [x] Treat logged-out current tabs as sync-ineligible sources
+- [x] Fix Manus logged-out landing page detection and page-kind handling
+- [x] Add focused tests for login detection / source gating
 
-## Guardrails
+Acceptance:
+- Logged-out source tabs do not create sets or fan out
+- ChatGPT / Claude / Manus / DeepSeek logged-out pages are not reported as ready
 
-- Keep each phase shippable.
-- Prefer extraction and consolidation over redesign.
-- Do not change product behavior unless the phase explicitly calls for it.
-- Run `pnpm compile`, `pnpm test`, and `pnpm build` at the end of every phase.
-- Land tests or test refactors together with the code they protect.
+## Phase 2 — Persist Sync Failures As Set Health
+- [ ] Add persistent workspace-level provider issue state
+- [ ] Record delivery failures as provider issues
+- [ ] Clear provider issues on successful recovery / successful delivery
+- [ ] Include provider issues in workspace summaries
 
-## Phase 1: Storage Safety
+Acceptance:
+- A failed fan-out remains visible as set attention even if the target tab later disappears
+- `all models synced` is impossible after a failed fan-out until the issue is cleared
 
-Goal: remove read-modify-write races around `chrome.storage`.
+## Phase 3 — Align Indicator And Popup / Pane Semantics
+- [ ] Make indicator derive set health from persistent issues plus current provider state
+- [ ] Replace internal terms like `no live tab` / `not connected` with user-facing semantics
+- [ ] Show recoverable missing tabs as `Will reopen on next sync`
+- [ ] Keep internal liveness states out of user-facing copy
 
-- [x] Add a serialized write queue for local/session state updates.
-- [x] Route `set/updateLocalState` and `set/updateSessionState` through the queue.
-- [x] Keep the public storage API small and consistent.
-- [x] Add focused tests for concurrent updates, especially debug logs and claimed tabs.
+Acceptance:
+- Indicator only shows conclusions
+- Popup / pane explains per-provider status and action
 
-Success criteria:
+## Phase 4 — Regression Tests And Full Verification
+- [ ] Add regression coverage for logged-out targets and failed fan-out health
+- [ ] Add UI-state tests for indicator and popup/pane mappings
+- [ ] Run compile / test / build
 
-- No direct read-modify-write races remain in storage helpers.
-- Existing tests still pass.
-- New concurrency tests cover the queue behavior.
-
-## Phase 2: Background Decomposition
-
-Goal: split the background god file by responsibility without changing behavior.
-
-- [x] Extract message routing bootstrap from `src/entrypoints/background.ts`.
-- [x] Extract presence/claim reconciliation.
-- [x] Extract submit routing + workspace creation flow.
-- [x] Extract delivery fan-out + sync progress notifications.
-- [x] Extract workspace status builders and popup/settings handlers.
-- [x] Extract GC / cleanup scheduling helpers.
-- [x] Keep one thin `background.ts` entrypoint that wires modules together.
-
-Success criteria:
-
-- `background.ts` becomes mostly imports + event wiring.
-- No logic duplication is introduced during extraction.
-- Behavior remains unchanged.
-
-## Phase 3: Claimed-Tab Lifecycle Consolidation
-
-Goal: unify the detach/transfer/keep rules so presence and submit use the same source of truth.
-
-- [x] Introduce a single claimed-tab transition classifier.
-- [x] Remove duplicated orchestration between presence and submit paths.
-- [x] Cover new-chat, foreign-session, unresolved-session, and transfer cases with tests.
-- [x] Keep existing edge-case behavior intact.
-
-Success criteria:
-
-- There is one central place to reason about claimed-tab transitions.
-- Presence and submit paths no longer drift independently.
-
-## Phase 4: Content Bootstrap Split
-
-Goal: turn `content-bootstrap.ts` into wiring code instead of a monolithic controller.
-
-- [x] Extract presence controller.
-- [x] Extract submit controller and echo-suppression logic.
-- [x] Extract delivery controller / runtime message handling.
-- [x] Extract shared content state shape where needed.
-- [x] Add teardown ownership so listeners/timers are clearly managed.
-
-Success criteria:
-
-- `bootstrapContentScript()` mostly composes controllers.
-- Timers/listeners are owned and cleaned up explicitly.
-- Indicator behavior remains unchanged.
-
-## Phase 5: Content UI Cleanup
-
-Goal: reduce fragility in `content-ui.ts`.
-
-- [x] Split injected styles, pill rendering, tooltip rendering, and panel rendering.
-- [x] Replace the largest `innerHTML` blocks with smaller render helpers or DOM builders.
-- [x] Add an explicit `destroy()` path for listeners if useful.
-- [x] Keep the current UX exactly the same.
-
-Success criteria:
-
-- `content-ui.ts` is materially smaller.
-- UI wiring is easier to read and test.
-- No user-facing UI regressions.
-
-## Phase 6: Adapter Consolidation
-
-Goal: remove repetitive provider adapter boilerplate while keeping provider-specific selectors local.
-
-- [x] Introduce a shared DOM adapter factory or shared composer/session helpers.
-- [x] Move common submit subscription logic into shared code.
-- [x] Keep provider-specific selectors, login keywords, and error heuristics configurable.
-- [x] Add or update adapter-level tests where needed.
-
-Success criteria:
-
-- The four provider adapters are substantially smaller.
-- Shared behavior lives in one place.
-- Provider-specific quirks stay readable.
-
-## Phase 7: Popup Decomposition
-
-Goal: split `App.tsx` into hooks + focused components.
-
-- [x] Extract popup status polling hook.
-- [x] Extract shortcut settings hook/component.
-- [x] Extract request modal flow.
-- [x] Extract diagnostics/log actions flow.
-- [x] Extract legal/feedback modal boundaries if still needed.
-
-Success criteria:
-
-- `App.tsx` becomes a composition file, not a logic dump.
-- State domains are easier to reason about independently.
-
-## Phase 8: Protocol and Runtime Types Cleanup
-
-Goal: separate domain types from runtime transport types.
-
-- [x] Split storage/domain types from runtime request/response messages.
-- [x] Move constants and shortcut helpers into narrower modules.
-- [x] Tighten response/request typing where possible.
-
-Success criteria:
-
-- `protocol.ts` is no longer the dumping ground for everything.
-- Message contracts are easier to navigate.
-
-## Phase 9: Test Builders and Coverage Cleanup
-
-Goal: make tests cheaper to extend.
-
-- [x] Add `LocalState` / `SessionState` / workspace builders for tests.
-- [x] Remove repeated fixture setup in large test files.
-- [x] Keep behavior-focused tests readable.
-- [x] Fill any gaps created by earlier refactors.
-
-Success criteria:
-
-- Test setup duplication drops materially.
-- New cases are easier to add.
-
-## Phase 10: Low-Risk Hygiene
-
-Goal: clear smaller non-best-practices once the structural work is done.
-
-- [x] Replace `sort(() => Math.random() - 0.5)` with Fisher-Yates.
-- [x] Review swallowed runtime-message errors and improve observability where useful.
-- [x] Re-scan styles and small utilities for duplicated patterns after code refactors settle.
-
-Success criteria:
-
-- Small known anti-patterns are cleaned up.
-- No broad style or architecture churn is mixed into larger phases.
-
-## Execution Order
-
-Recommended order:
-
-1. Phase 1
-2. Phase 2
-3. Phase 3
-4. Phase 4
-5. Phase 5
-6. Phase 6
-7. Phase 7
-8. Phase 8
-9. Phase 9
-10. Phase 10
-
-## Notes
-
-- Do not combine Phase 2 and Phase 3 into one commit. Extraction first, behavior consolidation second.
-- Do not mix popup refactors with content refactors in the same pass.
-- If a phase exposes a real bug, fix it in that phase and note it in the commit message.
+Acceptance:
+- Logged-out sync scenario is covered end to end in tests
+- Full verification passes

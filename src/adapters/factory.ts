@@ -20,6 +20,7 @@ type DomProviderAdapterConfig = {
   mountId: string;
   className: string;
   prepareDom?: () => void;
+  isLoginRequired?: () => boolean;
   composerSelectors: string[];
   sendButtonSelectors?: string[];
   findSendButton?: (findComposer: () => HTMLElement | null) => HTMLElement | null;
@@ -50,13 +51,12 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
   const getStatus = (): ProviderStatus => {
     prepareDom();
     const currentUrl = window.location.href;
+    const isLoginRequired = config.isLoginRequired
+      ? config.isLoginRequired()
+      : detectLoginRequired(config.loginKeywords);
     const hasObviousError = detectObviousErrorPage(config.errorKeywords ?? []);
     const isReady = Boolean(findComposer()) && !hasObviousError;
-    const pageState = isReady
-      ? 'ready'
-      : detectLoginRequired(config.loginKeywords)
-        ? 'login-required'
-        : 'not-ready';
+    const pageState = isLoginRequired ? 'login-required' : isReady ? 'ready' : 'not-ready';
 
     return {
       provider: config.provider,

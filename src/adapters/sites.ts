@@ -62,7 +62,7 @@ export const SUPPORTED_SITES: SiteInfo[] = [
     matches: ['*://manus.im/*'],
     isBlankChatUrl(url) {
       const pathname = new URL(url).pathname;
-      return pathname === '/app' || pathname === '/app/';
+      return pathname === '/' || pathname === '/app' || pathname === '/app/';
     },
     extractSessionId(url) {
       return extractLastPathSegment(url, '/app/');
