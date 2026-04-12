@@ -109,29 +109,41 @@ export function createDeliveryController(
           snapshot.pageKind === 'new-chat';
 
         if (shouldAwaitSessionRef) {
-          void adapter.session.waitForSessionRefUpdate?.(baselineUrl).then(async (ref) => {
-            await dependencies.logDebug({
-              level: 'info',
-              message: 'Observed session ref update',
-              detail: ref.url,
-              workspaceId: message.workspaceId,
-            });
-            return sendRuntimeMessage(buildHeartbeatMessage(adapter), {
+          try {
+            const ref = await adapter.session.waitForSessionRefUpdate?.(baselineUrl);
+            if (ref) {
+              await dependencies.logDebug({
+                level: 'info',
+                message: 'Observed session ref update',
+                detail: ref.url,
+                workspaceId: message.workspaceId,
+              });
+            }
+            await sendRuntimeMessage(buildHeartbeatMessage(adapter), {
               onError(error) {
                 console.warn('ask-em: failed to report post-delivery heartbeat', error);
               },
             });
-          }).catch(async (error) => {
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error);
             await dependencies.logDebug({
               level: 'warn',
               message: 'Expected session ref update was not observed',
-              detail: error instanceof Error ? error.message : String(error),
+              detail: reason,
               workspaceId: message.workspaceId,
             });
-          });
+            state.showCurrentWarning('Delivery failed');
+            sendResponse({
+              ok: false,
+              accepted: true,
+              confirmed: false,
+              error: reason,
+            });
+            return;
+          }
         }
 
-        sendResponse({ ok: true });
+        sendResponse({ ok: true, accepted: true, confirmed: true });
         void dependencies.reportPresence('HELLO');
       } catch (error) {
         await dependencies.logDebug({

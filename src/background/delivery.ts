@@ -100,20 +100,50 @@ export async function deliverPromptToWorkspaceTargets(
           timestamp: Date.now(),
         });
 
-        const payload = response as { ok?: boolean; blocked?: boolean; error?: string } | undefined;
-        if (!payload?.ok) {
-          const reason = payload?.error ?? (payload?.blocked ? 'Prompt delivery blocked' : 'Prompt delivery failed');
+        const payload = response as {
+          ok?: boolean;
+          accepted?: boolean;
+          confirmed?: boolean;
+          blocked?: boolean;
+          error?: string;
+        } | undefined;
+
+        if (payload?.accepted) {
           await logDebug({
-            level: payload?.blocked ? 'warn' : 'error',
+            level: 'info',
             scope: 'background',
             provider,
             workspaceId,
-            message: payload?.blocked ? 'Prompt delivery blocked' : 'Prompt delivery failed',
+            message: 'Prompt delivery accepted',
+            detail: `${message.provider} -> ${provider}`,
+          });
+        }
+
+        if (!payload?.ok || payload?.confirmed === false) {
+          const reason =
+            payload?.error ??
+            (payload?.confirmed === false
+              ? 'Prompt delivery was not confirmed'
+              : payload?.blocked
+                ? 'Prompt delivery blocked'
+                : 'Prompt delivery failed');
+          await logDebug({
+            level: payload?.blocked || payload?.confirmed === false ? 'warn' : 'error',
+            scope: 'background',
+            provider,
+            workspaceId,
+            message: payload?.confirmed === false
+              ? 'Prompt delivery confirmation failed'
+              : payload?.blocked
+                ? 'Prompt delivery blocked'
+                : 'Prompt delivery failed',
             detail: reason,
           });
           deliveryResult = {
             provider,
             ok: false,
+            accepted: payload?.accepted,
+            confirmed: payload?.confirmed,
             blocked: payload?.blocked,
             reason,
           } satisfies ProviderDeliveryResult;
@@ -123,13 +153,15 @@ export async function deliverPromptToWorkspaceTargets(
             scope: 'background',
             provider,
             workspaceId,
-            message: 'Prompt delivery accepted',
+            message: 'Prompt delivery confirmed',
             detail: `${message.provider} -> ${provider}`,
           });
 
           deliveryResult = {
             provider,
             ok: true,
+            accepted: payload?.accepted,
+            confirmed: payload?.confirmed,
           } satisfies ProviderDeliveryResult;
         }
       } catch (error) {
@@ -388,16 +420,20 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
     });
   }
 
+  const finalLocalState = await getLocalState();
+  const finalWorkspace =
+    finalLocalState.workspaces[workspaceLookup.workspaceId] ?? localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace;
+
   return {
     ok: true,
     synced: true,
     workspaceId: workspaceLookup.workspaceId,
     providerEnabled: true,
     globalSyncEnabled: true,
-    canStartNewSet: canStartNewSet(localState),
+    canStartNewSet: canStartNewSet(finalLocalState),
     deliveryResults,
     workspaceSummary: buildWorkspaceSummary(
-      localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
+      finalWorkspace,
       await getSessionState(),
     ),
   };

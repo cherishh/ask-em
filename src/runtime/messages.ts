@@ -50,6 +50,8 @@ export type DeliverPromptMessage = {
 export type ProviderDeliveryResult = {
   provider: Provider;
   ok: boolean;
+  accepted?: boolean;
+  confirmed?: boolean;
   blocked?: boolean;
   reason?: string;
 };

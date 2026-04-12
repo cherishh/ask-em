@@ -32,9 +32,9 @@ Acceptance:
 - A future `login-required` misclassification can be diagnosed from logs alone
 
 ## Phase 4 — Delivery Confirmation Follow-up
-- [ ] Split target delivery `accepted` vs `confirmed`
-- [ ] Treat missing session-ref confirmation on new-chat targets as failed sync health
-- [ ] Persist late failures back into workspace issues
+- [x] Split target delivery `accepted` vs `confirmed`
+- [x] Treat missing session-ref confirmation on new-chat targets as failed sync health
+- [x] Persist late failures back into workspace issues
 
 Acceptance:
 - `all models synced` is impossible after a late target confirmation failure

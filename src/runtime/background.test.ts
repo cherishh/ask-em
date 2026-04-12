@@ -1353,6 +1353,220 @@ describe('background submit routing', () => {
     ]);
   });
 
+  it('returns the post-delivery workspace summary so source indicator sees persisted failures', async () => {
+    const localState: LocalState = {
+      ...makeLocalState(),
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          members: {
+            claude: makeConversationRef('claude', 'c-1', 'https://claude.ai/chat/c-1'),
+            chatgpt: makeConversationRef('chatgpt', null, 'https://chatgpt.com/'),
+          },
+          enabledProviders: ['claude', 'chatgpt'],
+        }),
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+      },
+    };
+    const finalLocalState: LocalState = {
+      ...localState,
+      workspaces: {
+        w1: {
+          ...localState.workspaces.w1,
+          memberIssues: {
+            chatgpt: 'needs-login',
+          },
+        },
+      },
+    };
+
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': makeClaimedTab({
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-1',
+          sessionId: 'c-1',
+        }),
+        'w1:chatgpt': makeClaimedTab({
+          provider: 'chatgpt',
+          workspaceId: 'w1',
+          tabId: 10,
+          currentUrl: 'https://chatgpt.com/',
+          sessionId: null,
+        }),
+      },
+    };
+
+    storageMocks.getLocalState
+      .mockResolvedValueOnce(localState)
+      .mockResolvedValueOnce(localState)
+      .mockResolvedValueOnce(finalLocalState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const sendMessage = vi.fn().mockImplementation((tabId: number, message: { type: string }) => {
+      if (tabId === 9 && message.type === 'SYNC_PROGRESS') {
+        return Promise.resolve({ ok: true });
+      }
+
+      if (tabId === 10 && message.type === 'PING') {
+        return Promise.resolve({
+          type: 'PING_RESPONSE',
+          provider: 'chatgpt',
+          currentUrl: 'https://chatgpt.com/',
+          sessionId: null,
+          pageState: 'login-required',
+          pageKind: 'new-chat',
+        });
+      }
+
+      return Promise.resolve({ ok: true });
+    });
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 9 }),
+        sendMessage,
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    const result = await handleUserSubmit(
+      makeSubmitMessage({
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+        content: 'fan out to logged-out chatgpt',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(result.workspaceSummary?.memberIssues.chatgpt).toBe('needs-login');
+  });
+
+  it('treats unconfirmed new-chat delivery as a persisted sync failure', async () => {
+    const localState: LocalState = {
+      ...makeLocalState(),
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          members: {
+            claude: makeConversationRef('claude', 'c-1', 'https://claude.ai/chat/c-1'),
+            chatgpt: makeConversationRef('chatgpt', null, 'https://chatgpt.com/'),
+          },
+          enabledProviders: ['claude', 'chatgpt'],
+        }),
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+      },
+    };
+    const finalLocalState: LocalState = {
+      ...localState,
+      workspaces: {
+        w1: {
+          ...localState.workspaces.w1,
+          memberIssues: {
+            chatgpt: 'delivery-failed',
+          },
+        },
+      },
+    };
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': makeClaimedTab({
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-1',
+          sessionId: 'c-1',
+        }),
+        'w1:chatgpt': makeClaimedTab({
+          provider: 'chatgpt',
+          workspaceId: 'w1',
+          tabId: 10,
+          currentUrl: 'https://chatgpt.com/',
+          sessionId: null,
+        }),
+      },
+    };
+
+    storageMocks.getLocalState
+      .mockResolvedValueOnce(localState)
+      .mockResolvedValueOnce(localState)
+      .mockResolvedValueOnce(finalLocalState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const sendMessage = vi.fn().mockImplementation((tabId: number, message: { type: string }) => {
+      if (tabId === 9 && message.type === 'SYNC_PROGRESS') {
+        return Promise.resolve({ ok: true });
+      }
+
+      if (tabId === 10 && message.type === 'PING') {
+        return Promise.resolve({
+          type: 'PING_RESPONSE',
+          provider: 'chatgpt',
+          currentUrl: 'https://chatgpt.com/',
+          sessionId: null,
+          pageState: 'ready',
+          pageKind: 'new-chat',
+        });
+      }
+
+      if (tabId === 10 && message.type === 'DELIVER_PROMPT') {
+        return Promise.resolve({
+          ok: false,
+          accepted: true,
+          confirmed: false,
+          error: 'Timed out waiting for session ref update',
+        });
+      }
+
+      return Promise.resolve({ ok: true });
+    });
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 9 }),
+        sendMessage,
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    const result = await handleUserSubmit(
+      makeSubmitMessage({
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+        content: 'fan out to unconfirmed chatgpt target',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(result.deliveryResults).toEqual([
+      expect.objectContaining({
+        provider: 'chatgpt',
+        ok: false,
+        accepted: true,
+        confirmed: false,
+      }),
+    ]);
+    expect(result.workspaceSummary?.memberIssues.chatgpt).toBe('delivery-failed');
+  });
+
   it('closes claimed provider tabs when deleting a workspace and the setting is enabled', async () => {
     const localState: LocalState = {
       ...makeLocalState(),
