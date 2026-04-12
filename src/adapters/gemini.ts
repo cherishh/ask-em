@@ -15,11 +15,16 @@ export const geminiAdapter = createDomProviderAdapter({
   provider: 'gemini',
   mountId: 'ask-em-gemini-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-gemini',
-  isLoginRequired() {
-    return isGeminiLoginRequiredPage({
-      pathname: window.location.pathname,
-      buttonTexts: getVisibleButtonTexts(),
-    });
+  classifyAuth() {
+    const pathname = window.location.pathname;
+    const buttonTexts = getVisibleButtonTexts();
+    const isLoginRequired = isGeminiLoginRequiredPage({ pathname, buttonTexts });
+
+    return {
+      isLoginRequired,
+      rule: isLoginRequired ? 'gemini-visible-sign-in-on-app' : undefined,
+      signals: `pathname=${pathname}; buttons=[${buttonTexts.slice(0, 6).join(' | ')}]`,
+    };
   },
   composerSelectors: ['.ql-editor[role="textbox"]', '[aria-label="Enter a prompt for Gemini"]'],
   sendButtonSelectors: ['button.send-button[aria-label="Send message"]'],

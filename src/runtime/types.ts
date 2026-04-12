@@ -12,6 +12,8 @@ export type ProviderStatus = {
   sessionId: string | null;
   pageKind: PageKind;
   pageState: PageState;
+  authRule?: string;
+  authSignalSummary?: string;
 };
 
 export type ConversationRef = {

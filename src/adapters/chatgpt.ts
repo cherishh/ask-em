@@ -28,12 +28,29 @@ export const chatgptAdapter = createDomProviderAdapter({
   provider: 'chatgpt',
   mountId: 'ask-em-chatgpt-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-chatgpt',
-  isLoginRequired() {
-    return isChatgptLoginRequiredPage({
-      pathname: window.location.pathname,
-      buttonTexts: getVisibleButtonTexts(),
-      headingTexts: getVisibleHeadingTexts(),
+  classifyAuth() {
+    const pathname = window.location.pathname;
+    const buttonTexts = getVisibleButtonTexts();
+    const headingTexts = getVisibleHeadingTexts();
+    const isLoginRequired = isChatgptLoginRequiredPage({
+      pathname,
+      buttonTexts,
+      headingTexts,
     });
+
+    return {
+      isLoginRequired,
+      rule: pathname.toLowerCase().startsWith('/auth') || pathname.toLowerCase().startsWith('/login')
+        ? 'chatgpt-auth-url'
+        : headingTexts.some((text) => text.toLowerCase() === 'welcome back')
+          ? 'chatgpt-account-chooser-heading'
+          : isLoginRequired
+            ? 'chatgpt-auth-cta-cluster'
+            : undefined,
+      signals: `pathname=${pathname}; headings=[${headingTexts.slice(0, 4).join(' | ')}]; buttons=[${buttonTexts
+        .slice(0, 8)
+        .join(' | ')}]`,
+    };
   },
   composerSelectors: ['#prompt-textarea', 'div[role="textbox"][aria-label="Chat with ChatGPT"]'],
   sendButtonSelectors: [

@@ -20,6 +20,11 @@ type DomProviderAdapterConfig = {
   mountId: string;
   className: string;
   prepareDom?: () => void;
+  classifyAuth?: () => {
+    isLoginRequired: boolean;
+    rule?: string;
+    signals?: string;
+  };
   isLoginRequired?: () => boolean;
   composerSelectors: string[];
   sendButtonSelectors?: string[];
@@ -51,9 +56,12 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
   const getStatus = (): ProviderStatus => {
     prepareDom();
     const currentUrl = window.location.href;
-    const isLoginRequired = config.isLoginRequired
-      ? config.isLoginRequired()
-      : detectLoginRequired(config.loginKeywords ?? []);
+    const authClassification = config.classifyAuth
+      ? config.classifyAuth()
+      : config.isLoginRequired
+        ? { isLoginRequired: config.isLoginRequired() }
+        : { isLoginRequired: detectLoginRequired(config.loginKeywords ?? []) };
+    const isLoginRequired = authClassification.isLoginRequired;
     const hasObviousError = detectObviousErrorPage(config.errorKeywords ?? []);
     const isReady = Boolean(findComposer()) && !hasObviousError;
     const pageState = isLoginRequired ? 'login-required' : isReady ? 'ready' : 'not-ready';
@@ -64,6 +72,8 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
       sessionId: site.extractSessionId(currentUrl),
       pageKind: site.isBlankChatUrl(currentUrl) ? 'new-chat' : 'existing-session',
       pageState,
+      authRule: isLoginRequired ? authClassification.rule : undefined,
+      authSignalSummary: isLoginRequired ? authClassification.signals : undefined,
     };
   };
 

@@ -24,11 +24,20 @@ export const claudeAdapter = createDomProviderAdapter({
   provider: 'claude',
   mountId: 'ask-em-claude-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-claude',
-  isLoginRequired() {
-    return isClaudeLoginRequiredPage({
-      pathname: window.location.pathname,
-      buttonTexts: getVisibleButtonTexts(),
-    });
+  classifyAuth() {
+    const pathname = window.location.pathname;
+    const buttonTexts = getVisibleButtonTexts();
+    const isLoginRequired = isClaudeLoginRequiredPage({ pathname, buttonTexts });
+
+    return {
+      isLoginRequired,
+      rule: pathname.toLowerCase().startsWith('/login')
+        ? 'claude-auth-url'
+        : isLoginRequired
+          ? 'claude-auth-cta-cluster'
+          : undefined,
+      signals: `pathname=${pathname}; buttons=[${buttonTexts.slice(0, 6).join(' | ')}]`,
+    };
   },
   composerSelectors: ['[data-testid="chat-input"]', '[aria-label="Write your prompt to Claude"]'],
   sendButtonSelectors: ['button[aria-label="Send message"]'],

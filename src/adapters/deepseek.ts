@@ -42,12 +42,28 @@ export const deepseekAdapter = createDomProviderAdapter({
   provider: 'deepseek',
   mountId: 'ask-em-deepseek-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-deepseek',
-  isLoginRequired() {
-    return isDeepseekLoginRequiredPage({
-      pathname: window.location.pathname,
-      buttonTexts: getVisibleButtonTexts(),
-      inputs: getVisibleInputDescriptors(),
+  classifyAuth() {
+    const pathname = window.location.pathname;
+    const buttonTexts = getVisibleButtonTexts();
+    const inputs = getVisibleInputDescriptors();
+    const isLoginRequired = isDeepseekLoginRequiredPage({
+      pathname,
+      buttonTexts,
+      inputs,
     });
+
+    return {
+      isLoginRequired,
+      rule: pathname.toLowerCase().startsWith('/sign_in')
+        ? 'deepseek-auth-url'
+        : isLoginRequired
+          ? 'deepseek-auth-form'
+          : undefined,
+      signals: `pathname=${pathname}; buttons=[${buttonTexts.slice(0, 6).join(' | ')}]; inputs=${inputs
+        .map((input) => [input.type, input.placeholder, input.ariaLabel].filter(Boolean).join('/'))
+        .slice(0, 4)
+        .join(' | ')}`,
+    };
   },
   composerSelectors: ['textarea[placeholder="Message DeepSeek"]'],
   findSendButton(findComposer) {

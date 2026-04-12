@@ -47,7 +47,7 @@ export function createSubmitController(
       await dependencies.logDebug({
         level: 'info',
         message: 'Skipped submit because current page is not sync-eligible',
-        detail: `${status.pageState}: ${content.slice(0, 120)}`,
+        detail: `${status.pageState} (${status.pageKind}) @ ${status.currentUrl}${status.authRule ? ` [rule=${status.authRule}; signals=${status.authSignalSummary ?? 'none'}]` : ''}: ${content.slice(0, 120)}`,
       });
       return;
     }

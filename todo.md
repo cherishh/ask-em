@@ -24,9 +24,9 @@ Acceptance:
 - Manus landing page with visible `Sign in` / `Sign up` is `login-required` even if composer exists
 
 ## Phase 3 — Structured Auth Classification Logging
-- [ ] Log which auth rule fired on each provider when local page state changes to `login-required`
-- [ ] Include URL, pageKind, and structural signals summary in the debug entry
-- [ ] Keep logs low-noise: only log on state transitions
+- [x] Log which auth rule fired on each provider when local page state changes to `login-required`
+- [x] Include URL, pageKind, and structural signals summary in the debug entry
+- [x] Keep logs low-noise: only log on state transitions
 
 Acceptance:
 - A future `login-required` misclassification can be diagnosed from logs alone

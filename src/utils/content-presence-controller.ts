@@ -15,6 +15,14 @@ type PresenceKind = 'HELLO' | 'HEARTBEAT';
 export function createPresenceController(
   adapter: ProviderAdapter,
   state: ContentStateController,
+  dependencies?: {
+    logDebug?: (entry: {
+      level: 'info' | 'warn' | 'error';
+      message: string;
+      detail?: string;
+      workspaceId?: string;
+    }) => Promise<void>;
+  },
 ) {
   let startupPresenceInterval: number | null = null;
   let startupPresenceDeadline = 0;
@@ -22,6 +30,7 @@ export function createPresenceController(
   let heartbeatInterval: number | null = null;
   let focusHandler: (() => void) | null = null;
   let visibilityHandler: (() => void) | null = null;
+  let lastObservedPageState: ReturnType<ProviderAdapter['session']['getStatus']>['pageState'] | null = null;
 
   const stopStartupPresencePolling = () => {
     if (startupPresenceInterval !== null) {
@@ -37,6 +46,27 @@ export function createPresenceController(
 
   const reportPresence = async (kind: PresenceKind) => {
     const status = adapter.session.getStatus();
+    const previousPageState = lastObservedPageState;
+    lastObservedPageState = status.pageState;
+
+    if (previousPageState !== null && previousPageState !== status.pageState) {
+      if (status.pageState === 'login-required') {
+        await dependencies?.logDebug?.({
+          level: 'warn',
+          message: 'Observed auth classification',
+          detail: `rule=${status.authRule ?? 'unknown'}; kind=${status.pageKind}; url=${status.currentUrl}; signals=${status.authSignalSummary ?? 'none'}`,
+          workspaceId: state.getUiContext().workspaceId ?? undefined,
+        });
+      } else {
+        await dependencies?.logDebug?.({
+          level: status.pageState === 'ready' ? 'info' : 'warn',
+          message: 'Observed local page state change',
+          detail: `${previousPageState} -> ${status.pageState} (${status.pageKind}) @ ${status.currentUrl}`,
+          workspaceId: state.getUiContext().workspaceId ?? undefined,
+        });
+      }
+    }
+
     const response =
       kind === 'HELLO'
         ? await sendRuntimeMessage<PresenceResponse>(buildHelloMessage(adapter), {

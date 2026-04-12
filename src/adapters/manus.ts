@@ -52,11 +52,23 @@ export const manusAdapter = createDomProviderAdapter({
   mountId: 'ask-em-manus-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-manus',
   prepareDom: dismissManusOverlay,
-  isLoginRequired() {
-    return isManusLoginRequiredPage({
-      pathname: window.location.pathname,
-      buttonTexts: getVisibleButtonTexts(),
+  classifyAuth() {
+    const pathname = window.location.pathname;
+    const buttonTexts = getVisibleButtonTexts();
+    const isLoginRequired = isManusLoginRequiredPage({
+      pathname,
+      buttonTexts,
     });
+
+    return {
+      isLoginRequired,
+      rule: pathname.toLowerCase().startsWith('/login')
+        ? 'manus-auth-url'
+        : isLoginRequired
+          ? 'manus-visible-nav-auth-cta'
+          : undefined,
+      signals: `pathname=${pathname}; buttons=[${buttonTexts.slice(0, 8).join(' | ')}]`,
+    };
   },
   composerSelectors: ['.tiptap.ProseMirror'],
   findSendButton(findComposer) {
