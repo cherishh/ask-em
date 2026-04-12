@@ -7,6 +7,7 @@ import type {
   WorkspaceSummary,
 } from '../runtime/protocol';
 import type { ContentTooltipSpec } from './content-tooltip';
+import { getWorkspaceProviderDisplay } from './workspace-provider-display';
 
 function isApplePlatform(): boolean {
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
@@ -89,41 +90,13 @@ function getProviderMeta(
   enabled: boolean,
   globalSyncEnabled: boolean,
 ) {
-  const member = workspaceSummary.workspace.members[provider];
-
-  if (memberState === 'pending') {
-    return 'connecting';
-  }
-
-  if (!globalSyncEnabled) {
-    return 'paused';
-  }
-
-  if (!enabled) {
-    return 'paused';
-  }
-
-  if (memberIssue === 'needs-login' || memberState === 'login-required') {
-    return 'needs login';
-  }
-
-  if (memberIssue === 'loading' || memberState === 'not-ready') {
-    return 'loading';
-  }
-
-  if (memberIssue === 'delivery-failed') {
-    return 'needs attention';
-  }
-
-  if (!member || memberState === 'inactive') {
-    return 'will reopen on next sync';
-  }
-
-  if (memberState === 'ready') {
-    return 'ready';
-  }
-
-  return 'will reopen on next sync';
+  return getWorkspaceProviderDisplay({
+    memberState,
+    memberIssue,
+    enabled,
+    globalSyncEnabled,
+    hasMember: Boolean(workspaceSummary.workspace.members[provider]),
+  }).detail.toLowerCase();
 }
 
 function getProviderDotState(

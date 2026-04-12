@@ -31,9 +31,9 @@ Acceptance:
 - Popup / pane explains per-provider status and action
 
 ## Phase 4 — Regression Tests And Full Verification
-- [ ] Add regression coverage for logged-out targets and failed fan-out health
-- [ ] Add UI-state tests for indicator and popup/pane mappings
-- [ ] Run compile / test / build
+- [x] Add regression coverage for logged-out targets and failed fan-out health
+- [x] Add UI-state tests for indicator and popup/pane mappings
+- [x] Run compile / test / build
 
 Acceptance:
 - Logged-out sync scenario is covered end to end in tests

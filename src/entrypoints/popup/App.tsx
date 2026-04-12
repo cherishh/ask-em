@@ -14,11 +14,11 @@ import type {
   ShortcutConfig,
   ShortcutId,
   StatusResponseMessage,
-  WorkspaceIssue,
   WorkspaceSummary,
 } from '../../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../../runtime/workspace';
 import { SUPPORTED_SITES } from '../../adapters/sites';
+import { getWorkspaceProviderDisplay } from '../../utils/workspace-provider-display';
 import { RequestProvidersModal } from './components/request-providers-modal';
 import { useDiagnostics } from './hooks/use-diagnostics';
 import { usePopupStatus } from './hooks/use-popup-status';
@@ -40,121 +40,62 @@ function formatTime(timestamp: number): string {
 
 function getDisplayMemberStateTone(
   state: GroupMemberState,
-  issue: WorkspaceIssue | null,
+  issue: WorkspaceSummary['memberIssues'][Provider],
   enabled: boolean,
   globalSyncEnabled: boolean,
 ): 'active' | 'inactive' | 'pending' | 'sync-paused' | 'frozen' | 'warning' {
-  if (state === 'inactive' || state === 'pending') {
-    if (issue === 'needs-login' || issue === 'loading' || issue === 'delivery-failed') {
+  const display = getWorkspaceProviderDisplay({
+    memberState: state,
+    memberIssue: issue ?? null,
+    enabled,
+    globalSyncEnabled,
+    hasMember: state !== 'inactive',
+  });
+
+  switch (display.kind) {
+    case 'ready':
+      return 'active';
+    case 'connecting':
+      return 'pending';
+    case 'paused':
+      return globalSyncEnabled ? 'sync-paused' : 'frozen';
+    case 'needs-login':
+    case 'loading':
+    case 'needs-attention':
       return 'warning';
-    }
-
-    return state;
+    case 'will-reopen':
+      return 'inactive';
   }
-
-  if (!globalSyncEnabled) {
-    return 'frozen';
-  }
-
-  if (!enabled) {
-    return 'sync-paused';
-  }
-
-  if (state === 'ready') {
-    return 'active';
-  }
-
-  if (state === 'login-required' || state === 'not-ready') {
-    return 'warning';
-  }
-
-  if (issue === 'needs-login' || issue === 'loading' || issue === 'delivery-failed') {
-    return 'warning';
-  }
-
-  return 'inactive';
 }
 
 function getDisplayMemberStateLabel(
   state: GroupMemberState,
-  issue: WorkspaceIssue | null,
+  issue: WorkspaceSummary['memberIssues'][Provider],
   enabled: boolean,
   globalSyncEnabled: boolean,
 ): string {
-  if (!globalSyncEnabled) {
-    return 'Paused';
-  }
-
-  if (!enabled) {
-    return 'Paused';
-  }
-
-  if (issue === 'needs-login' || state === 'login-required') {
-    return 'Needs Login';
-  }
-
-  if (issue === 'loading' || state === 'not-ready') {
-    return 'Loading';
-  }
-
-  if (issue === 'delivery-failed') {
-    return 'Needs Attention';
-  }
-
-  if (state === 'inactive') {
-    return 'Will Reopen';
-  }
-
-  if (state === 'pending') {
-    return 'Connecting';
-  }
-
-  if (state === 'ready') {
-    return 'Ready';
-  }
-
-  return 'Will Reopen';
+  return getWorkspaceProviderDisplay({
+    memberState: state,
+    memberIssue: issue ?? null,
+    enabled,
+    globalSyncEnabled,
+    hasMember: state !== 'inactive',
+  }).label;
 }
 
 function getMemberOutcomeCopy(
   state: GroupMemberState,
-  issue: WorkspaceIssue | null,
+  issue: WorkspaceSummary['memberIssues'][Provider],
   enabled: boolean,
   globalSyncEnabled: boolean,
 ): string {
-  if (!globalSyncEnabled) {
-    return 'Global sync is paused.';
-  }
-
-  if (!enabled) {
-    return 'Sync is paused for this model.';
-  }
-
-  if (issue === 'needs-login' || state === 'login-required') {
-    return 'Sign in before the next sync';
-  }
-
-  if (issue === 'loading' || state === 'not-ready') {
-    return 'Wait for this page to become ready';
-  }
-
-  if (issue === 'delivery-failed') {
-    return 'Last sync did not reach this model';
-  }
-
-  if (state === 'inactive') {
-    return 'Will reopen on the next sync';
-  }
-
-  if (state === 'pending') {
-    return 'Waiting for this model to connect';
-  }
-
-  if (state === 'ready') {
-    return 'Next prompt will be synced';
-  }
-
-  return 'Will reopen on the next sync';
+  return getWorkspaceProviderDisplay({
+    memberState: state,
+    memberIssue: issue ?? null,
+    enabled,
+    globalSyncEnabled,
+    hasMember: state !== 'inactive',
+  }).detail;
 }
 
 export default function App() {
