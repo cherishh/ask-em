@@ -9,7 +9,6 @@ import { DEFAULT_SHORTCUTS, resolveShortcutConfig } from '../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../runtime/workspace';
 import { renderContentTooltipHtml, type ContentTooltipSpec } from './content-tooltip';
 import type { IndicatorAlertLevel, IndicatorUiState, SyncIndicatorTone } from './content-indicator';
-import { CONTENT_UI_STYLE_TEXT } from './content-ui-style';
 import {
   formatBindingKeys,
   getStandaloneTooltipSpec,
@@ -96,13 +95,6 @@ function matchesShortcutKey(event: KeyboardEvent, binding: ShortcutBinding): boo
 export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) {
   const { mountId, className } = adapter.getUiSpec();
   const shellId = `${mountId}-shell`;
-
-  if (!document.getElementById('ask-em-content-style')) {
-    const style = document.createElement('style');
-    style.id = 'ask-em-content-style';
-    style.textContent = CONTENT_UI_STYLE_TEXT;
-    document.documentElement.appendChild(style);
-  }
 
   let shell = document.getElementById(shellId) as HTMLDivElement | null;
   if (!shell) {

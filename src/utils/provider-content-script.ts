@@ -1,3 +1,4 @@
+import '../styles/content-ui.css';
 import { getAdapter } from '../adapters/registry';
 import { getSiteInfoByProvider } from '../adapters/sites';
 import type { Provider } from '../runtime/protocol';
