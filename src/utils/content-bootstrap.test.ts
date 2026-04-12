@@ -42,6 +42,11 @@ function createWorkspaceSummary(
       updatedAt: 1,
     },
     memberStates,
+    memberIssues: {
+      claude: null,
+      chatgpt: null,
+      gemini: null,
+    },
   };
 }
 

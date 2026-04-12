@@ -28,6 +28,7 @@ function createWorkspaceSummary(
       updatedAt: 1,
     },
     memberStates: Object.fromEntries(enabledProviders.map((provider) => [provider, 'ready'])),
+    memberIssues: Object.fromEntries(enabledProviders.map((provider) => [provider, null])),
     ...overrides,
   };
 }
@@ -244,6 +245,37 @@ describe('content indicator presentation', () => {
       syncLabel: 'all models synced',
       syncTone: 'neutral',
       alertLevel: 'normal',
+    });
+  });
+
+  it('still warns when an inactive member has a persisted sync issue', () => {
+    const summary = createWorkspaceSummary({
+      memberStates: {
+        claude: 'ready',
+        chatgpt: 'inactive',
+        gemini: 'ready',
+      },
+      memberIssues: {
+        claude: null,
+        chatgpt: 'needs-login',
+        gemini: null,
+      },
+    });
+
+    expect(countWorkspaceIssues(summary)).toBe(1);
+    expect(
+      getContentIndicatorPresentation(
+        createInput({
+          hasWorkspace: true,
+          workspaceSummary: summary,
+        }),
+      ),
+    ).toEqual({
+      state: 'idle',
+      label: 'current model is in sync',
+      syncLabel: '1 model needs attention',
+      syncTone: 'warning',
+      alertLevel: 'set-warning',
     });
   });
 

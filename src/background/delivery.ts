@@ -7,7 +7,14 @@ import {
   type UserSubmitMessage,
 } from '../runtime/protocol';
 import { clearClaimedTab, getLocalState, getSessionState, setLocalState, upsertClaimedTab } from '../runtime/storage';
-import { bindWorkspaceMember, createPendingWorkspace, getDefaultEnabledProviderList, getWorkspacesOrdered } from '../runtime/workspace';
+import {
+  bindWorkspaceMember,
+  clearWorkspaceProviderIssue,
+  createPendingWorkspace,
+  getDefaultEnabledProviderList,
+  getWorkspacesOrdered,
+  setWorkspaceProviderIssue,
+} from '../runtime/workspace';
 import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
 import { getClaimedTabByTabId, resolveDeliveryTarget } from '../runtime/recovery';
 import { cancelScheduledGroupGc } from './gc';
@@ -165,7 +172,7 @@ export async function deliverPromptToWorkspaceTargets(
     }),
   );
 
-  return settledResults.map((result, index) => {
+  const deliveryResults = settledResults.map((result, index) => {
     if (result.status === 'fulfilled') {
       return result.value;
     }
@@ -177,6 +184,28 @@ export async function deliverPromptToWorkspaceTargets(
       reason: result.reason instanceof Error ? result.reason.message : String(result.reason),
     } satisfies ProviderDeliveryResult;
   });
+
+  const nextWorkspaceState = deliveryResults.reduce((nextState, result) => {
+    if (result.ok) {
+      return clearWorkspaceProviderIssue(nextState, workspaceId, result.provider);
+    }
+
+    const normalizedReason = (result.reason ?? '').toLowerCase();
+    const issue =
+      normalizedReason.includes('login required')
+        ? 'needs-login'
+        : normalizedReason.includes('not ready') || normalizedReason.includes('blocked')
+          ? 'loading'
+          : 'delivery-failed';
+
+    return setWorkspaceProviderIssue(nextState, workspaceId, result.provider, issue);
+  }, localState);
+
+  if (nextWorkspaceState !== localState) {
+    await setLocalState(nextWorkspaceState);
+  }
+
+  return deliveryResults;
 }
 
 export async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runtime.MessageSender) {

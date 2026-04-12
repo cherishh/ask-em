@@ -24,11 +24,14 @@ export type Workspace = {
   id: string;
   label?: string;
   members: Partial<Record<Provider, ConversationRef>>;
+  memberIssues?: Partial<Record<Provider, WorkspaceIssue>>;
   enabledProviders: Provider[];
   createdAt: number;
   updatedAt: number;
   pendingSource?: Provider;
 };
+
+export type WorkspaceIssue = 'needs-login' | 'loading' | 'delivery-failed';
 
 export type DefaultEnabledProviders = Record<Provider, boolean>;
 
@@ -73,6 +76,7 @@ export type SessionState = {
 export type WorkspaceSummary = {
   workspace: Workspace;
   memberStates: Partial<Record<Provider, GroupMemberState>>;
+  memberIssues: Partial<Record<Provider, WorkspaceIssue | null>>;
 };
 
 export type GroupMemberState =

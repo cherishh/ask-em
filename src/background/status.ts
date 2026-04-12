@@ -29,9 +29,14 @@ export function buildWorkspaceSummary(
     }),
   );
 
+  const memberIssues = Object.fromEntries(
+    ALL_PROVIDERS.map((provider) => [provider, workspace.memberIssues?.[provider] ?? null]),
+  );
+
   return {
     workspace,
     memberStates,
+    memberIssues,
   };
 }
 

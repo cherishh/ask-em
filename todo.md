@@ -11,10 +11,10 @@ Acceptance:
 - ChatGPT / Claude / Manus / DeepSeek logged-out pages are not reported as ready
 
 ## Phase 2 — Persist Sync Failures As Set Health
-- [ ] Add persistent workspace-level provider issue state
-- [ ] Record delivery failures as provider issues
-- [ ] Clear provider issues on successful recovery / successful delivery
-- [ ] Include provider issues in workspace summaries
+- [x] Add persistent workspace-level provider issue state
+- [x] Record delivery failures as provider issues
+- [x] Clear provider issues on successful recovery / successful delivery
+- [x] Include provider issues in workspace summaries
 
 Acceptance:
 - A failed fan-out remains visible as set attention even if the target tab later disappears

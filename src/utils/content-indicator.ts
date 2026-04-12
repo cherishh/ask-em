@@ -1,4 +1,4 @@
-import type { GroupMemberState, PageState, WorkspaceSummary } from '../runtime/protocol';
+import type { GroupMemberState, PageState, WorkspaceIssue, WorkspaceSummary } from '../runtime/protocol';
 
 export type IndicatorUiState = 'idle' | 'blocked' | 'syncing';
 
@@ -46,13 +46,17 @@ function isWarningMemberState(state: GroupMemberState | undefined) {
   return state === 'login-required' || state === 'not-ready';
 }
 
+function isWarningIssue(issue: WorkspaceIssue | null | undefined) {
+  return issue === 'needs-login' || issue === 'loading' || issue === 'delivery-failed';
+}
+
 export function countWorkspaceIssues(summary: WorkspaceSummary | null): number {
   if (!summary) {
     return 0;
   }
 
   return summary.workspace.enabledProviders.filter((provider) =>
-    isWarningMemberState(summary.memberStates[provider]),
+    isWarningMemberState(summary.memberStates[provider]) || isWarningIssue(summary.memberIssues[provider]),
   ).length;
 }
 

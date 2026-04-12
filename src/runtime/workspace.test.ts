@@ -16,6 +16,7 @@ import {
 } from '../test/builders';
 import {
   bindWorkspaceMember,
+  clearWorkspaceProviderIssue,
   cleanupPendingWorkspaces,
   clearWorkspace,
   clearWorkspaceProvider,
@@ -26,6 +27,7 @@ import {
   lookupWorkspaceBySession,
   rebuildWorkspaceIndex,
   setWorkspaceProviderEnabled,
+  setWorkspaceProviderIssue,
 } from './workspace';
 import { countClaimedTabsForWorkspace, isClaimedTabStale, removeClaimedTabsForTabId } from './recovery';
 
@@ -223,6 +225,21 @@ describe('workspace state', () => {
     expect(nextState.workspaces.w1.members.claude).toBeUndefined();
   });
 
+  it('removes persisted provider issues when the provider is cleared', () => {
+    let state = createPendingWorkspace(createEmptyState(), {
+      sourceProvider: 'claude',
+      sourceUrl: 'https://claude.ai/new',
+      workspaceId: 'w1',
+      enabledProviders: ['claude', 'chatgpt'],
+    });
+
+    state = setWorkspaceProviderIssue(state, 'w1', 'chatgpt', 'needs-login');
+
+    const nextState = clearWorkspaceProvider(state, 'w1', 'chatgpt');
+
+    expect(nextState.workspaces.w1.memberIssues?.chatgpt).toBeUndefined();
+  });
+
   it('clears an entire workspace and all of its member indexes', () => {
     let state = createPendingWorkspace(createEmptyState(), {
       sourceProvider: 'claude',
@@ -325,6 +342,21 @@ describe('workspace state', () => {
 
     expect(state.workspaces.w1.enabledProviders).toEqual(['gemini', 'claude']);
     expect(state.workspaces.w1.members.gemini).toBeDefined();
+  });
+
+  it('can set and clear a persisted provider issue', () => {
+    let state = createPendingWorkspace(createEmptyState(), {
+      sourceProvider: 'gemini',
+      sourceUrl: 'https://gemini.google.com/app',
+      workspaceId: 'w1',
+      enabledProviders: ['gemini', 'chatgpt'],
+    });
+
+    state = setWorkspaceProviderIssue(state, 'w1', 'chatgpt', 'delivery-failed');
+    expect(state.workspaces.w1.memberIssues?.chatgpt).toBe('delivery-failed');
+
+    state = clearWorkspaceProviderIssue(state, 'w1', 'chatgpt');
+    expect(state.workspaces.w1.memberIssues?.chatgpt).toBeUndefined();
   });
 
   it('removes claimed tabs by tab id and can count remaining tabs per group', () => {

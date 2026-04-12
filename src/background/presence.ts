@@ -1,6 +1,11 @@
 import type { HeartbeatMessage, HelloMessage, PageKind, Provider } from '../runtime/protocol';
 import { clearClaimedTab, getLocalState, getSessionState, setLocalState, upsertClaimedTab } from '../runtime/storage';
-import { bindWorkspaceMember, lookupWorkspaceBySession } from '../runtime/workspace';
+import {
+  bindWorkspaceMember,
+  clearWorkspaceProviderIssue,
+  lookupWorkspaceBySession,
+  setWorkspaceProviderIssue,
+} from '../runtime/workspace';
 import { getClaimedTabByTabId } from '../runtime/recovery';
 import { cancelScheduledGroupGc, scheduleGroupGcIfEmpty } from './gc';
 import { logDebug } from './debug';
@@ -346,6 +351,22 @@ export async function handlePresenceMessage(message: HelloMessage | HeartbeatMes
       },
     });
 
+    await setLocalState(localState);
+  }
+
+  if (message.pageState === 'ready') {
+    localState = clearWorkspaceProviderIssue(localState, workspaceLookup.workspaceId, message.provider);
+  } else if (message.pageState === 'login-required') {
+    localState = setWorkspaceProviderIssue(localState, workspaceLookup.workspaceId, message.provider, 'needs-login');
+  } else if (message.pageState === 'not-ready') {
+    localState = setWorkspaceProviderIssue(localState, workspaceLookup.workspaceId, message.provider, 'loading');
+  }
+
+  if (
+    message.pageState === 'ready' ||
+    message.pageState === 'login-required' ||
+    message.pageState === 'not-ready'
+  ) {
     await setLocalState(localState);
   }
 
