@@ -1,4 +1,4 @@
-import { findClickableByText, isVisible, triggerPointerClick } from './dom';
+import { findClickableByText, getVisibleButtonTexts, isVisible, triggerPointerClick } from './dom';
 import { createDomProviderAdapter } from './factory';
 
 function dismissManusOverlay(): void {
@@ -26,26 +26,37 @@ function dismissManusOverlay(): void {
   }
 }
 
+export function isManusLoginRequiredPage(input: {
+  pathname: string;
+  buttonTexts: string[];
+}): boolean {
+  const pathname = input.pathname.toLowerCase();
+  const buttonTexts = input.buttonTexts.map((text) => text.toLowerCase());
+  const authCtaCount = buttonTexts.filter(
+    (text) => text === 'sign in' || text === 'sign up' || text.startsWith('continue with '),
+  ).length;
+
+  if (pathname.startsWith('/login')) {
+    return true;
+  }
+
+  if (pathname === '/' || pathname === '') {
+    return authCtaCount > 0;
+  }
+
+  return authCtaCount >= 2;
+}
+
 export const manusAdapter = createDomProviderAdapter({
   provider: 'manus',
   mountId: 'ask-em-manus-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-manus',
   prepareDom: dismissManusOverlay,
   isLoginRequired() {
-    if (window.location.pathname.startsWith('/login')) {
-      return true;
-    }
-
-    const authCtas = Array.from(document.querySelectorAll<HTMLElement>('a, button')).filter((element) => {
-      if (!isVisible(element)) {
-        return false;
-      }
-
-      const text = (element.innerText || element.textContent || '').trim().toLowerCase();
-      return text === 'sign in' || text === 'sign up' || text.startsWith('continue with ');
+    return isManusLoginRequiredPage({
+      pathname: window.location.pathname,
+      buttonTexts: getVisibleButtonTexts(),
     });
-
-    return authCtas.length >= 2;
   },
   composerSelectors: ['.tiptap.ProseMirror'],
   findSendButton(findComposer) {
@@ -73,15 +84,6 @@ export const manusAdapter = createDomProviderAdapter({
 
     return buttons.at(-1) ?? null;
   },
-  loginKeywords: [
-    'sign in or sign up',
-    'sign in',
-    'sign up',
-    'continue with google',
-    'continue with apple',
-    'continue with microsoft',
-    'verify you are human',
-  ],
   errorKeywords: ['something went wrong', 'failed to load', 'try again'],
   submitWaitMs: 200,
   submitTimeoutMs: 3_000,

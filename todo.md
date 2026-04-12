@@ -14,10 +14,10 @@ Acceptance:
 - No phase-1 provider relies on whole-page keyword scanning for auth
 
 ## Phase 2 — Structural Auth Signals For ChatGPT / Manus
-- [ ] Replace ChatGPT body-text auth detection with visible CTA / account-chooser signals
-- [ ] Replace Manus auth detection with visible nav CTA signals
-- [ ] Remove provider-specific fallback dependence on whole-page keyword scans where possible
-- [ ] Expand pure auth-rule tests for ChatGPT / Manus
+- [x] Replace ChatGPT body-text auth detection with visible CTA / account-chooser signals
+- [x] Replace Manus auth detection with visible nav CTA signals
+- [x] Remove provider-specific fallback dependence on whole-page keyword scans where possible
+- [x] Expand pure auth-rule tests for ChatGPT / Manus
 
 Acceptance:
 - ChatGPT account chooser on `/` is `login-required` without reading full-page transcript text
