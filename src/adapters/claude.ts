@@ -1,130 +1,45 @@
-import { getSiteInfoByProvider } from './sites';
-import type { AdapterSnapshot, ProviderAdapter } from './types';
-import type { DeliverPromptMessage, ProviderStatus } from '../runtime/protocol';
-import {
-  detectObviousErrorPage,
-  detectLoginRequired,
-  dispatchEnterKey,
-  getEditableText,
-  isElementWithin,
-  queryVisible,
-  sleep,
-  setEditableText,
-  triggerPointerClick,
-  waitFor,
-  waitForUrlChange,
-} from './dom';
+import { getVisibleButtonTexts } from './dom';
+import { createDomProviderAdapter } from './factory';
 
-const site = getSiteInfoByProvider('claude');
-
-function findComposer(): HTMLElement | null {
-  return queryVisible(['[data-testid="chat-input"]', '[aria-label="Write your prompt to Claude"]']);
-}
-
-function findSendButton(): HTMLElement | null {
-  return queryVisible(['button[aria-label="Send message"]']);
-}
-
-function getStatus(): ProviderStatus {
-  const currentUrl = window.location.href;
-  const hasObviousError = detectObviousErrorPage([
-    'conversation not found',
-    'something went wrong',
-  ]);
-  const isReady = Boolean(findComposer()) && !hasObviousError;
-  const pageState = isReady
-    ? 'ready'
-    : detectLoginRequired(['log in', 'sign in', 'continue with google'])
-      ? 'login-required'
-      : 'not-ready';
-
-  return {
-    provider: 'claude',
-    currentUrl,
-    sessionId: site.extractSessionId(currentUrl),
-    pageKind: site.isBlankChatUrl(currentUrl) ? 'new-chat' : 'existing-session',
-    pageState,
-  };
-}
-
-function canDeliverPrompt(message: DeliverPromptMessage, snapshot: AdapterSnapshot): boolean {
-  if (message.provider !== 'claude' || snapshot.pageState !== 'ready') {
-    return false;
+export function isClaudeLoginRequiredPage(input: {
+  pathname: string;
+  buttonTexts: string[];
+}): boolean {
+  const pathname = input.pathname.toLowerCase();
+  if (pathname.startsWith('/login')) {
+    return true;
   }
 
-  if (message.expectedSessionId) {
-    return snapshot.sessionId === message.expectedSessionId;
-  }
+  const buttonTexts = input.buttonTexts.map((text) => text.toLowerCase());
 
-  return snapshot.pageKind === 'new-chat';
+  return (
+    buttonTexts.some((text) => text.includes('continue with google')) ||
+    buttonTexts.some((text) => text.includes('continue with email')) ||
+    buttonTexts.some((text) => text === 'console login') ||
+    buttonTexts.some((text) => text === 'log in')
+  );
 }
 
-export const claudeAdapter: ProviderAdapter = {
-  name: 'claude',
-  getUiSpec() {
+export const claudeAdapter = createDomProviderAdapter({
+  provider: 'claude',
+  mountId: 'ask-em-claude-ui',
+  className: 'ask-em-provider-ui ask-em-provider-ui-claude',
+  classifyAuth() {
+    const pathname = window.location.pathname;
+    const buttonTexts = getVisibleButtonTexts();
+    const isLoginRequired = isClaudeLoginRequiredPage({ pathname, buttonTexts });
+
     return {
-      mountId: 'ask-em-claude-ui',
-      className: 'ask-em-provider-ui ask-em-provider-ui-claude',
+      isLoginRequired,
+      rule: pathname.toLowerCase().startsWith('/login')
+        ? 'claude-auth-url'
+        : isLoginRequired
+          ? 'claude-auth-cta-cluster'
+          : undefined,
+      signals: `pathname=${pathname}; buttons=[${buttonTexts.slice(0, 6).join(' | ')}]`,
     };
   },
-  session: {
-    getCurrentUrl() {
-      return window.location.href;
-    },
-    getStatus,
-    waitForSessionRefUpdate(baselineUrl) {
-      return waitForUrlChange(site.extractSessionId, baselineUrl);
-    },
-    canDeliverPrompt,
-  },
-  composer: {
-    subscribeToUserSubmissions(onSubmit) {
-      const handleKeydown = (event: KeyboardEvent) => {
-        const composer = findComposer();
-        if (
-          event.key === 'Enter' &&
-          !event.shiftKey &&
-          !event.isComposing &&
-          isElementWithin(event.target, composer)
-        ) {
-          onSubmit(getEditableText(composer));
-        }
-      };
-
-      const handleClick = (event: MouseEvent) => {
-        const sendButton = findSendButton();
-        if (isElementWithin(event.target, sendButton)) {
-          onSubmit(getEditableText(findComposer()));
-        }
-      };
-
-      document.addEventListener('keydown', handleKeydown, true);
-      document.addEventListener('click', handleClick, true);
-
-      return () => {
-        document.removeEventListener('keydown', handleKeydown, true);
-        document.removeEventListener('click', handleClick, true);
-      };
-    },
-    async setComposerText(content) {
-      setEditableText(findComposer(), content);
-    },
-    async submit() {
-      await sleep(150);
-      const sendButton = await waitFor(() => {
-        const button = findSendButton();
-        return button && !button.hasAttribute('disabled') ? button : null;
-      }, 2_000);
-
-      if (sendButton) {
-        triggerPointerClick(sendButton);
-        return;
-      }
-
-      const composer = findComposer();
-      if (composer) {
-        dispatchEnterKey(composer);
-      }
-    },
-  },
-};
+  composerSelectors: ['[data-testid="chat-input"]', '[aria-label="Write your prompt to Claude"]'],
+  sendButtonSelectors: ['button[aria-label="Send message"]'],
+  errorKeywords: ['conversation not found', 'something went wrong'],
+});

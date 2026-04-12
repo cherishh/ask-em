@@ -9,6 +9,7 @@ import {
   type Provider,
   type SessionState,
   type Workspace,
+  type WorkspaceIssue,
   type WorkspaceIndex,
 } from './protocol';
 
@@ -73,6 +74,7 @@ export function createPendingWorkspace(
     createdAt: now,
     updatedAt: now,
     pendingSource: input.sourceProvider,
+    memberIssues: {},
   };
 
   return {
@@ -207,6 +209,8 @@ export function clearWorkspaceProvider(
   if (member) {
     delete nextMembers[provider];
   }
+  const nextMemberIssues = { ...(workspace.memberIssues ?? {}) };
+  delete nextMemberIssues[provider];
 
   const nextWorkspaceIndex = { ...state.workspaceIndex };
   if (member?.sessionId) {
@@ -222,6 +226,7 @@ export function clearWorkspaceProvider(
       [workspaceId]: {
         ...workspace,
         members: nextMembers,
+        memberIssues: nextMemberIssues,
         enabledProviders,
         updatedAt: Date.now(),
         pendingSource: workspace.pendingSource === provider ? undefined : workspace.pendingSource,
@@ -254,6 +259,61 @@ export function setWorkspaceProviderEnabled(
       [workspaceId]: {
         ...workspace,
         enabledProviders,
+        updatedAt: Date.now(),
+      },
+    },
+  };
+}
+
+export function setWorkspaceProviderIssue(
+  state: LocalState,
+  workspaceId: string,
+  provider: Provider,
+  issue: WorkspaceIssue,
+): LocalState {
+  const workspace = state.workspaces[workspaceId];
+
+  if (!workspace) {
+    return state;
+  }
+
+  return {
+    ...state,
+    workspaces: {
+      ...state.workspaces,
+      [workspaceId]: {
+        ...workspace,
+        memberIssues: {
+          ...(workspace.memberIssues ?? {}),
+          [provider]: issue,
+        },
+        updatedAt: Date.now(),
+      },
+    },
+  };
+}
+
+export function clearWorkspaceProviderIssue(
+  state: LocalState,
+  workspaceId: string,
+  provider: Provider,
+): LocalState {
+  const workspace = state.workspaces[workspaceId];
+
+  if (!workspace?.memberIssues?.[provider]) {
+    return state;
+  }
+
+  const nextMemberIssues = { ...workspace.memberIssues };
+  delete nextMemberIssues[provider];
+
+  return {
+    ...state,
+    workspaces: {
+      ...state.workspaces,
+      [workspaceId]: {
+        ...workspace,
+        memberIssues: nextMemberIssues,
         updatedAt: Date.now(),
       },
     },

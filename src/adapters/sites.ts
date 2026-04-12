@@ -56,6 +56,18 @@ export const SUPPORTED_SITES: SiteInfo[] = [
       return extractLastPathSegment(url, '/a/chat/s/');
     },
   },
+  {
+    name: 'manus',
+    origin: 'https://manus.im',
+    matches: ['*://manus.im/*'],
+    isBlankChatUrl(url) {
+      const pathname = new URL(url).pathname;
+      return pathname === '/' || pathname === '/app' || pathname === '/app/';
+    },
+    extractSessionId(url) {
+      return extractLastPathSegment(url, '/app/');
+    },
+  },
 ];
 
 function extractLastPathSegment(url: string, prefix: string): string | null {

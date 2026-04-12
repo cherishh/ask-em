@@ -1,135 +1,65 @@
-import { getSiteInfoByProvider } from './sites';
-import type { AdapterSnapshot, ProviderAdapter } from './types';
-import type { DeliverPromptMessage, ProviderStatus } from '../runtime/protocol';
-import {
-  detectObviousErrorPage,
-  detectLoginRequired,
-  dispatchEnterKey,
-  getEditableText,
-  isElementWithin,
-  queryVisible,
-  sleep,
-  setEditableText,
-  triggerPointerClick,
-  waitFor,
-  waitForUrlChange,
-} from './dom';
+import { getVisibleButtonTexts, getVisibleHeadingTexts } from './dom';
+import { createDomProviderAdapter } from './factory';
 
-const site = getSiteInfoByProvider('chatgpt');
+export function isChatgptLoginRequiredPage(input: {
+  pathname: string;
+  buttonTexts: string[];
+  headingTexts: string[];
+}): boolean {
+  const pathname = input.pathname.toLowerCase();
+  const buttonTexts = input.buttonTexts.map((text) => text.toLowerCase());
+  const headingTexts = input.headingTexts.map((text) => text.toLowerCase());
 
-function findComposer(): HTMLElement | null {
-  return queryVisible(['#prompt-textarea', 'div[role="textbox"][aria-label="Chat with ChatGPT"]']);
+  return (
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/login') ||
+    headingTexts.includes('welcome back') ||
+    headingTexts.includes('choose an account to continue') ||
+    buttonTexts.includes('log in') ||
+    buttonTexts.includes('sign up') ||
+    buttonTexts.includes('sign up for free') ||
+    buttonTexts.includes('continue with google') ||
+    buttonTexts.includes('continue with microsoft') ||
+    buttonTexts.includes('continue with apple')
+  );
 }
 
-function findSendButton(): HTMLElement | null {
-  return queryVisible([
+export const chatgptAdapter = createDomProviderAdapter({
+  provider: 'chatgpt',
+  mountId: 'ask-em-chatgpt-ui',
+  className: 'ask-em-provider-ui ask-em-provider-ui-chatgpt',
+  classifyAuth() {
+    const pathname = window.location.pathname;
+    const buttonTexts = getVisibleButtonTexts();
+    const headingTexts = getVisibleHeadingTexts();
+    const isLoginRequired = isChatgptLoginRequiredPage({
+      pathname,
+      buttonTexts,
+      headingTexts,
+    });
+
+    return {
+      isLoginRequired,
+      rule: pathname.toLowerCase().startsWith('/auth') || pathname.toLowerCase().startsWith('/login')
+        ? 'chatgpt-auth-url'
+        : headingTexts.some((text) => text.toLowerCase() === 'welcome back')
+          ? 'chatgpt-account-chooser-heading'
+          : isLoginRequired
+            ? 'chatgpt-auth-cta-cluster'
+            : undefined,
+      signals: `pathname=${pathname}; headings=[${headingTexts.slice(0, 4).join(' | ')}]; buttons=[${buttonTexts
+        .slice(0, 8)
+        .join(' | ')}]`,
+    };
+  },
+  composerSelectors: ['#prompt-textarea', 'div[role="textbox"][aria-label="Chat with ChatGPT"]'],
+  sendButtonSelectors: [
     '#composer-submit-button',
     'button[data-testid="send-button"]',
     'button[data-testid="composer-send-button"]',
     'form[aria-label="Chat with ChatGPT"] button[class*="composer-submit-button"]',
-  ]);
-}
-
-function getStatus(): ProviderStatus {
-  const currentUrl = window.location.href;
-  const hasObviousError = detectObviousErrorPage([
-    'unable to load conversation',
-    'conversation not found',
-  ]);
-  const isReady = Boolean(findComposer()) && !hasObviousError;
-  const pageState = isReady
-    ? 'ready'
-    : detectLoginRequired(['log in', 'sign up', 'continue with google'])
-      ? 'login-required'
-      : 'not-ready';
-
-  return {
-    provider: 'chatgpt',
-    currentUrl,
-    sessionId: site.extractSessionId(currentUrl),
-    pageKind: site.isBlankChatUrl(currentUrl) ? 'new-chat' : 'existing-session',
-    pageState,
-  };
-}
-
-function canDeliverPrompt(message: DeliverPromptMessage, snapshot: AdapterSnapshot): boolean {
-  if (message.provider !== 'chatgpt' || snapshot.pageState !== 'ready') {
-    return false;
-  }
-
-  if (message.expectedSessionId) {
-    return snapshot.sessionId === message.expectedSessionId;
-  }
-
-  return snapshot.pageKind === 'new-chat';
-}
-
-export const chatgptAdapter: ProviderAdapter = {
-  name: 'chatgpt',
-  getUiSpec() {
-    return {
-      mountId: 'ask-em-chatgpt-ui',
-      className: 'ask-em-provider-ui ask-em-provider-ui-chatgpt',
-    };
-  },
-  session: {
-    getCurrentUrl() {
-      return window.location.href;
-    },
-    getStatus,
-    waitForSessionRefUpdate(baselineUrl) {
-      return waitForUrlChange(site.extractSessionId, baselineUrl);
-    },
-    canDeliverPrompt,
-  },
-  composer: {
-    subscribeToUserSubmissions(onSubmit) {
-      const handleKeydown = (event: KeyboardEvent) => {
-        const composer = findComposer();
-        if (
-          event.key === 'Enter' &&
-          !event.shiftKey &&
-          !event.isComposing &&
-          isElementWithin(event.target, composer)
-        ) {
-          onSubmit(getEditableText(composer));
-        }
-      };
-
-      const handleClick = (event: MouseEvent) => {
-        const sendButton = findSendButton();
-        if (isElementWithin(event.target, sendButton)) {
-          onSubmit(getEditableText(findComposer()));
-        }
-      };
-
-      document.addEventListener('keydown', handleKeydown, true);
-      document.addEventListener('click', handleClick, true);
-
-      return () => {
-        document.removeEventListener('keydown', handleKeydown, true);
-        document.removeEventListener('click', handleClick, true);
-      };
-    },
-    async setComposerText(content) {
-      setEditableText(findComposer(), content);
-    },
-    async submit() {
-      await sleep(200);
-      const sendButton = await waitFor(() => {
-        const button = findSendButton();
-        return button && !button.hasAttribute('disabled') ? button : null;
-      }, 2_500);
-
-      if (sendButton) {
-        triggerPointerClick(sendButton);
-        return;
-      }
-
-      const composer = findComposer();
-      if (composer) {
-        dispatchEnterKey(composer);
-      }
-    },
-  },
-};
+  ],
+  errorKeywords: ['unable to load conversation', 'conversation not found'],
+  submitWaitMs: 200,
+  submitTimeoutMs: 2_500,
+});

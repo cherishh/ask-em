@@ -33,6 +33,24 @@ type StorageArea = Pick<
   'get' | 'set' | 'remove'
 >;
 
+function createStorageQueue() {
+  let tail = Promise.resolve();
+
+  return {
+    run<T>(task: () => Promise<T>): Promise<T> {
+      const result = tail.then(task, task);
+      tail = result.then(
+        () => undefined,
+        () => undefined,
+      );
+      return result;
+    },
+  };
+}
+
+const localStateQueue = createStorageQueue();
+const sessionStateQueue = createStorageQueue();
+
 async function readState<T>(area: StorageArea, key: string, fallback: T): Promise<T> {
   const result = await area.get(key);
   return (result[key] as T | undefined) ?? fallback;
@@ -67,26 +85,38 @@ function normalizeLocalState(state: LocalState): LocalState {
 }
 
 export async function getLocalState(): Promise<LocalState> {
-  const state = await readState(chrome.storage.local, STORAGE_KEYS.local, DEFAULT_LOCAL_STATE);
-  const normalized = normalizeLocalState(state);
+  return localStateQueue.run(async () => {
+    const state = await readState(chrome.storage.local, STORAGE_KEYS.local, DEFAULT_LOCAL_STATE);
+    const normalized = normalizeLocalState(state);
 
-  if (normalized !== state) {
-    await writeState(chrome.storage.local, STORAGE_KEYS.local, normalized);
-  }
+    if (normalized !== state) {
+      await writeState(chrome.storage.local, STORAGE_KEYS.local, normalized);
+    }
 
-  return normalized;
+    return normalized;
+  });
 }
 
 export async function setLocalState(state: LocalState): Promise<LocalState> {
-  return writeState(chrome.storage.local, STORAGE_KEYS.local, normalizeLocalState(state));
+  return localStateQueue.run(async () =>
+    writeState(chrome.storage.local, STORAGE_KEYS.local, normalizeLocalState(state)),
+  );
 }
 
 export async function updateLocalState(
   updater: (state: LocalState) => LocalState | Promise<LocalState>,
 ): Promise<LocalState> {
-  const current = await getLocalState();
-  const next = await updater(current);
-  return setLocalState(next);
+  return localStateQueue.run(async () => {
+    const current = await readState(chrome.storage.local, STORAGE_KEYS.local, DEFAULT_LOCAL_STATE);
+    const normalizedCurrent = normalizeLocalState(current);
+
+    if (normalizedCurrent !== current) {
+      await writeState(chrome.storage.local, STORAGE_KEYS.local, normalizedCurrent);
+    }
+
+    const next = await updater(normalizedCurrent);
+    return writeState(chrome.storage.local, STORAGE_KEYS.local, normalizeLocalState(next));
+  });
 }
 
 export async function clearLocalState(): Promise<void> {
@@ -94,19 +124,25 @@ export async function clearLocalState(): Promise<void> {
 }
 
 export async function getSessionState(): Promise<SessionState> {
-  return readState(chrome.storage.session, STORAGE_KEYS.session, DEFAULT_SESSION_STATE);
+  return sessionStateQueue.run(async () =>
+    readState(chrome.storage.session, STORAGE_KEYS.session, DEFAULT_SESSION_STATE),
+  );
 }
 
 export async function setSessionState(state: SessionState): Promise<SessionState> {
-  return writeState(chrome.storage.session, STORAGE_KEYS.session, state);
+  return sessionStateQueue.run(async () =>
+    writeState(chrome.storage.session, STORAGE_KEYS.session, state),
+  );
 }
 
 export async function updateSessionState(
   updater: (state: SessionState) => SessionState | Promise<SessionState>,
 ): Promise<SessionState> {
-  const current = await getSessionState();
-  const next = await updater(current);
-  return setSessionState(next);
+  return sessionStateQueue.run(async () => {
+    const current = await readState(chrome.storage.session, STORAGE_KEYS.session, DEFAULT_SESSION_STATE);
+    const next = await updater(current);
+    return writeState(chrome.storage.session, STORAGE_KEYS.session, next);
+  });
 }
 
 export async function clearSessionState(): Promise<void> {

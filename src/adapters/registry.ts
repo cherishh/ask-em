@@ -2,6 +2,7 @@ import { claudeAdapter } from './claude';
 import { deepseekAdapter } from './deepseek';
 import { geminiAdapter } from './gemini';
 import { chatgptAdapter } from './chatgpt';
+import { manusAdapter } from './manus';
 import type { ProviderAdapter } from './types';
 import { getSiteInfo, isSupportedOrigin, SUPPORTED_SITES } from './sites';
 
@@ -10,6 +11,7 @@ export const adapterRegistry: Record<(typeof SUPPORTED_SITES)[number]['name'], P
   chatgpt: chatgptAdapter,
   gemini: geminiAdapter,
   deepseek: deepseekAdapter,
+  manus: manusAdapter,
 };
 
 export function getAdapter(provider: (typeof SUPPORTED_SITES)[number]['name']): ProviderAdapter {

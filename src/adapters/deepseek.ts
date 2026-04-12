@@ -1,141 +1,87 @@
-import { getSiteInfoByProvider } from './sites';
-import type { AdapterSnapshot, ProviderAdapter } from './types';
-import type { DeliverPromptMessage, ProviderStatus } from '../runtime/protocol';
-import {
-  detectObviousErrorPage,
-  detectLoginRequired,
-  dispatchEnterKey,
-  getEditableText,
-  isElementWithin,
-  queryVisible,
-  sleep,
-  setEditableText,
-  triggerPointerClick,
-  waitFor,
-  waitForUrlChange,
-} from './dom';
+import { getVisibleButtonTexts, getVisibleInputDescriptors, isElementWithin } from './dom';
+import { createDomProviderAdapter } from './factory';
 
-const site = getSiteInfoByProvider('deepseek');
-
-function findComposer(): HTMLElement | null {
-  return queryVisible(['textarea[placeholder="Message DeepSeek"]']);
-}
-
-function findSendButton(): HTMLElement | null {
-  const composer = findComposer();
-  const container = composer?.closest('div')?.parentElement;
-
-  if (!container) {
-    return null;
+export function isDeepseekLoginRequiredPage(input: {
+  pathname: string;
+  buttonTexts: string[];
+  inputs: Array<{
+    type: string | null;
+    placeholder: string | null;
+    ariaLabel: string | null;
+  }>;
+}): boolean {
+  const pathname = input.pathname.toLowerCase();
+  if (pathname.startsWith('/sign_in')) {
+    return true;
   }
 
-  const buttons = Array.from(
-    container.querySelectorAll<HTMLElement>('div.ds-icon-button[role="button"][aria-disabled]'),
-  ).filter((element) => isElementWithin(element, container));
+  const buttonTexts = input.buttonTexts.map((text) => text.toLowerCase());
+  const hasLoginCtas =
+    buttonTexts.some((text) => text === 'log in') &&
+    buttonTexts.some((text) => text === 'sign up');
+  const credentialInputs = input.inputs.filter((inputDescriptor) => {
+    const haystack = [
+      inputDescriptor.placeholder ?? '',
+      inputDescriptor.ariaLabel ?? '',
+      inputDescriptor.type ?? '',
+    ]
+      .join(' ')
+      .toLowerCase();
 
-  return buttons.at(-1) ?? null;
+    return (
+      haystack.includes('phone number') ||
+      haystack.includes('email') ||
+      haystack.includes('password')
+    );
+  });
+
+  return hasLoginCtas && credentialInputs.length >= 2;
 }
 
-function getStatus(): ProviderStatus {
-  const currentUrl = window.location.href;
-  const hasObviousError = detectObviousErrorPage([
-    'network error',
-    'something went wrong',
-  ]);
-  const isReady = Boolean(findComposer()) && !hasObviousError;
-  const pageState = isReady
-    ? 'ready'
-    : detectLoginRequired(['log in', 'sign in', 'phone number'])
-      ? 'login-required'
-      : 'not-ready';
+export const deepseekAdapter = createDomProviderAdapter({
+  provider: 'deepseek',
+  mountId: 'ask-em-deepseek-ui',
+  className: 'ask-em-provider-ui ask-em-provider-ui-deepseek',
+  classifyAuth() {
+    const pathname = window.location.pathname;
+    const buttonTexts = getVisibleButtonTexts();
+    const inputs = getVisibleInputDescriptors();
+    const isLoginRequired = isDeepseekLoginRequiredPage({
+      pathname,
+      buttonTexts,
+      inputs,
+    });
 
-  return {
-    provider: 'deepseek',
-    currentUrl,
-    sessionId: site.extractSessionId(currentUrl),
-    pageKind: site.isBlankChatUrl(currentUrl) ? 'new-chat' : 'existing-session',
-    pageState,
-  };
-}
-
-function canDeliverPrompt(message: DeliverPromptMessage, snapshot: AdapterSnapshot): boolean {
-  if (message.provider !== 'deepseek' || snapshot.pageState !== 'ready') {
-    return false;
-  }
-
-  if (message.expectedSessionId) {
-    return snapshot.sessionId === message.expectedSessionId;
-  }
-
-  return snapshot.pageKind === 'new-chat';
-}
-
-export const deepseekAdapter: ProviderAdapter = {
-  name: 'deepseek',
-  getUiSpec() {
     return {
-      mountId: 'ask-em-deepseek-ui',
-      className: 'ask-em-provider-ui ask-em-provider-ui-deepseek',
+      isLoginRequired,
+      rule: pathname.toLowerCase().startsWith('/sign_in')
+        ? 'deepseek-auth-url'
+        : isLoginRequired
+          ? 'deepseek-auth-form'
+          : undefined,
+      signals: `pathname=${pathname}; buttons=[${buttonTexts.slice(0, 6).join(' | ')}]; inputs=${inputs
+        .map((input) => [input.type, input.placeholder, input.ariaLabel].filter(Boolean).join('/'))
+        .slice(0, 4)
+        .join(' | ')}`,
     };
   },
-  session: {
-    getCurrentUrl() {
-      return window.location.href;
-    },
-    getStatus,
-    waitForSessionRefUpdate(baselineUrl) {
-      return waitForUrlChange(site.extractSessionId, baselineUrl);
-    },
-    canDeliverPrompt,
+  composerSelectors: ['textarea[placeholder="Message DeepSeek"]'],
+  findSendButton(findComposer) {
+    const composer = findComposer();
+    const container = composer?.closest('div')?.parentElement;
+
+    if (!container) {
+      return null;
+    }
+
+    const buttons = Array.from(
+      container.querySelectorAll<HTMLElement>('div.ds-icon-button[role="button"][aria-disabled]'),
+    ).filter((element) => isElementWithin(element, container));
+
+    return buttons.at(-1) ?? null;
   },
-  composer: {
-    subscribeToUserSubmissions(onSubmit) {
-      const handleKeydown = (event: KeyboardEvent) => {
-        const composer = findComposer();
-        if (
-          event.key === 'Enter' &&
-          !event.shiftKey &&
-          !event.isComposing &&
-          isElementWithin(event.target, composer)
-        ) {
-          onSubmit(getEditableText(composer));
-        }
-      };
-
-      const handleClick = (event: MouseEvent) => {
-        const sendButton = findSendButton();
-        if (isElementWithin(event.target, sendButton)) {
-          onSubmit(getEditableText(findComposer()));
-        }
-      };
-
-      document.addEventListener('keydown', handleKeydown, true);
-      document.addEventListener('click', handleClick, true);
-
-      return () => {
-        document.removeEventListener('keydown', handleKeydown, true);
-        document.removeEventListener('click', handleClick, true);
-      };
-    },
-    async setComposerText(content) {
-      setEditableText(findComposer(), content);
-    },
-    async submit() {
-      await sleep(150);
-      const sendButton = await waitFor(() => {
-        const button = findSendButton();
-        return button && button.getAttribute('aria-disabled') !== 'true' ? button : null;
-      }, 2_000);
-
-      if (sendButton && sendButton.getAttribute('aria-disabled') !== 'true') {
-        triggerPointerClick(sendButton);
-        return;
-      }
-
-      const composer = findComposer();
-      if (composer) {
-        dispatchEnterKey(composer);
-      }
-    },
+  errorKeywords: ['network error', 'something went wrong'],
+  isSendButtonEnabled(button) {
+    return button.getAttribute('aria-disabled') !== 'true';
   },
-};
+});
