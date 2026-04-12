@@ -80,7 +80,9 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
     });
   };
 
-  const presenceController = createPresenceController(adapter, state);
+  const presenceController = createPresenceController(adapter, state, {
+    logDebug,
+  });
   const submitController = createSubmitController(adapter, state, {
     reportPresence: presenceController.reportPresence,
     logDebug,

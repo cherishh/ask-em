@@ -302,11 +302,11 @@ export default function App() {
               <div className="askem-us-group">
                 <div className="askem-us-toggle-row">
                   <div>
-                    <span className="askem-us-row-title">Close tabs when deleting a set</span>
+                    <span className="askem-us-row-title">Close tabs used by this set</span>
                     <span className="askem-us-row-sub">
                       {status?.closeTabsOnDeleteSet
-                        ? "Delete Set also closes set's tabs."
-                        : 'Delete Set keeps provider tabs open.'}
+                        ? 'Delete Set also closes tabs currently used by this set.'
+                        : 'Delete Set keeps those tabs open.'}
                     </span>
                   </div>
                   <button

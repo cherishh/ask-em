@@ -60,6 +60,42 @@ export async function deliverPromptToWorkspaceTargets(
   const settledResults = await Promise.allSettled(
     providers.map(async (provider) => {
       let deliveryResult: ProviderDeliveryResult;
+      const existingIssue = workspace.memberIssues?.[provider] ?? null;
+
+      if (existingIssue === 'needs-login') {
+        const reason = `${provider} login required`;
+        await logDebug({
+          level: 'info',
+          scope: 'background',
+          provider,
+          workspaceId,
+          message: 'Skipped delivery for provider with known login issue',
+          detail: reason,
+        });
+
+        deliveryResult = {
+          provider,
+          ok: false,
+          reason,
+        } satisfies ProviderDeliveryResult;
+
+        completed += 1;
+        failed += 1;
+
+        if (sourceTabId) {
+          await notifySyncProgress(sourceTabId, {
+            type: 'SYNC_PROGRESS',
+            workspaceId,
+            total: providers.length,
+            completed,
+            succeeded,
+            failed,
+          });
+        }
+
+        return deliveryResult;
+      }
+
       try {
         const target = await resolveDeliveryTarget(workspace, provider, sessionState);
         await upsertClaimedTab(workspaceId, provider, {
