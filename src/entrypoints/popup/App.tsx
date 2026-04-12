@@ -850,7 +850,7 @@ function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => void })
           <p>ask&apos;em is a browser extension that synchronizes prompts you type across multiple AI chat provider websites. The Extension operates entirely within your browser and interacts with third-party websites on your behalf.</p>
 
           <h3>3. Third-Party Services</h3>
-          <p>The Extension interacts with third-party AI chat services (Claude, ChatGPT, Gemini, DeepSeek). Your use of those services is governed by their respective terms. ask&apos;em is not affiliated with any of these providers.</p>
+          <p>The Extension interacts with third-party AI chat services (Claude, ChatGPT, Gemini, DeepSeek, Manus). Your use of those services is governed by their respective terms. ask&apos;em is not affiliated with any of these providers.</p>
 
           <h3>4. User Responsibilities</h3>
           <p>You are responsible for your prompts and for complying with each provider&apos;s terms. You must have valid accounts with the providers you use.</p>

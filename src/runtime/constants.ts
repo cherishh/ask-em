@@ -11,7 +11,7 @@ export const STORAGE_KEYS = {
   session: 'ask-em-session-state',
 } as const;
 
-export const ALL_PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek'];
+export const ALL_PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek', 'manus'];
 
 export function createDefaultEnabledProviders(
   enabledProviders: Provider[] = ALL_PROVIDERS,
@@ -21,6 +21,7 @@ export function createDefaultEnabledProviders(
     chatgpt: enabledProviders.includes('chatgpt'),
     gemini: enabledProviders.includes('gemini'),
     deepseek: enabledProviders.includes('deepseek'),
+    manus: enabledProviders.includes('manus'),
   };
 }
 

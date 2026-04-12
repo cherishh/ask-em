@@ -19,6 +19,7 @@ type DomProviderAdapterConfig = {
   provider: Provider;
   mountId: string;
   className: string;
+  prepareDom?: () => void;
   composerSelectors: string[];
   sendButtonSelectors?: string[];
   findSendButton?: (findComposer: () => HTMLElement | null) => HTMLElement | null;
@@ -32,13 +33,22 @@ type DomProviderAdapterConfig = {
 export function createDomProviderAdapter(config: DomProviderAdapterConfig): ProviderAdapter {
   const site = getSiteInfoByProvider(config.provider);
 
-  const findComposer = () => queryVisible(config.composerSelectors);
-  const findSendButton = () =>
-    config.findSendButton ? config.findSendButton(findComposer) : queryVisible(config.sendButtonSelectors ?? []);
+  const prepareDom = () => {
+    config.prepareDom?.();
+  };
+  const findComposer = () => {
+    prepareDom();
+    return queryVisible(config.composerSelectors);
+  };
+  const findSendButton = () => {
+    prepareDom();
+    return config.findSendButton ? config.findSendButton(findComposer) : queryVisible(config.sendButtonSelectors ?? []);
+  };
   const isSendButtonEnabled = (button: HTMLElement) =>
     config.isSendButtonEnabled ? config.isSendButtonEnabled(button) : !button.hasAttribute('disabled');
 
   const getStatus = (): ProviderStatus => {
+    prepareDom();
     const currentUrl = window.location.href;
     const hasObviousError = detectObviousErrorPage(config.errorKeywords ?? []);
     const isReady = Boolean(findComposer()) && !hasObviousError;
@@ -117,9 +127,11 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
         };
       },
       async setComposerText(content) {
+        prepareDom();
         setEditableText(findComposer(), content);
       },
       async submit() {
+        prepareDom();
         await sleep(config.submitWaitMs ?? 150);
         const sendButton = await waitFor(() => {
           const button = findSendButton();

@@ -1,6 +1,6 @@
 import type { ShortcutConfig } from './shortcuts';
 
-export type Provider = 'claude' | 'chatgpt' | 'gemini' | 'deepseek';
+export type Provider = 'claude' | 'chatgpt' | 'gemini' | 'deepseek' | 'manus';
 
 export type PageState = 'ready' | 'login-required' | 'not-ready';
 
