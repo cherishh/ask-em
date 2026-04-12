@@ -24,7 +24,7 @@ type DomProviderAdapterConfig = {
   composerSelectors: string[];
   sendButtonSelectors?: string[];
   findSendButton?: (findComposer: () => HTMLElement | null) => HTMLElement | null;
-  loginKeywords: string[];
+  loginKeywords?: string[];
   errorKeywords?: string[];
   submitWaitMs?: number;
   submitTimeoutMs?: number;
@@ -53,7 +53,7 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     const currentUrl = window.location.href;
     const isLoginRequired = config.isLoginRequired
       ? config.isLoginRequired()
-      : detectLoginRequired(config.loginKeywords);
+      : detectLoginRequired(config.loginKeywords ?? []);
     const hasObviousError = detectObviousErrorPage(config.errorKeywords ?? []);
     const isReady = Boolean(findComposer()) && !hasObviousError;
     const pageState = isLoginRequired ? 'login-required' : isReady ? 'ready' : 'not-ready';

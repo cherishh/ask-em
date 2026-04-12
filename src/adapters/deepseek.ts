@@ -1,10 +1,54 @@
-import { isElementWithin } from './dom';
+import { getVisibleButtonTexts, getVisibleInputDescriptors, isElementWithin } from './dom';
 import { createDomProviderAdapter } from './factory';
+
+export function isDeepseekLoginRequiredPage(input: {
+  pathname: string;
+  buttonTexts: string[];
+  inputs: Array<{
+    type: string | null;
+    placeholder: string | null;
+    ariaLabel: string | null;
+  }>;
+}): boolean {
+  const pathname = input.pathname.toLowerCase();
+  if (pathname.startsWith('/sign_in')) {
+    return true;
+  }
+
+  const buttonTexts = input.buttonTexts.map((text) => text.toLowerCase());
+  const hasLoginCtas =
+    buttonTexts.some((text) => text === 'log in') &&
+    buttonTexts.some((text) => text === 'sign up');
+  const credentialInputs = input.inputs.filter((inputDescriptor) => {
+    const haystack = [
+      inputDescriptor.placeholder ?? '',
+      inputDescriptor.ariaLabel ?? '',
+      inputDescriptor.type ?? '',
+    ]
+      .join(' ')
+      .toLowerCase();
+
+    return (
+      haystack.includes('phone number') ||
+      haystack.includes('email') ||
+      haystack.includes('password')
+    );
+  });
+
+  return hasLoginCtas && credentialInputs.length >= 2;
+}
 
 export const deepseekAdapter = createDomProviderAdapter({
   provider: 'deepseek',
   mountId: 'ask-em-deepseek-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-deepseek',
+  isLoginRequired() {
+    return isDeepseekLoginRequiredPage({
+      pathname: window.location.pathname,
+      buttonTexts: getVisibleButtonTexts(),
+      inputs: getVisibleInputDescriptors(),
+    });
+  },
   composerSelectors: ['textarea[placeholder="Message DeepSeek"]'],
   findSendButton(findComposer) {
     const composer = findComposer();
@@ -20,7 +64,6 @@ export const deepseekAdapter = createDomProviderAdapter({
 
     return buttons.at(-1) ?? null;
   },
-  loginKeywords: ['log in', 'sign in', 'phone number'],
   errorKeywords: ['network error', 'something went wrong'],
   isSendButtonEnabled(button) {
     return button.getAttribute('aria-disabled') !== 'true';

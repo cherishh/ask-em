@@ -44,6 +44,95 @@ export function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
+function getVisibleText(element: HTMLElement): string {
+  return normalizeWhitespace(element.innerText || element.textContent || '');
+}
+
+function shouldIgnoreDetectionSubtree(element: Element): boolean {
+  const tagName = element.tagName;
+  if (tagName === 'SCRIPT' || tagName === 'STYLE' || tagName === 'NOSCRIPT') {
+    return true;
+  }
+
+  return element.id.startsWith('ask-em-') || element.classList.contains('ask-em-sync-shell');
+}
+
+function getDocumentTextForDetection(): string {
+  const root = document.body;
+  if (!root) {
+    return '';
+  }
+
+  const parts: string[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (node instanceof Element && shouldIgnoreDetectionSubtree(node)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+
+      if (node.nodeType === Node.TEXT_NODE) {
+        const parent = node.parentElement;
+        if (!parent || !isVisible(parent) || shouldIgnoreDetectionSubtree(parent)) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+
+      return NodeFilter.FILTER_SKIP;
+    },
+  });
+
+  let current = walker.nextNode();
+  while (current) {
+    if (current.nodeType === Node.TEXT_NODE && current.textContent) {
+      parts.push(current.textContent);
+    }
+    current = walker.nextNode();
+  }
+
+  return normalizeWhitespace(parts.join(' '));
+}
+
+export function getVisibleButtonTexts(): string[] {
+  const elements = Array.from(document.querySelectorAll<HTMLElement>('a, button, [role="button"]'));
+
+  return elements
+    .filter((element) => isVisible(element) && !shouldIgnoreDetectionSubtree(element))
+    .map((element) => getVisibleText(element))
+    .filter(Boolean);
+}
+
+export function getVisibleHeadingTexts(): string[] {
+  const elements = Array.from(document.querySelectorAll<HTMLElement>('h1, h2, h3'));
+
+  return elements
+    .filter((element) => isVisible(element) && !shouldIgnoreDetectionSubtree(element))
+    .map((element) => getVisibleText(element))
+    .filter(Boolean);
+}
+
+export type VisibleInputDescriptor = {
+  tagName: string;
+  type: string | null;
+  placeholder: string | null;
+  ariaLabel: string | null;
+  name: string | null;
+};
+
+export function getVisibleInputDescriptors(): VisibleInputDescriptor[] {
+  const elements = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'));
+
+  return elements
+    .filter((element) => isVisible(element) && !shouldIgnoreDetectionSubtree(element))
+    .map((element) => ({
+      tagName: element.tagName,
+      type: element.getAttribute('type'),
+      placeholder: element.getAttribute('placeholder'),
+      ariaLabel: element.getAttribute('aria-label'),
+      name: element.getAttribute('name'),
+    }));
+}
+
 export function getEditableText(element: HTMLElement | null): string {
   if (!element) {
     return '';
@@ -171,12 +260,12 @@ export function isElementWithin(target: EventTarget | null, container: HTMLEleme
 }
 
 export function detectLoginRequired(keywords: string[]): boolean {
-  const bodyText = normalizeWhitespace(document.body?.innerText || '').toLowerCase();
+  const bodyText = getDocumentTextForDetection().toLowerCase();
   return keywords.some((keyword) => bodyText.includes(keyword.toLowerCase()));
 }
 
 export function detectObviousErrorPage(keywords: string[] = []): boolean {
-  const bodyText = normalizeWhitespace(document.body?.innerText || '').toLowerCase();
+  const bodyText = getDocumentTextForDetection().toLowerCase();
   const titleText = normalizeWhitespace(document.title || '').toLowerCase();
   const combinedText = `${titleText} ${bodyText}`;
 

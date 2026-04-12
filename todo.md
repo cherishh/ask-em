@@ -1,40 +1,41 @@
-# Login / Sync State Redesign
+# Auth Detection Refactor
 
-## Phase 1 — Login Detection And Source Gating
-- [x] Tighten provider login detection for real-world logged-out variants
-- [x] Treat logged-out current tabs as sync-ineligible sources
-- [x] Fix Manus logged-out landing page detection and page-kind handling
-- [x] Add focused tests for login detection / source gating
-
-Acceptance:
-- Logged-out source tabs do not create sets or fan out
-- ChatGPT / Claude / Manus / DeepSeek logged-out pages are not reported as ready
-
-## Phase 2 — Persist Sync Failures As Set Health
-- [x] Add persistent workspace-level provider issue state
-- [x] Record delivery failures as provider issues
-- [x] Clear provider issues on successful recovery / successful delivery
-- [x] Include provider issues in workspace summaries
+## Phase 1 — Structural Auth Signals For Gemini / DeepSeek / Claude
+- [x] Add shared DOM helpers for visible auth buttons, headings, and credential inputs
+- [x] Replace Gemini `loginKeywords` with structure-based auth detection
+- [x] Replace DeepSeek `loginKeywords` with structure-based auth detection
+- [x] Replace Claude `loginKeywords` with structure-based auth detection
+- [x] Add pure tests for Gemini / DeepSeek / Claude auth rules
 
 Acceptance:
-- A failed fan-out remains visible as set attention even if the target tab later disappears
-- `all models synced` is impossible after a failed fan-out until the issue is cleared
+- Gemini logged-out `/app` is `login-required` because visible `Sign in` exists, regardless of composer
+- DeepSeek logged-out `/sign_in` is `login-required` from URL / auth form signals
+- Claude logged-out `/login` is `login-required` from URL / visible auth CTA signals
+- No phase-1 provider relies on whole-page keyword scanning for auth
 
-## Phase 3 — Align Indicator And Popup / Pane Semantics
-- [x] Make indicator derive set health from persistent issues plus current provider state
-- [x] Replace internal terms like `no live tab` / `not connected` with user-facing semantics
-- [x] Show recoverable missing tabs as `Will reopen on next sync`
-- [x] Keep internal liveness states out of user-facing copy
-
-Acceptance:
-- Indicator only shows conclusions
-- Popup / pane explains per-provider status and action
-
-## Phase 4 — Regression Tests And Full Verification
-- [x] Add regression coverage for logged-out targets and failed fan-out health
-- [x] Add UI-state tests for indicator and popup/pane mappings
-- [x] Run compile / test / build
+## Phase 2 — Structural Auth Signals For ChatGPT / Manus
+- [ ] Replace ChatGPT body-text auth detection with visible CTA / account-chooser signals
+- [ ] Replace Manus auth detection with visible nav CTA signals
+- [ ] Remove provider-specific fallback dependence on whole-page keyword scans where possible
+- [ ] Expand pure auth-rule tests for ChatGPT / Manus
 
 Acceptance:
-- Logged-out sync scenario is covered end to end in tests
-- Full verification passes
+- ChatGPT account chooser on `/` is `login-required` without reading full-page transcript text
+- Manus landing page with visible `Sign in` / `Sign up` is `login-required` even if composer exists
+
+## Phase 3 — Structured Auth Classification Logging
+- [ ] Log which auth rule fired on each provider when local page state changes to `login-required`
+- [ ] Include URL, pageKind, and structural signals summary in the debug entry
+- [ ] Keep logs low-noise: only log on state transitions
+
+Acceptance:
+- A future `login-required` misclassification can be diagnosed from logs alone
+
+## Phase 4 — Delivery Confirmation Follow-up
+- [ ] Split target delivery `accepted` vs `confirmed`
+- [ ] Treat missing session-ref confirmation on new-chat targets as failed sync health
+- [ ] Persist late failures back into workspace issues
+
+Acceptance:
+- `all models synced` is impossible after a late target confirmation failure
+- ChatGPT-style delayed session-ref failures become persistent set attention
