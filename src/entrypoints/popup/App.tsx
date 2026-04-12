@@ -136,10 +136,9 @@ export default function App() {
     submitRequestModal,
     resetRequestCooldownForDev,
   } = useProviderRequest();
-  const selectedProviderKey = selectedProviders.join('|');
   const onboardingProviders = useMemo(
-    () => pickRandomProviders(selectedProviderKey ? (selectedProviderKey.split('|') as Provider[]) : [], 4),
-    [selectedProviderKey],
+    () => selectedProviders,
+    [selectedProviders],
   );
 
   const workspaceCount = status?.workspaces.length ?? 0;
@@ -654,17 +653,6 @@ function normalizeShortcutKey(event: KeyboardEvent): string {
   }
 
   return event.key.length === 1 ? event.key.toLowerCase() : event.key;
-}
-
-function pickRandomProviders(providers: Provider[], limit: number): Provider[] {
-  const shuffled = [...providers];
-
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
-  }
-
-  return shuffled.slice(0, limit);
 }
 
 function ShortcutRecorder({
