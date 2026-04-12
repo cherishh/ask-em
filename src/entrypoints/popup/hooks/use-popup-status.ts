@@ -26,19 +26,24 @@ export function usePopupStatus() {
       setLoading(true);
     }
 
-    const nextStatus = await requestStatus();
-    startTransition(() => {
-      setStatus(nextStatus);
-      if (nextStatus) {
-        setSelectedProviders(
-          PROVIDERS.filter((provider) => nextStatus.defaultEnabledProviders[provider]),
-        );
-        setShortcuts(resolveShortcutConfig(nextStatus.shortcuts));
-      }
+    try {
+      const nextStatus = await requestStatus();
+      startTransition(() => {
+        if (nextStatus) {
+          setStatus(nextStatus);
+          setSelectedProviders(
+            PROVIDERS.filter((provider) => nextStatus.defaultEnabledProviders[provider]),
+          );
+          setShortcuts(resolveShortcutConfig(nextStatus.shortcuts));
+        }
+      });
+    } finally {
       if (!options.silent) {
-        setLoading(false);
+        startTransition(() => {
+          setLoading(false);
+        });
       }
-    });
+    }
   }, []);
 
   useEffect(() => {
@@ -55,16 +60,22 @@ export function usePopupStatus() {
 
   const clearWorkspace = useCallback(async (workspaceId: string) => {
     setBusyKey(workspaceId);
-    await chrome.runtime.sendMessage({ type: 'CLEAR_WORKSPACE', workspaceId });
-    await refresh();
-    setBusyKey(null);
+    try {
+      await chrome.runtime.sendMessage({ type: 'CLEAR_WORKSPACE', workspaceId });
+      await refresh();
+    } finally {
+      setBusyKey(null);
+    }
   }, [refresh]);
 
   const clearProvider = useCallback(async (workspaceId: string, provider: Provider) => {
     setBusyKey(`${workspaceId}:${provider}`);
-    await chrome.runtime.sendMessage({ type: 'CLEAR_WORKSPACE_PROVIDER', workspaceId, provider });
-    await refresh();
-    setBusyKey(null);
+    try {
+      await chrome.runtime.sendMessage({ type: 'CLEAR_WORKSPACE_PROVIDER', workspaceId, provider });
+      await refresh();
+    } finally {
+      setBusyKey(null);
+    }
   }, [refresh]);
 
   const toggleDefaultProvider = useCallback(async (provider: Provider) => {

@@ -1,4 +1,4 @@
-import { getSiteInfoByProvider } from '../adapters/sites';
+import { getSiteInfo, getSiteInfoByProvider } from '../adapters/sites';
 import {
   HEARTBEAT_STALE_MS,
   toClaimedTabKey,
@@ -13,7 +13,7 @@ export type DeliveryTarget = {
   tabId: number;
   expectedSessionId: string | null;
   expectedUrl: string | null;
-  resolution: 'reuse-claimed-tab' | 'navigate-claimed-tab' | 'open-new-tab';
+  resolution: 'reuse-claimed-tab' | 'navigate-claimed-tab' | 'open-new-tab' | 'reuse-ready-tab';
   reason: string;
 };
 
@@ -308,4 +308,55 @@ export async function resolveDeliveryTarget(
           : `claimed tab ${claimedTab.tabId} was unsuitable and no bound URL was available`
       : 'no claimed tab was available for this provider',
   };
+}
+
+export async function resolveReadyProviderTabForWorkspace(
+  workspace: Workspace,
+  provider: Provider,
+  sessionState: SessionState,
+): Promise<DeliveryTarget | null> {
+  const member = workspace.members[provider];
+  const expectedSessionId = member?.sessionId ?? null;
+  const site = getSiteInfoByProvider(provider);
+  const tabs = await chrome.tabs.query({});
+
+  for (const tab of tabs) {
+    if (!tab.id || !tab.url) {
+      continue;
+    }
+
+    if (getSiteInfo(tab.url)?.name !== provider) {
+      continue;
+    }
+
+    const claimedTab = getClaimedTabByTabId(sessionState, tab.id, provider);
+    if (claimedTab && claimedTab.workspaceId !== workspace.id) {
+      continue;
+    }
+
+    const ping = await pingContentTab(tab.id);
+    if (!ping || ping.provider !== provider || ping.pageState !== 'ready') {
+      continue;
+    }
+
+    if (expectedSessionId) {
+      if (ping.sessionId !== expectedSessionId) {
+        continue;
+      }
+    } else if (!site.isBlankChatUrl(ping.currentUrl)) {
+      continue;
+    }
+
+    return {
+      tabId: tab.id,
+      expectedSessionId,
+      expectedUrl: member?.url ?? null,
+      resolution: 'reuse-ready-tab',
+      reason: expectedSessionId
+        ? `ready tab responded with matching session ${expectedSessionId}`
+        : 'ready tab responded on new-chat surface',
+    };
+  }
+
+  return null;
 }

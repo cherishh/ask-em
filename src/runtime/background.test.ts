@@ -17,6 +17,7 @@ const storageMocks = vi.hoisted(() => ({
   getSessionState: vi.fn(),
   setLocalState: vi.fn(),
   setSessionState: vi.fn(),
+  updateLocalState: vi.fn(),
   upsertClaimedTab: vi.fn(),
 }));
 
@@ -26,6 +27,16 @@ describe('background new-chat detachment', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    storageMocks.setLocalState.mockImplementation(async (state: LocalState) => {
+      storageMocks.getLocalState.mockResolvedValue(state);
+      return state;
+    });
+    storageMocks.updateLocalState.mockImplementation(async (updater: (state: LocalState) => LocalState | Promise<LocalState>) => {
+      const current = await storageMocks.getLocalState();
+      const next = await updater(current);
+      await storageMocks.setLocalState(next);
+      return next;
+    });
     vi.stubGlobal('defineBackground', vi.fn((callback: unknown) => callback));
     vi.stubGlobal('chrome', {
       tabs: {
@@ -1649,6 +1660,109 @@ describe('background submit routing', () => {
     expect(result.workspaceSummary?.memberIssues.chatgpt).toBe('needs-login');
   });
 
+  it('recovers a known login issue when a ready provider tab already exists', async () => {
+    const localState: LocalState = {
+      ...makeLocalState(),
+      workspaces: {
+        w1: {
+          ...makeWorkspace({
+            id: 'w1',
+            members: {
+              claude: makeConversationRef('claude', 'c-1', 'https://claude.ai/chat/c-1'),
+            },
+            enabledProviders: ['claude', 'manus'],
+          }),
+          memberIssues: {
+            manus: 'needs-login',
+          },
+        },
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+      },
+    };
+    const sessionState: SessionState = {
+      claimedTabs: {
+        'w1:claude': makeClaimedTab({
+          provider: 'claude',
+          workspaceId: 'w1',
+          tabId: 9,
+          currentUrl: 'https://claude.ai/chat/c-1',
+          sessionId: 'c-1',
+        }),
+      },
+    };
+
+    storageMocks.getLocalState.mockResolvedValue(localState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const sendMessage = vi.fn().mockImplementation((tabId: number, message: { type: string }) => {
+      if (tabId === 9 && message.type === 'SYNC_PROGRESS') {
+        return Promise.resolve({ ok: true });
+      }
+
+      if (tabId === 42 && message.type === 'PING') {
+        return Promise.resolve({
+          provider: 'manus',
+          pageState: 'ready',
+          pageKind: 'new-chat',
+          sessionId: null,
+          currentUrl: 'https://manus.im/app',
+        });
+      }
+
+      if (tabId === 42 && message.type === 'DELIVER_PROMPT') {
+        return Promise.resolve({ ok: true, accepted: true, confirmed: true });
+      }
+
+      return Promise.resolve({ ok: true });
+    });
+
+    const createTab = vi.fn();
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 9 }),
+        sendMessage,
+        create: createTab,
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([{ id: 42, url: 'https://manus.im/app' }]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    const result = await handleUserSubmit(
+      makeSubmitMessage({
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+        content: 'recover from login issue',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(createTab).not.toHaveBeenCalled();
+    expect(storageMocks.upsertClaimedTab).toHaveBeenCalledWith(
+      'w1',
+      'manus',
+      expect.objectContaining({
+        tabId: 42,
+        currentUrl: '',
+        sessionId: null,
+      }),
+    );
+    expect(result.deliveryResults).toEqual([
+      expect.objectContaining({
+        provider: 'manus',
+        ok: true,
+      }),
+    ]);
+    expect(result.workspaceSummary?.memberIssues.manus).toBeNull();
+  });
+
   it('closes claimed provider tabs when deleting a workspace and the setting is enabled', async () => {
     const localState: LocalState = {
       ...makeLocalState(),
@@ -1785,5 +1899,113 @@ describe('background submit routing', () => {
     expect(sendMessage).toHaveBeenCalledWith(9, {
       type: 'REFRESH_CONTENT_CONTEXT',
     });
+  });
+
+  it('applies delivery issues against the latest local state snapshot', async () => {
+    const initialState: LocalState = {
+      ...makeLocalState(),
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          members: {
+            claude: makeConversationRef('claude', 'c-1', 'https://claude.ai/chat/c-1'),
+            chatgpt: makeConversationRef('chatgpt', 'g-1', 'https://chatgpt.com/c/g-1'),
+          },
+          enabledProviders: ['claude', 'chatgpt'],
+        }),
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+        'chatgpt:g-1': 'w1',
+      },
+    };
+
+    const currentState: LocalState = {
+      ...initialState,
+      workspaces: {
+        ...initialState.workspaces,
+        w2: makeWorkspace({
+          id: 'w2',
+          members: {
+            gemini: makeConversationRef('gemini', 'm-1', 'https://gemini.google.com/app/m-1'),
+          },
+          enabledProviders: ['gemini'],
+        }),
+      },
+      workspaceIndex: {
+        ...initialState.workspaceIndex,
+        'gemini:m-1': 'w2',
+      },
+    };
+
+    const sessionState: SessionState = makeSessionState({
+      'w1:chatgpt': makeClaimedTab({
+        provider: 'chatgpt',
+        workspaceId: 'w1',
+        tabId: 10,
+        currentUrl: 'https://chatgpt.com/c/g-1',
+        sessionId: 'g-1',
+      }),
+    });
+
+    storageMocks.getLocalState.mockResolvedValueOnce(initialState).mockResolvedValue(currentState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+    storageMocks.updateLocalState.mockImplementationOnce(async (updater: (state: LocalState) => LocalState | Promise<LocalState>) => {
+      const next = await updater(currentState);
+      storageMocks.setLocalState(next);
+      return next;
+    });
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 10, url: 'https://chatgpt.com/c/g-1' }),
+        sendMessage: vi
+          .fn()
+          .mockResolvedValueOnce({
+            provider: 'chatgpt',
+            pageState: 'ready',
+            sessionId: 'g-1',
+          })
+          .mockResolvedValueOnce({
+            ok: false,
+            accepted: true,
+            confirmed: false,
+            error: 'chatgpt login required',
+          }),
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { deliverPromptToWorkspaceTargets } = await import('../entrypoints/background');
+    await deliverPromptToWorkspaceTargets(
+      'w1',
+      makeSubmitMessage({
+        provider: 'claude',
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+        pageKind: 'existing-session',
+        content: 'hello',
+      }),
+    );
+
+    expect(storageMocks.setLocalState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaces: expect.objectContaining({
+          w1: expect.objectContaining({
+            memberIssues: expect.objectContaining({
+              chatgpt: 'needs-login',
+            }),
+          }),
+          w2: expect.objectContaining({
+            id: 'w2',
+          }),
+        }),
+      }),
+    );
   });
 });

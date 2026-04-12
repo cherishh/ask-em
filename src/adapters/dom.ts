@@ -27,7 +27,7 @@ export function findClickableByText(text: string): HTMLElement | null {
 
   return (
     elements.find((element) => {
-      if (!isVisible(element)) {
+      if (!isVisible(element) || shouldIgnoreDetectionSubtree(element)) {
         return false;
       }
 
@@ -48,13 +48,17 @@ function getVisibleText(element: HTMLElement): string {
   return normalizeWhitespace(element.innerText || element.textContent || '');
 }
 
+function isInIgnoredDetectionSubtree(element: Element): boolean {
+  return element.closest("[id^='ask-em-'], .ask-em-sync-shell") !== null;
+}
+
 function shouldIgnoreDetectionSubtree(element: Element): boolean {
   const tagName = element.tagName;
   if (tagName === 'SCRIPT' || tagName === 'STYLE' || tagName === 'NOSCRIPT') {
     return true;
   }
 
-  return element.id.startsWith('ask-em-') || element.classList.contains('ask-em-sync-shell');
+  return isInIgnoredDetectionSubtree(element);
 }
 
 function getDocumentTextForDetection(): string {

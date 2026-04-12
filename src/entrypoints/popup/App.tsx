@@ -129,6 +129,7 @@ export default function App() {
     requestedProviders,
     requestSubmitting,
     requestSubmitted,
+    requestComingSoon,
     requestCooldownUntil,
     toggleRequestedProvider,
     openRequestModal,
@@ -430,6 +431,7 @@ export default function App() {
         requestedProviders={requestedProviders}
         requestSubmitting={requestSubmitting}
         requestSubmitted={requestSubmitted}
+        requestComingSoon={requestComingSoon}
         requestCooldownUntil={requestCooldownUntil}
         onToggleProvider={toggleRequestedProvider}
         onClose={closeRequestModal}

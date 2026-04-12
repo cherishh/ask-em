@@ -1,7 +1,12 @@
 import type { DebugLogEntry, StatusResponseMessage } from '../../runtime/protocol';
 
 export async function requestStatus(): Promise<StatusResponseMessage | null> {
-  return chrome.runtime.sendMessage({ type: 'GET_STATUS' });
+  try {
+    return await chrome.runtime.sendMessage({ type: 'GET_STATUS' });
+  } catch (error) {
+    console.warn('ask-em: failed to load popup status', error);
+    return null;
+  }
 }
 
 export async function requestFullLogs(): Promise<DebugLogEntry[]> {

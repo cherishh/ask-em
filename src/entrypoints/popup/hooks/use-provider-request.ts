@@ -35,20 +35,26 @@ export function formatCooldownRemaining(cooldownUntil: number): string {
   return `in ${remainingDays} days`;
 }
 
-async function submitMoreProviderRequest(requestedProviders: string[]) {
+async function submitMoreProviderRequest(requestedProviders: string[]): Promise<'submitted' | 'coming-soon'> {
   if (!MORE_PROVIDERS_REQUEST_ENDPOINT) {
+    // TODO: wire this modal to a real endpoint once provider requests are supported.
     console.info('TODO: submit more provider request', requestedProviders);
-    await new Promise((resolve) => window.setTimeout(resolve, 240));
-    return;
+    return 'coming-soon';
   }
 
-  await fetch(MORE_PROVIDERS_REQUEST_ENDPOINT, {
+  const response = await fetch(MORE_PROVIDERS_REQUEST_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ requestedProviders }),
   });
+
+  if (!response.ok) {
+    throw new Error(`More provider request failed (${response.status})`);
+  }
+
+  return 'submitted';
 }
 
 export function useProviderRequest() {
@@ -56,6 +62,7 @@ export function useProviderRequest() {
   const [requestedProviders, setRequestedProviders] = useState<string[]>([]);
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [requestSubmitted, setRequestSubmitted] = useState(false);
+  const [requestComingSoon, setRequestComingSoon] = useState(false);
   const [requestCooldownUntil, setRequestCooldownUntil] = useState<number | null>(null);
 
   const toggleRequestedProvider = useCallback((provider: string) => {
@@ -69,6 +76,7 @@ export function useProviderRequest() {
   const openRequestModal = useCallback(() => {
     setRequestedProviders([]);
     setRequestSubmitted(false);
+    setRequestComingSoon(false);
     setRequestCooldownUntil(getMoreProvidersCooldownUntil());
     setRequestModalOpen(true);
   }, []);
@@ -89,10 +97,17 @@ export function useProviderRequest() {
     setRequestSubmitting(true);
 
     try {
-      await submitMoreProviderRequest(requestedProviders);
+      const status = await submitMoreProviderRequest(requestedProviders);
+      if (status === 'coming-soon') {
+        setRequestComingSoon(true);
+        return;
+      }
+
       setMoreProvidersSubmittedNow();
       setRequestCooldownUntil(getMoreProvidersCooldownUntil());
       setRequestSubmitted(true);
+    } catch (error) {
+      console.error('ask-em: failed to submit more provider request', error);
     } finally {
       setRequestSubmitting(false);
     }
@@ -108,6 +123,7 @@ export function useProviderRequest() {
     requestedProviders,
     requestSubmitting,
     requestSubmitted,
+    requestComingSoon,
     requestCooldownUntil,
     toggleRequestedProvider,
     openRequestModal,

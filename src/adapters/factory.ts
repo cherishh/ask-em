@@ -123,7 +123,7 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
 
         const handleClick = (event: MouseEvent) => {
           const sendButton = findSendButton();
-          if (isElementWithin(event.target, sendButton)) {
+          if (sendButton && isSendButtonEnabled(sendButton) && isElementWithin(event.target, sendButton)) {
             onSubmit(getEditableText(findComposer()));
           }
         };

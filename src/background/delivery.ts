@@ -6,7 +6,14 @@ import {
   type SyncProgressMessage,
   type UserSubmitMessage,
 } from '../runtime/protocol';
-import { clearClaimedTab, getLocalState, getSessionState, setLocalState, upsertClaimedTab } from '../runtime/storage';
+import {
+  clearClaimedTab,
+  getLocalState,
+  getSessionState,
+  setLocalState,
+  updateLocalState,
+  upsertClaimedTab,
+} from '../runtime/storage';
 import {
   bindWorkspaceMember,
   clearWorkspaceProviderIssue,
@@ -16,7 +23,11 @@ import {
   setWorkspaceProviderIssue,
 } from '../runtime/workspace';
 import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
-import { getClaimedTabByTabId, resolveDeliveryTarget } from '../runtime/recovery';
+import {
+  getClaimedTabByTabId,
+  resolveDeliveryTarget,
+  resolveReadyProviderTabForWorkspace,
+} from '../runtime/recovery';
 import { cancelScheduledGroupGc } from './gc';
 import { logDebug } from './debug';
 import { notifySyncProgress } from './tabs';
@@ -61,43 +72,61 @@ export async function deliverPromptToWorkspaceTargets(
     providers.map(async (provider) => {
       let deliveryResult: ProviderDeliveryResult;
       const existingIssue = workspace.memberIssues?.[provider] ?? null;
+      let deliveryTargetOverride: Awaited<ReturnType<typeof resolveReadyProviderTabForWorkspace>> = null;
 
       if (existingIssue === 'needs-login') {
-        const reason = `${provider} login required`;
+        deliveryTargetOverride = await resolveReadyProviderTabForWorkspace(
+          workspace,
+          provider,
+          sessionState,
+        );
+
+        if (!deliveryTargetOverride) {
+          const reason = `${provider} login required`;
+          await logDebug({
+            level: 'info',
+            scope: 'background',
+            provider,
+            workspaceId,
+            message: 'Skipped delivery for provider with known login issue',
+            detail: reason,
+          });
+
+          deliveryResult = {
+            provider,
+            ok: false,
+            reason,
+          } satisfies ProviderDeliveryResult;
+
+          completed += 1;
+          failed += 1;
+
+          if (sourceTabId) {
+            await notifySyncProgress(sourceTabId, {
+              type: 'SYNC_PROGRESS',
+              workspaceId,
+              total: providers.length,
+              completed,
+              succeeded,
+              failed,
+            });
+          }
+
+          return deliveryResult;
+        }
+
         await logDebug({
           level: 'info',
           scope: 'background',
           provider,
           workspaceId,
-          message: 'Skipped delivery for provider with known login issue',
-          detail: reason,
+          message: 'Recovered delivery target from ready tab after login issue',
+          detail: deliveryTargetOverride.reason,
         });
-
-        deliveryResult = {
-          provider,
-          ok: false,
-          reason,
-        } satisfies ProviderDeliveryResult;
-
-        completed += 1;
-        failed += 1;
-
-        if (sourceTabId) {
-          await notifySyncProgress(sourceTabId, {
-            type: 'SYNC_PROGRESS',
-            workspaceId,
-            total: providers.length,
-            completed,
-            succeeded,
-            failed,
-          });
-        }
-
-        return deliveryResult;
       }
 
       try {
-        const target = await resolveDeliveryTarget(workspace, provider, sessionState);
+        const target = deliveryTargetOverride ?? (await resolveDeliveryTarget(workspace, provider, sessionState));
         await upsertClaimedTab(workspaceId, provider, {
           provider,
           workspaceId,
@@ -253,25 +282,23 @@ export async function deliverPromptToWorkspaceTargets(
     } satisfies ProviderDeliveryResult;
   });
 
-  const nextWorkspaceState = deliveryResults.reduce((nextState, result) => {
-    if (result.ok) {
-      return clearWorkspaceProviderIssue(nextState, workspaceId, result.provider);
-    }
+  await updateLocalState((currentState) =>
+    deliveryResults.reduce((nextState, result) => {
+      if (result.ok) {
+        return clearWorkspaceProviderIssue(nextState, workspaceId, result.provider);
+      }
 
-    const normalizedReason = (result.reason ?? '').toLowerCase();
-    const issue =
-      normalizedReason.includes('login required')
-        ? 'needs-login'
-        : normalizedReason.includes('not ready') || normalizedReason.includes('blocked')
-          ? 'loading'
-          : 'delivery-failed';
+      const normalizedReason = (result.reason ?? '').toLowerCase();
+      const issue =
+        normalizedReason.includes('login required')
+          ? 'needs-login'
+          : normalizedReason.includes('not ready') || normalizedReason.includes('blocked')
+            ? 'loading'
+            : 'delivery-failed';
 
-    return setWorkspaceProviderIssue(nextState, workspaceId, result.provider, issue);
-  }, localState);
-
-  if (nextWorkspaceState !== localState) {
-    await setLocalState(nextWorkspaceState);
-  }
+      return setWorkspaceProviderIssue(nextState, workspaceId, result.provider, issue);
+    }, currentState),
+  );
 
   return deliveryResults;
 }

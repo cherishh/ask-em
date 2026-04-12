@@ -420,6 +420,29 @@
   display: grid;
   gap: 8px;
   margin-top: 12px;
+  max-height: calc(6 * 54px + 5 * 8px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 113, 108, 0.28) transparent;
+  overscroll-behavior: contain;
+}
+
+.ask-em-panel-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ask-em-panel-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ask-em-panel-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(120, 113, 108, 0.22);
+}
+
+.ask-em-panel-list:hover::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 108, 0.34);
 }
 
 .ask-em-panel-row {
