@@ -169,6 +169,10 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
   const getDefaultLabel = () => {
     if (!context.workspaceId) {
+      if (!context.globalSyncEnabled || !context.standaloneCreateSetEnabled) {
+        return 'Local only';
+      }
+
       return 'ready';
     }
 

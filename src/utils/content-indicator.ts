@@ -70,6 +70,10 @@ function getCurrentTabLabel(input: ContentIndicatorInput): string {
       return 'loading';
     }
 
+    if (!input.globalSyncEnabled || !input.standaloneCreateSetEnabled) {
+      return 'Local only';
+    }
+
     return 'ready';
   }
 

@@ -68,7 +68,7 @@ describe('content indicator presentation', () => {
       ),
     ).toEqual({
       state: 'blocked',
-      label: 'ready',
+      label: 'Local only',
       syncLabel: 'next prompt stays here',
       syncTone: 'neutral',
       alertLevel: 'normal',
@@ -103,6 +103,22 @@ describe('content indicator presentation', () => {
       label: 'ready',
       syncLabel: 'set limit reached',
       syncTone: 'warning',
+      alertLevel: 'normal',
+    });
+  });
+
+  it('shows standalone global pause as local-only mode', () => {
+    expect(
+      getContentIndicatorPresentation(
+        createInput({
+          globalSyncEnabled: false,
+        }),
+      ),
+    ).toEqual({
+      state: 'blocked',
+      label: 'Local only',
+      syncLabel: 'next prompt stays here',
+      syncTone: 'neutral',
       alertLevel: 'normal',
     });
   });
