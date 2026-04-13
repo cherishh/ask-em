@@ -3,7 +3,6 @@ import {
   type Provider,
   type ProviderDeliveryResult,
   type SwitchProviderTabMessage,
-  type SyncProgressMessage,
   type UserSubmitMessage,
 } from '../runtime/protocol';
 import {
@@ -21,15 +20,17 @@ import {
   getWorkspacesOrdered,
 } from '../runtime/workspace';
 import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
-import {
-  resolveDeliveryTarget,
-  resolveReadyProviderTabForWorkspace,
-} from './delivery-targets';
 import { getClaimedTabByTabId } from './claimed-tabs';
+import { attemptProviderDelivery } from './delivery-executor';
 import { applyDeliveryResultsToWorkspaceIssues } from './delivery-issues';
+import {
+  createSyncProgressTracker,
+  normalizeSettledDeliveryResults,
+  notifyInitialSyncProgress,
+} from './delivery-progress';
+import { buildUserSubmitResult, logFanOutCompletion, type UserSubmitResult } from './delivery-submit';
 import { cancelScheduledGroupGc } from './gc';
 import { logDebug } from './debug';
-import { notifySyncProgress } from './tabs';
 import { refreshPendingState } from './state';
 import { reconcileClaimedTabContext } from './presence';
 import { buildWorkspaceSummary, canStartNewSet } from './status';
@@ -51,235 +52,26 @@ export async function deliverPromptToWorkspaceTargets(
   const providers = ALL_PROVIDERS.filter((provider) =>
     shouldSyncWorkspaceProvider(message.provider, provider, workspace.enabledProviders),
   );
+  const progressTracker = createSyncProgressTracker(sourceTabId, workspaceId, providers.length);
 
-  let completed = 0;
-  let succeeded = 0;
-  let failed = 0;
-
-  if (sourceTabId && providers.length > 0) {
-    await notifySyncProgress(sourceTabId, {
-      type: 'SYNC_PROGRESS',
-      workspaceId,
-      total: providers.length,
-      completed: 0,
-      succeeded: 0,
-      failed: 0,
-    });
-  }
+  await notifyInitialSyncProgress(sourceTabId, workspaceId, providers.length);
 
   const settledResults = await Promise.allSettled(
     providers.map(async (provider) => {
-      let deliveryResult: ProviderDeliveryResult;
-      const existingIssue = workspace.memberIssues?.[provider] ?? null;
-      let deliveryTargetOverride: Awaited<ReturnType<typeof resolveReadyProviderTabForWorkspace>> = null;
-
-      if (existingIssue === 'needs-login') {
-        deliveryTargetOverride = await resolveReadyProviderTabForWorkspace(
-          workspace,
-          provider,
-          sessionState,
-        );
-
-        if (!deliveryTargetOverride) {
-          const reason = `${provider} login required`;
-          await logDebug({
-            level: 'info',
-            scope: 'background',
-            provider,
-            workspaceId,
-            message: 'Skipped delivery for provider with known login issue',
-            detail: reason,
-          });
-
-          deliveryResult = {
-            provider,
-            ok: false,
-            reason,
-          } satisfies ProviderDeliveryResult;
-
-          completed += 1;
-          failed += 1;
-
-          if (sourceTabId) {
-            await notifySyncProgress(sourceTabId, {
-              type: 'SYNC_PROGRESS',
-              workspaceId,
-              total: providers.length,
-              completed,
-              succeeded,
-              failed,
-            });
-          }
-
-          return deliveryResult;
-        }
-
-        await logDebug({
-          level: 'info',
-          scope: 'background',
-          provider,
-          workspaceId,
-          message: 'Recovered delivery target from ready tab after login issue',
-          detail: deliveryTargetOverride.reason,
-        });
-      }
-
-      try {
-        const target = deliveryTargetOverride ?? (await resolveDeliveryTarget(workspace, provider, sessionState));
-        await upsertClaimedTab(workspaceId, provider, {
-          provider,
-          workspaceId,
-          tabId: target.tabId,
-          lastSeenAt: Date.now(),
-          pageState: 'not-ready',
-          currentUrl: target.expectedUrl ?? '',
-          sessionId: target.expectedSessionId,
-        });
-
-        await logDebug({
-          level: 'info',
-          scope: 'background',
-          provider,
-          workspaceId,
-          message: 'Resolved delivery target',
-          detail: `${target.resolution}: ${target.reason}`,
-        });
-
-        await logDebug({
-          level: 'info',
-          scope: 'background',
-          provider,
-          workspaceId,
-          message: 'Delivering prompt',
-          detail: `${message.provider} -> ${provider} @ ${target.expectedSessionId ?? 'new-chat'}`,
-        });
-
-        const response = await chrome.tabs.sendMessage(target.tabId, {
-          type: 'DELIVER_PROMPT',
-          workspaceId,
-          provider,
-          content: message.content,
-          expectedSessionId: target.expectedSessionId,
-          expectedUrl: target.expectedUrl,
-          timestamp: Date.now(),
-        });
-
-        const payload = response as {
-          ok?: boolean;
-          accepted?: boolean;
-          confirmed?: boolean;
-          blocked?: boolean;
-          error?: string;
-        } | undefined;
-
-        if (payload?.accepted) {
-          await logDebug({
-            level: 'info',
-            scope: 'background',
-            provider,
-            workspaceId,
-            message: 'Prompt delivery accepted',
-            detail: `${message.provider} -> ${provider}`,
-          });
-        }
-
-        if (!payload?.ok || payload?.confirmed === false) {
-          const reason =
-            payload?.error ??
-            (payload?.confirmed === false
-              ? 'Prompt delivery was not confirmed'
-              : payload?.blocked
-                ? 'Prompt delivery blocked'
-                : 'Prompt delivery failed');
-          await logDebug({
-            level: payload?.blocked || payload?.confirmed === false ? 'warn' : 'error',
-            scope: 'background',
-            provider,
-            workspaceId,
-            message: payload?.confirmed === false
-              ? 'Prompt delivery confirmation failed'
-              : payload?.blocked
-                ? 'Prompt delivery blocked'
-                : 'Prompt delivery failed',
-            detail: reason,
-          });
-          deliveryResult = {
-            provider,
-            ok: false,
-            accepted: payload?.accepted,
-            confirmed: payload?.confirmed,
-            blocked: payload?.blocked,
-            reason,
-          } satisfies ProviderDeliveryResult;
-        } else {
-          await logDebug({
-            level: 'info',
-            scope: 'background',
-            provider,
-            workspaceId,
-            message: 'Prompt delivery confirmed',
-            detail: `${message.provider} -> ${provider}`,
-          });
-
-          deliveryResult = {
-            provider,
-            ok: true,
-            accepted: payload?.accepted,
-            confirmed: payload?.confirmed,
-          } satisfies ProviderDeliveryResult;
-        }
-      } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
-        const isLoginRequired = reason.toLowerCase().includes('login required');
-        await logDebug({
-          level: isLoginRequired ? 'warn' : 'error',
-          scope: 'background',
-          provider,
-          workspaceId,
-          message: isLoginRequired ? 'Prompt delivery login required' : 'Prompt delivery threw',
-          detail: reason,
-        });
-        deliveryResult = {
-          provider,
-          ok: false,
-          reason,
-        } satisfies ProviderDeliveryResult;
-      }
-
-      completed += 1;
-      if (deliveryResult.ok) {
-        succeeded += 1;
-      } else {
-        failed += 1;
-      }
-
-      if (sourceTabId) {
-        await notifySyncProgress(sourceTabId, {
-          type: 'SYNC_PROGRESS',
-          workspaceId,
-          total: providers.length,
-          completed,
-          succeeded,
-          failed,
-        });
-      }
+      const deliveryResult = await attemptProviderDelivery({
+        workspace,
+        workspaceId,
+        provider,
+        message,
+        sessionState,
+      });
+      await progressTracker.record(deliveryResult);
 
       return deliveryResult;
     }),
   );
 
-  const deliveryResults = settledResults.map((result, index) => {
-    if (result.status === 'fulfilled') {
-      return result.value;
-    }
-
-    const provider = providers[index];
-    return {
-      provider,
-      ok: false,
-      reason: result.reason instanceof Error ? result.reason.message : String(result.reason),
-    } satisfies ProviderDeliveryResult;
-  });
+  const deliveryResults = normalizeSettledDeliveryResults(providers, settledResults);
 
   await updateLocalState((currentState) =>
     applyDeliveryResultsToWorkspaceIssues(currentState, workspaceId, deliveryResults),
@@ -288,7 +80,10 @@ export async function deliverPromptToWorkspaceTargets(
   return deliveryResults;
 }
 
-export async function handleUserSubmit(message: UserSubmitMessage, sender: chrome.runtime.MessageSender) {
+export async function handleUserSubmit(
+  message: UserSubmitMessage,
+  sender: chrome.runtime.MessageSender,
+): Promise<UserSubmitResult> {
   const tabId = sender.tab?.id;
   const refreshedState = await refreshPendingState();
   let { localState } = refreshedState;
@@ -348,14 +143,13 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
       message: 'Ignored submit without workspace',
       detail: `${message.pageKind}: ${message.sessionId ?? 'no-session'} @ ${message.currentUrl}`,
     });
-    return {
-      ok: true,
+    return buildUserSubmitResult({
       synced: false,
       workspaceId: null,
       globalSyncEnabled: localState.globalSyncEnabled,
       canStartNewSet: canStartNewSet(localState),
       workspaceSummary: null,
-    };
+    });
   }
 
   cancelScheduledGroupGc(workspaceLookup.workspaceId);
@@ -368,8 +162,7 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
       workspaceId: workspaceLookup.workspaceId,
       message: 'Ignored submit from disabled provider',
     });
-    return {
-      ok: true,
+    return buildUserSubmitResult({
       synced: false,
       workspaceId: workspaceLookup.workspaceId,
       providerEnabled: false,
@@ -379,7 +172,7 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
         localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
         await getSessionState(),
       ),
-    };
+    });
   }
 
   if (message.sessionId) {
@@ -423,8 +216,7 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
       workspaceId: workspaceLookup.workspaceId,
       message: 'Skipped sync fan-out because global sync is paused',
     });
-    return {
-      ok: true,
+    return buildUserSubmitResult({
       synced: false,
       workspaceId: workspaceLookup.workspaceId,
       providerEnabled: true,
@@ -434,7 +226,7 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
         localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
         await getSessionState(),
       ),
-    };
+    });
   }
 
   const deliveryResults = await deliverPromptToWorkspaceTargets(
@@ -442,38 +234,18 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
     message,
     tabId,
   );
-  if (deliveryResults.length > 0) {
-    const succeeded = deliveryResults.filter((result) => result.ok);
-    const failed = deliveryResults.filter((result) => !result.ok);
-    await logDebug({
-      level: failed.length > 0 ? 'warn' : 'info',
-      scope: 'background',
-      provider: message.provider,
-      workspaceId: workspaceLookup.workspaceId,
-      message: 'Sync fan-out completed',
-      detail: failed.length > 0
-        ? `${succeeded.length}/${deliveryResults.length} ok; failed: ${failed
-            .map((result) => `${result.provider}${result.reason ? ` (${result.reason})` : ''}`)
-            .join(', ')}`
-        : `${succeeded.length}/${deliveryResults.length} ok`,
-    });
-  } else {
-    await logDebug({
-      level: 'info',
-      scope: 'background',
-      provider: message.provider,
-      workspaceId: workspaceLookup.workspaceId,
-      message: 'No sync fan-out targets',
-      detail: workspaceLookup.workspace.enabledProviders.join(', '),
-    });
-  }
+  await logFanOutCompletion(
+    message.provider,
+    workspaceLookup.workspaceId,
+    workspaceLookup.workspace.enabledProviders,
+    deliveryResults,
+  );
 
   const finalLocalState = await getLocalState();
   const finalWorkspace =
     finalLocalState.workspaces[workspaceLookup.workspaceId] ?? localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace;
 
-  return {
-    ok: true,
+  return buildUserSubmitResult({
     synced: true,
     workspaceId: workspaceLookup.workspaceId,
     providerEnabled: true,
@@ -484,7 +256,7 @@ export async function handleUserSubmit(message: UserSubmitMessage, sender: chrom
       finalWorkspace,
       await getSessionState(),
     ),
-  };
+  });
 }
 
 export async function handleSwitchProviderTab(
