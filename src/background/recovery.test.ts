@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SessionState, Workspace } from '../runtime/protocol';
-import { reconcileClaimedTabsWithBrowser } from './tab-runtime';
+import { reconcileClaimedTabsWithBrowser, waitForContentStatus } from './tab-runtime';
 import { resolveDeliveryTarget } from './delivery-targets';
 import {
   makeClaimedTab,
@@ -217,6 +217,34 @@ describe('recovery', () => {
       url: 'https://chat.deepseek.com',
       active: false,
     });
+  });
+
+  it('treats error pages as terminal content status', async () => {
+    const sendMessage = vi.fn().mockResolvedValue({
+      provider: 'claude',
+      currentUrl: 'https://claude.ai/chat/missing',
+      sessionId: null,
+      pageState: 'error',
+      pageKind: 'existing-session',
+    });
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        sendMessage,
+      },
+    });
+
+    const status = await waitForContentStatus(12, 'claude', 1_000);
+
+    expect(status).toEqual({
+      provider: 'claude',
+      currentUrl: 'https://claude.ai/chat/missing',
+      sessionId: null,
+      pageState: 'error',
+      pageKind: 'existing-session',
+    });
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(12, { type: 'PING' });
   });
 
   it('reconciles claimed tabs whose browser tabs are gone', async () => {

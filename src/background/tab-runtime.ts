@@ -64,7 +64,11 @@ export async function waitForContentStatus(
     if (response?.provider === provider) {
       latestResponse = response;
 
-      if (response.pageState === 'ready' || response.pageState === 'login-required') {
+      if (
+        response.pageState === 'ready' ||
+        response.pageState === 'login-required' ||
+        response.pageState === 'error'
+      ) {
         return response;
       }
     }
