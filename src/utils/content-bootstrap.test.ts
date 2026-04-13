@@ -80,6 +80,7 @@ describe('content bootstrap wiring', () => {
     setState: ReturnType<typeof vi.fn>;
     setSyncStatus: ReturnType<typeof vi.fn>;
     setAlertLevel: ReturnType<typeof vi.fn>;
+    resetPosition: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -103,6 +104,7 @@ describe('content bootstrap wiring', () => {
       setState: vi.fn(),
       setSyncStatus: vi.fn(),
       setAlertLevel: vi.fn(),
+      resetPosition: vi.fn(),
     };
 
     uiMocks.createContentUi.mockReturnValue(ui);
@@ -207,6 +209,23 @@ describe('content bootstrap wiring', () => {
     expect(ui.setState).toHaveBeenLastCalledWith('syncing', 'current model is in sync');
     expect(ui.setSyncStatus).toHaveBeenLastCalledWith('1 of 3 synced', 'neutral');
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('normal');
+  });
+
+  it('resets indicator position when requested by the background', async () => {
+    await bootstrap();
+
+    const sendResponse = vi.fn();
+    runtimeListener?.(
+      {
+        type: 'RESET_INDICATOR_POSITION',
+      },
+      {} as chrome.runtime.MessageSender,
+      sendResponse,
+    );
+    await flushMicrotasks();
+
+    expect(ui.resetPosition).toHaveBeenCalled();
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true });
   });
 
   it('marks progress failures as set warnings', async () => {

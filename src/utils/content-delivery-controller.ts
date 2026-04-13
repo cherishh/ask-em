@@ -15,6 +15,7 @@ export function createDeliveryController(
   submitController: Pick<ContentSubmitController, 'suppressObservedSubmissionsFor' | 'rememberProgrammaticSubmit'>,
   dependencies: {
     reportPresence: (kind: 'HELLO' | 'HEARTBEAT') => Promise<void>;
+    resetIndicatorPosition: () => Promise<void> | void;
     logDebug: (entry: {
       level: 'info' | 'warn' | 'error';
       message: string;
@@ -44,6 +45,12 @@ export function createDeliveryController(
 
       if (message.type === 'REFRESH_CONTENT_CONTEXT') {
         await dependencies.reportPresence('HELLO');
+        sendResponse({ ok: true });
+        return;
+      }
+
+      if (message.type === 'RESET_INDICATOR_POSITION') {
+        await dependencies.resetIndicatorPosition();
         sendResponse({ ok: true });
         return;
       }

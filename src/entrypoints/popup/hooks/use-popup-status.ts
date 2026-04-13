@@ -120,6 +120,11 @@ export function usePopupStatus() {
     await chrome.runtime.sendMessage({ type: 'SET_SHORTCUTS', shortcuts: DEFAULT_SHORTCUTS });
   }, []);
 
+  const resetIndicatorPositions = useCallback(async () => {
+    await chrome.runtime.sendMessage({ type: 'RESET_INDICATOR_POSITIONS' });
+    await refresh({ silent: true });
+  }, [refresh]);
+
   return {
     status,
     loading,
@@ -135,5 +140,6 @@ export function usePopupStatus() {
     toggleCloseTabsOnDeleteSet,
     updateShortcut,
     resetShortcuts,
+    resetIndicatorPositions,
   };
 }

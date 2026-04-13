@@ -181,6 +181,14 @@ export type RefreshContentContextMessage = {
   type: 'REFRESH_CONTENT_CONTEXT';
 };
 
+export type ResetIndicatorPositionMessage = {
+  type: 'RESET_INDICATOR_POSITION';
+};
+
+export type ResetIndicatorPositionsMessage = {
+  type: 'RESET_INDICATOR_POSITIONS';
+};
+
 export type RuntimeMessage =
   | HelloMessage
   | HeartbeatMessage
@@ -204,6 +212,8 @@ export type RuntimeMessage =
   | SetDebugLoggingEnabledMessage
   | DebugLogMessage
   | RefreshContentContextMessage
+  | ResetIndicatorPositionMessage
+  | ResetIndicatorPositionsMessage
   | DebugLogsResponseMessage
   | WorkspaceContextResponseMessage
   | StatusResponseMessage;

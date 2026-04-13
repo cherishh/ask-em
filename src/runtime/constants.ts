@@ -9,6 +9,7 @@ export const HEARTBEAT_STALE_MS = 240_000;
 export const STORAGE_KEYS = {
   local: 'ask-em-local-state',
   session: 'ask-em-session-state',
+  indicatorPositions: 'ask-em-indicator-positions',
 } as const;
 
 export const ALL_PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek', 'manus'];

@@ -23,6 +23,7 @@ import {
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
   handleSetGlobalSyncEnabled,
+  handleResetIndicatorPositions,
   handleSetShortcuts,
   handleSetWorkspaceProviderEnabled,
   handleWorkspaceClear,
@@ -51,6 +52,7 @@ export {
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
   handleSetGlobalSyncEnabled,
+  handleResetIndicatorPositions,
   handleSetShortcuts,
   handleSetWorkspaceProviderEnabled,
   handleSwitchProviderTab,
@@ -130,6 +132,9 @@ export default defineBackground(() => {
           return;
         case 'CLEAR_DEBUG_LOGS':
           sendResponse(await handleClearDebugLogs());
+          return;
+        case 'RESET_INDICATOR_POSITIONS':
+          sendResponse(await handleResetIndicatorPositions());
           return;
         case 'CLEAR_WORKSPACE':
         case 'CLEAR_WORKSPACE_PROVIDER':

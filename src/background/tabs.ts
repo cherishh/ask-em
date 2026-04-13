@@ -34,3 +34,17 @@ export async function notifyAllTabsToRefreshContext() {
     tabs.map((tab) => tab.id).filter((tabId): tabId is number => typeof tabId === 'number'),
   );
 }
+
+export async function notifyAllTabsToResetIndicatorPosition() {
+  const tabs: chrome.tabs.Tab[] = await chrome.tabs.query({});
+  await Promise.allSettled(
+    tabs
+      .map((tab) => tab.id)
+      .filter((tabId): tabId is number => typeof tabId === 'number')
+      .map(async (tabId) => {
+        await chrome.tabs.sendMessage(tabId, {
+          type: 'RESET_INDICATOR_POSITION',
+        });
+      }),
+  );
+}

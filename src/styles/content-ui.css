@@ -1,15 +1,12 @@
 .ask-em-sync-shell {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  inset: 0;
   z-index: 2147483647;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
+  pointer-events: none;
 }
 
 .ask-em-sync-pill {
+  position: absolute;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -36,6 +33,7 @@
   pointer-events: auto;
   user-select: none;
   cursor: default;
+  touch-action: none;
 }
 
 .ask-em-sync-pill[data-visible="false"] {
@@ -43,11 +41,16 @@
 }
 
 .ask-em-sync-pill[data-interactive="true"] {
-  cursor: pointer;
+  cursor: grab;
 }
 
 .ask-em-sync-pill:hover {
   opacity: 0.98;
+}
+
+.ask-em-sync-shell[data-dragging="true"] .ask-em-sync-pill {
+  cursor: grabbing;
+  transition: none;
 }
 
 .ask-em-sync-pill::before {
@@ -186,7 +189,7 @@
 }
 
 .ask-em-sync-panel {
-  position: relative;
+  position: absolute;
   width: 252px;
   padding: 12px;
   border-radius: 18px;
@@ -200,16 +203,20 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
   color: rgba(15, 23, 42, 0.88);
   opacity: 0;
-  transform: translateY(8px) scale(0.98);
-  transform-origin: bottom right;
+  transform: scale(0.98);
+  transform-origin: bottom center;
   pointer-events: none;
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
 .ask-em-sync-panel[data-visible="true"] {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: scale(1);
   pointer-events: auto;
+}
+
+.ask-em-sync-panel[data-side="down"] {
+  transform-origin: top center;
 }
 
 .ask-em-sync-panel[data-mode="tooltip"] {

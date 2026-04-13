@@ -1,10 +1,15 @@
-import { createDefaultEnabledProviders, type RuntimeMessage } from '../runtime/protocol';
+import { createDefaultEnabledProviders, STORAGE_KEYS, type RuntimeMessage } from '../runtime/protocol';
 import { clearDebugLogs, getLocalState, getSessionState, setLocalState, setSessionState } from '../runtime/storage';
 import { clearWorkspace, clearWorkspaceProvider, setWorkspaceProviderEnabled } from '../runtime/workspace';
 import { removeClaimedTabsForWorkspace } from '../runtime/recovery';
 import { logDebug } from './debug';
 import { scheduleEmptyGroupDeletion } from './gc';
-import { getClaimedTabIdsForWorkspace, notifyAllTabsToRefreshContext, notifyTabsToRefreshContext } from './tabs';
+import {
+  getClaimedTabIdsForWorkspace,
+  notifyAllTabsToRefreshContext,
+  notifyAllTabsToResetIndicatorPosition,
+  notifyTabsToRefreshContext,
+} from './tabs';
 
 export async function handleWorkspaceClear(
   message: Extract<RuntimeMessage, { type: 'CLEAR_WORKSPACE' | 'CLEAR_WORKSPACE_PROVIDER' }>,
@@ -191,5 +196,11 @@ export async function handleDebugLog(
 
 export async function handleClearDebugLogs() {
   await clearDebugLogs();
+  return { ok: true };
+}
+
+export async function handleResetIndicatorPositions() {
+  await chrome.storage.local.remove(STORAGE_KEYS.indicatorPositions);
+  await notifyAllTabsToResetIndicatorPosition();
   return { ok: true };
 }

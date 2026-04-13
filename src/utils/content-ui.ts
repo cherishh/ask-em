@@ -7,6 +7,15 @@ import type {
 } from '../runtime/protocol';
 import { DEFAULT_SHORTCUTS, resolveShortcutConfig } from '../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../runtime/workspace';
+import {
+  clampIndicatorPixels,
+  getDefaultIndicatorPlacement,
+  getPanelPlacement,
+  loadIndicatorPlacement,
+  pixelsToPlacement,
+  placementToPixels,
+  saveIndicatorPlacement,
+} from './content-position';
 import { renderContentTooltipHtml, type ContentTooltipSpec } from './content-tooltip';
 import type { IndicatorAlertLevel, IndicatorUiState, SyncIndicatorTone } from './content-indicator';
 import {
@@ -41,30 +50,38 @@ export type UiHandlers = {
   onRefreshContext: () => Promise<void>;
 };
 
+type DragState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  startLeft: number;
+  startTop: number;
+  moved: boolean;
+};
+
+const DRAG_THRESHOLD_PX = 6;
+const FALLBACK_PILL_WIDTH = 260;
+const FALLBACK_PILL_HEIGHT = 44;
+
 function matchesShortcut(event: KeyboardEvent, binding: ShortcutBinding): boolean {
   const apple = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
   let modifierMatch: boolean;
   if (apple) {
-    // On Apple: if binding has meta or ctrl (but not both), treat it as "primary modifier" = Cmd
-    // If binding explicitly has ctrl only (recorded via physical Ctrl), match Ctrl exactly
     if (binding.meta && !binding.ctrl) {
       modifierMatch = event.metaKey && !event.ctrlKey;
     } else if (binding.ctrl && !binding.meta) {
-      // Default shortcuts use ctrl=true for cross-platform compat → map to Cmd on Apple
       modifierMatch = event.metaKey && !event.ctrlKey;
     } else {
       modifierMatch = event.metaKey === binding.meta && event.ctrlKey === binding.ctrl;
     }
+  } else if (binding.meta && !binding.ctrl) {
+    modifierMatch = event.ctrlKey && !event.metaKey;
+  } else if (binding.ctrl && !binding.meta) {
+    modifierMatch = event.ctrlKey && !event.metaKey;
   } else {
-    // On non-Apple: if binding has meta or ctrl, treat as Ctrl
-    if (binding.meta && !binding.ctrl) {
-      modifierMatch = event.ctrlKey && !event.metaKey;
-    } else if (binding.ctrl && !binding.meta) {
-      modifierMatch = event.ctrlKey && !event.metaKey;
-    } else {
-      modifierMatch = event.ctrlKey === binding.ctrl && event.metaKey === binding.meta;
-    }
+    modifierMatch = event.ctrlKey === binding.ctrl && event.metaKey === binding.meta;
   }
+
   return (
     matchesShortcutKey(event, binding) &&
     modifierMatch &&
@@ -101,6 +118,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     shell = document.createElement('div');
     shell.id = shellId;
     shell.className = 'ask-em-sync-shell';
+    shell.dataset.dragging = 'false';
     document.body.appendChild(shell);
   }
 
@@ -109,6 +127,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     panel = document.createElement('div');
     panel.className = 'ask-em-sync-panel';
     panel.dataset.visible = 'false';
+    panel.dataset.side = 'up';
     shell.appendChild(panel);
   }
 
@@ -153,6 +172,90 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
   let panelPinned = false;
   let currentProviderToggleBusy = false;
+  let currentPlacement = getDefaultIndicatorPlacement();
+  let dragState: DragState | null = null;
+  let suppressClickUntil = 0;
+
+  const getViewportSize = () => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+
+  const getMountSize = () => {
+    const rect = mount.getBoundingClientRect();
+
+    return {
+      width: rect.width || mount.offsetWidth || FALLBACK_PILL_WIDTH,
+      height: rect.height || mount.offsetHeight || FALLBACK_PILL_HEIGHT,
+    };
+  };
+
+  const closePanel = () => {
+    panelPinned = false;
+    panel.dataset.visible = 'false';
+  };
+
+  const applyPanelPlacement = () => {
+    if (panel.dataset.visible !== 'true') {
+      return;
+    }
+
+    const pillRect = mount.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const placement = getPanelPlacement(
+      pillRect,
+      {
+        width: panelRect.width || panel.offsetWidth || 252,
+        height: panelRect.height || panel.offsetHeight || 180,
+      },
+      getViewportSize(),
+    );
+
+    panel.dataset.side = placement.side;
+    panel.style.left = `${Math.round(placement.left)}px`;
+    panel.style.top = `${Math.round(placement.top)}px`;
+  };
+
+  const applyMountPixels = (left: number, top: number) => {
+    mount.style.left = `${Math.round(left)}px`;
+    mount.style.top = `${Math.round(top)}px`;
+
+    if (panel.dataset.visible === 'true') {
+      applyPanelPlacement();
+    }
+  };
+
+  const applyPlacement = () => {
+    const size = getMountSize();
+    const viewport = getViewportSize();
+    const pixels = placementToPixels(currentPlacement, size, viewport);
+    const clampedPixels = clampIndicatorPixels(pixels, size, viewport);
+
+    applyMountPixels(clampedPixels.left, clampedPixels.top);
+  };
+
+  const persistCurrentPlacement = async () => {
+    const rect = mount.getBoundingClientRect();
+    const viewport = getViewportSize();
+    currentPlacement = pixelsToPlacement(
+      {
+        left: rect.left,
+        top: rect.top,
+      },
+      {
+        width: rect.width || FALLBACK_PILL_WIDTH,
+        height: rect.height || FALLBACK_PILL_HEIGHT,
+      },
+      viewport,
+    );
+    await saveIndicatorPlacement(adapter.name, currentPlacement);
+  };
+
+  const resetPosition = async () => {
+    currentPlacement = getDefaultIndicatorPlacement();
+    closePanel();
+    applyPlacement();
+  };
 
   const updateLabel = (text: string) => {
     if (label) {
@@ -208,7 +311,12 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   };
 
   const setPanelVisible = (visible: boolean) => {
-    panel.dataset.visible = String(visible && Boolean(context.workspaceId || context.standaloneReady));
+    const nextVisible = visible && Boolean(context.workspaceId || context.standaloneReady);
+    panel.dataset.visible = String(nextVisible);
+
+    if (nextVisible) {
+      applyPanelPlacement();
+    }
   };
 
   const renderTooltip = (spec: ContentTooltipSpec) => {
@@ -254,6 +362,14 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     });
   };
 
+  const refreshLayout = () => {
+    if (dragState?.moved) {
+      return;
+    }
+
+    applyPlacement();
+  };
+
   const setCurrentProviderToggleBusy = (busy: boolean) => {
     currentProviderToggleBusy = busy;
     mount.dataset.busy = String(busy);
@@ -280,6 +396,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       mount.dataset.providerEnabled = String(nextEnabled);
       await refreshPanel();
       updateSyncLabel(nextEnabled ? 'Ready for next prompt' : 'This tab is paused');
+      refreshLayout();
     } finally {
       setCurrentProviderToggleBusy(false);
     }
@@ -294,7 +411,9 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     handlers.onStandaloneSetCreationToggle(nextEnabled);
     context.standaloneCreateSetEnabled = nextEnabled;
     mount.dataset.standaloneCreateSetEnabled = String(nextEnabled);
+    updateLabel(nextEnabled ? 'ready' : 'Local only');
     updateSyncLabel(nextEnabled ? 'Next prompt will fan out' : 'Next prompt stays here');
+    refreshLayout();
 
     if (panel.dataset.visible === 'true' && panel.dataset.mode === 'tooltip') {
       renderStandaloneTooltip();
@@ -318,6 +437,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     mount.dataset.globalSyncEnabled = String(context.globalSyncEnabled);
     syncPrimaryLabel();
     renderPanel(response);
+    applyPanelPlacement();
   };
 
   const openPanel = async (pin = false) => {
@@ -334,7 +454,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   };
 
   const handleMountClick = (event: MouseEvent) => {
-    if (mount.dataset.interactive !== 'true') {
+    if (mount.dataset.interactive !== 'true' || Date.now() < suppressClickUntil) {
       return;
     }
 
@@ -347,8 +467,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     }
 
     if (panelPinned) {
-      panelPinned = false;
-      setPanelVisible(false);
+      closePanel();
       return;
     }
 
@@ -357,7 +476,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   mount.addEventListener('click', handleMountClick);
 
   const handleMountMouseMove = () => {
-    if (panelPinned || (!context.workspaceId && !context.standaloneReady)) {
+    if (dragState || panelPinned || (!context.workspaceId && !context.standaloneReady)) {
       return;
     }
 
@@ -372,14 +491,86 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   };
   mount.addEventListener('mousemove', handleMountMouseMove);
 
-  const handleShellMouseLeave = () => {
-    if (panelPinned) {
+  const handleMountMouseLeave = () => {
+    if (!panelPinned) {
+      setPanelVisible(false);
+    }
+  };
+  mount.addEventListener('mouseleave', handleMountMouseLeave);
+
+  const handleMountPointerDown = (event: PointerEvent) => {
+    if (event.button !== 0 || mount.dataset.visible === 'false') {
       return;
     }
 
-    setPanelVisible(false);
+    const rect = mount.getBoundingClientRect();
+    dragState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: rect.left,
+      startTop: rect.top,
+      moved: false,
+    };
+    mount.setPointerCapture(event.pointerId);
   };
-  shell.addEventListener('mouseleave', handleShellMouseLeave);
+  mount.addEventListener('pointerdown', handleMountPointerDown);
+
+  const finishDrag = (pointerId: number) => {
+    if (!dragState || dragState.pointerId !== pointerId) {
+      return;
+    }
+
+    if (dragState.moved) {
+      shell.dataset.dragging = 'false';
+      suppressClickUntil = Date.now() + 250;
+      void persistCurrentPlacement();
+    }
+
+    if (mount.hasPointerCapture(pointerId)) {
+      mount.releasePointerCapture(pointerId);
+    }
+
+    dragState = null;
+    shell.dataset.dragging = 'false';
+  };
+
+  const handleMountPointerMove = (event: PointerEvent) => {
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = event.clientX - dragState.startX;
+    const deltaY = event.clientY - dragState.startY;
+
+    if (!dragState.moved && Math.hypot(deltaX, deltaY) < DRAG_THRESHOLD_PX) {
+      return;
+    }
+
+    if (!dragState.moved) {
+      dragState.moved = true;
+      closePanel();
+      shell.dataset.dragging = 'true';
+    }
+
+    const clamped = clampIndicatorPixels(
+      {
+        left: dragState.startLeft + deltaX,
+        top: dragState.startTop + deltaY,
+      },
+      getMountSize(),
+      getViewportSize(),
+    );
+
+    applyMountPixels(clamped.left, clamped.top);
+  };
+  mount.addEventListener('pointermove', handleMountPointerMove);
+
+  const handleMountPointerUp = (event: PointerEvent) => {
+    finishDrag(event.pointerId);
+  };
+  mount.addEventListener('pointerup', handleMountPointerUp);
+  mount.addEventListener('pointercancel', handleMountPointerUp);
 
   const handlePanelClick = (event: MouseEvent) => {
     const toggle = (event.target as HTMLElement).closest<HTMLButtonElement>('.ask-em-panel-switch');
@@ -408,6 +599,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         await refreshPanel();
         if (provider === adapter.name) {
           updateSyncLabel(nextEnabled ? 'Ready for next prompt' : 'This tab is paused');
+          refreshLayout();
         }
       })
       .finally(() => {
@@ -421,9 +613,8 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       return;
     }
 
-    if (!shell.contains(event.target as Node)) {
-      panelPinned = false;
-      setPanelVisible(false);
+    if (!mount.contains(event.target as Node) && !panel.contains(event.target as Node)) {
+      closePanel();
     }
   };
   document.addEventListener('pointerdown', handleDocumentPointerDown);
@@ -441,6 +632,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       void handlers.onProviderTabSwitch(switchDirection).then((response) => {
         if (response?.switched === false && response.reason) {
           updateSyncLabel(response.reason, 'neutral');
+          refreshLayout();
         }
       });
       return;
@@ -465,25 +657,44 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   };
   document.addEventListener('keydown', handleDocumentKeyDown);
 
+  const handleWindowResize = () => {
+    applyPlacement();
+  };
+  window.addEventListener('resize', handleWindowResize);
+
+  applyPlacement();
+  void loadIndicatorPlacement(adapter.name).then((savedPlacement) => {
+    if (!savedPlacement) {
+      return;
+    }
+
+    currentPlacement = savedPlacement;
+    applyPlacement();
+  });
+
   return {
     setVisible(visible: boolean) {
       mount.dataset.visible = String(visible);
       if (!visible) {
-        panelPinned = false;
-        setPanelVisible(false);
+        closePanel();
+        return;
       }
+
+      refreshLayout();
     },
     setState(state: UiState, labelText?: string) {
       mount.dataset.state = state;
       if (labelText) {
         updateLabel(labelText);
-        return;
+      } else {
+        syncPrimaryLabel();
       }
 
-      syncPrimaryLabel();
+      refreshLayout();
     },
     setSyncStatus(text: string, tone: SyncIndicatorTone = 'neutral') {
       updateSyncLabel(text, tone);
+      refreshLayout();
     },
     setAlertLevel(level: IndicatorAlertLevel) {
       mount.dataset.alertLevel = level;
@@ -504,20 +715,30 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       mount.dataset.interactive = String(Boolean(nextContext.workspaceId || nextContext.standaloneReady));
 
       if (!nextContext.workspaceId && !nextContext.standaloneReady) {
-        panelPinned = false;
-        renderPanel(null);
+        closePanel();
+        panel.innerHTML = '';
+        panel.dataset.mode = '';
       }
 
       syncPrimaryLabel();
       syncStandaloneStatusLabel();
+      refreshLayout();
+    },
+    async resetPosition() {
+      await resetPosition();
     },
     destroy() {
       mount.removeEventListener('click', handleMountClick);
       mount.removeEventListener('mousemove', handleMountMouseMove);
-      shell.removeEventListener('mouseleave', handleShellMouseLeave);
+      mount.removeEventListener('mouseleave', handleMountMouseLeave);
+      mount.removeEventListener('pointerdown', handleMountPointerDown);
+      mount.removeEventListener('pointermove', handleMountPointerMove);
+      mount.removeEventListener('pointerup', handleMountPointerUp);
+      mount.removeEventListener('pointercancel', handleMountPointerUp);
       panel.removeEventListener('click', handlePanelClick);
       document.removeEventListener('pointerdown', handleDocumentPointerDown);
       document.removeEventListener('keydown', handleDocumentKeyDown);
+      window.removeEventListener('resize', handleWindowResize);
     },
   };
 }

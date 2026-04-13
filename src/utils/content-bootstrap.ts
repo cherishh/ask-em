@@ -89,6 +89,9 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
   });
   const deliveryController = createDeliveryController(adapter, state, submitController, {
     reportPresence: presenceController.reportPresence,
+    async resetIndicatorPosition() {
+      await ui.resetPosition?.();
+    },
     logDebug,
   });
 
