@@ -1,16 +1,9 @@
 import type { ProviderAdapter } from '../adapters/types';
 import type {
   PageState,
-  ShortcutConfig,
   WorkspaceSummary,
 } from '../runtime/protocol';
-import { DEFAULT_SHORTCUTS } from '../runtime/protocol';
-import {
-  buildPresenceContextTransition,
-  buildSubmitContextTransition,
-  type PresenceResponse,
-  type SubmitResponse,
-} from './context';
+import type { PresenceResponse, SubmitResponse } from './context';
 import {
   applyIncomingSyncProgress,
   reconcileSyncProgressForWorkspace,
@@ -23,20 +16,23 @@ import {
   type SyncProgressSnapshot,
 } from './indicator';
 import {
-  rememberProgrammaticSubmit as rememberProgrammaticSubmitEntry,
-  shouldSuppressProgrammaticSubmit as shouldSuppressProgrammaticSubmitEntry,
-  type RecentProgrammaticSubmitState,
-} from './submit-memory';
-import {
-  rememberSubmitFingerprint,
-  shouldSkipDuplicateSubmit,
-} from './submit-fingerprint';
-import {
-  isSubmissionSuppressed,
-  suppressObservedSubmissions,
-  type SubmitSuppressionState,
-} from './submit-suppression';
+  createInitialSubmitRuntime,
+  isSubmitRuntimeSuppressed,
+  rememberProgrammaticSubmitInRuntime,
+  rememberSubmitFingerprintInRuntime,
+  shouldSkipDuplicateSubmitInRuntime,
+  shouldSuppressProgrammaticSubmitInRuntime,
+  suppressSubmitRuntime,
+} from './submit-runtime';
 import type { UiContext } from './ui';
+import {
+  applyPresenceResponseToView,
+  applySubmitResponseToView,
+  createInitialViewRuntime,
+  setViewProviderEnabled,
+  setViewStandaloneCreateSetEnabled,
+  setViewWorkspaceSummary,
+} from './view-runtime';
 export type { PresenceResponse, SubmitResponse } from './context';
 
 export function shouldShowStandaloneIndicator(adapter: ProviderAdapter): boolean {
@@ -54,25 +50,7 @@ export function createContentState(
     setAlertLevel(level: IndicatorAlertLevel): void;
   },
 ) {
-  const viewRuntime: {
-    uiContext: UiContext;
-    workspaceSummary: WorkspaceSummary | null;
-    hasHydratedPresence: boolean;
-    standaloneCreateSetTouched: boolean;
-  } = {
-    uiContext: {
-      workspaceId: null,
-      providerEnabled: true,
-      globalSyncEnabled: true,
-      standaloneReady: false,
-      standaloneCreateSetEnabled: true,
-      canStartNewSet: true,
-      shortcuts: DEFAULT_SHORTCUTS,
-    },
-    workspaceSummary: null,
-    hasHydratedPresence: false,
-    standaloneCreateSetTouched: false,
-  };
+  const viewRuntime = createInitialViewRuntime();
   const syncRuntime: {
     syncProgress: SyncProgressSnapshot | null;
     pendingSyncProgress: SyncProgressSnapshot | null;
@@ -80,16 +58,7 @@ export function createContentState(
     syncProgress: null,
     pendingSyncProgress: null,
   };
-  const submitRuntime: SubmitSuppressionState &
-    RecentProgrammaticSubmitState & {
-      lastFingerprint: string;
-      lastFingerprintAt: number;
-    } = {
-    suppressSubmissionsUntil: 0,
-    lastFingerprint: '',
-    lastFingerprintAt: 0,
-    recentProgrammaticSubmits: new Map<string, number>(),
-  };
+  const submitRuntime = createInitialSubmitRuntime();
 
   const syncPendingProgress = () => {
     const nextState = reconcileSyncProgressForWorkspace(
@@ -130,50 +99,31 @@ export function createContentState(
   };
 
   const setStandaloneCreateSetEnabled = (nextEnabled: boolean) => {
-    viewRuntime.standaloneCreateSetTouched = true;
-    viewRuntime.uiContext = {
-      ...viewRuntime.uiContext,
-      standaloneCreateSetEnabled: nextEnabled,
-    };
-    ui.setContext(viewRuntime.uiContext);
+    ui.setContext(setViewStandaloneCreateSetEnabled(viewRuntime, nextEnabled));
   };
 
   const setProviderEnabled = (nextEnabled: boolean) => {
-    viewRuntime.uiContext = {
-      ...viewRuntime.uiContext,
-      providerEnabled: nextEnabled,
-    };
-    ui.setContext(viewRuntime.uiContext);
+    ui.setContext(setViewProviderEnabled(viewRuntime, nextEnabled));
   };
 
   const applyPresenceResponse = (response: PresenceResponse | null) => {
-    const transition = buildPresenceContextTransition({
-      currentContext: viewRuntime.uiContext,
+    const viewUpdate = applyPresenceResponseToView(
+      viewRuntime,
       response,
-      standaloneVisible: shouldShowStandaloneIndicator(adapter),
-      hasHydratedPresence: viewRuntime.hasHydratedPresence,
-      standaloneCreateSetTouched: viewRuntime.standaloneCreateSetTouched,
-    });
-
-    viewRuntime.workspaceSummary = transition.workspaceSummary;
-    viewRuntime.uiContext = transition.uiContext;
-    viewRuntime.standaloneCreateSetTouched = transition.standaloneCreateSetTouched;
-    viewRuntime.hasHydratedPresence = transition.hasHydratedPresence;
-    ui.setContext(viewRuntime.uiContext);
-    ui.setVisible(transition.visible);
+      shouldShowStandaloneIndicator(adapter),
+    );
+    ui.setContext(viewUpdate.uiContext);
+    ui.setVisible(viewUpdate.visible);
   };
 
   const applySubmitResponse = (response: SubmitResponse | null) => {
-    const transition = buildSubmitContextTransition({
-      currentContext: viewRuntime.uiContext,
+    const viewUpdate = applySubmitResponseToView(
+      viewRuntime,
       response,
-      standaloneVisible: shouldShowStandaloneIndicator(adapter),
-    });
-
-    viewRuntime.workspaceSummary = transition.workspaceSummary;
-    viewRuntime.uiContext = transition.uiContext;
-    ui.setContext(viewRuntime.uiContext);
-    ui.setVisible(transition.visible);
+      shouldShowStandaloneIndicator(adapter),
+    );
+    ui.setContext(viewUpdate.uiContext);
+    ui.setVisible(viewUpdate.visible);
     syncRuntime.syncProgress = null;
   };
 
@@ -214,17 +164,11 @@ export function createContentState(
   };
 
   const rememberProgrammaticSubmit = (content: string) => {
-    rememberProgrammaticSubmitEntry(
-      submitRuntime,
-      content,
-    );
+    rememberProgrammaticSubmitInRuntime(submitRuntime, content);
   };
 
   const shouldSuppressProgrammaticSubmit = (content: string) => {
-    return shouldSuppressProgrammaticSubmitEntry(
-      submitRuntime,
-      content,
-    );
+    return shouldSuppressProgrammaticSubmitInRuntime(submitRuntime, content);
   };
 
   return {
@@ -232,27 +176,14 @@ export function createContentState(
     hasHydratedPresence: () => viewRuntime.hasHydratedPresence,
     getWorkspaceSummary: () => viewRuntime.workspaceSummary,
     setWorkspaceSummary: (nextSummary: WorkspaceSummary | null) => {
-      viewRuntime.workspaceSummary = nextSummary;
+      setViewWorkspaceSummary(viewRuntime, nextSummary);
     },
-    isSubmissionSuppressed: (now = Date.now()) => isSubmissionSuppressed(submitRuntime, now),
+    isSubmissionSuppressed: (now = Date.now()) => isSubmitRuntimeSuppressed(submitRuntime, now),
     shouldSkipDuplicateSubmit(fingerprint: string, now = Date.now()) {
-      return shouldSkipDuplicateSubmit(
-        {
-          lastFingerprint: submitRuntime.lastFingerprint,
-          lastFingerprintAt: submitRuntime.lastFingerprintAt,
-        },
-        fingerprint,
-        now,
-      );
+      return shouldSkipDuplicateSubmitInRuntime(submitRuntime, fingerprint, now);
     },
     rememberSubmitFingerprint(fingerprint: string, now = Date.now()) {
-      const state = {
-        lastFingerprint: submitRuntime.lastFingerprint,
-        lastFingerprintAt: submitRuntime.lastFingerprintAt,
-      };
-      rememberSubmitFingerprint(state, fingerprint, now);
-      submitRuntime.lastFingerprint = state.lastFingerprint;
-      submitRuntime.lastFingerprintAt = state.lastFingerprintAt;
+      rememberSubmitFingerprintInRuntime(submitRuntime, fingerprint, now);
     },
     shouldSuppressProgrammaticSubmit,
     rememberProgrammaticSubmit,
@@ -266,7 +197,7 @@ export function createContentState(
     setSyncing,
     showCurrentWarning,
     suppressObservedSubmissions(durationMs: number, now = Date.now()) {
-      suppressObservedSubmissions(submitRuntime, durationMs, now);
+      suppressSubmitRuntime(submitRuntime, durationMs, now);
     },
   };
 }

@@ -1,4 +1,5 @@
 import type { ClaimedTab, PingResponseMessage, Provider, SessionState } from '../runtime/protocol';
+import { isTerminalRecoveryPageState } from './recovery-semantics';
 
 export async function reconcileClaimedTabsWithBrowser(
   sessionState: SessionState,
@@ -64,11 +65,7 @@ export async function waitForContentStatus(
     if (response?.provider === provider) {
       latestResponse = response;
 
-      if (
-        response.pageState === 'ready' ||
-        response.pageState === 'login-required' ||
-        response.pageState === 'error'
-      ) {
+      if (isTerminalRecoveryPageState(response.pageState)) {
         return response;
       }
     }

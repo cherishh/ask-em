@@ -1,6 +1,7 @@
 import { getSiteInfo, getSiteInfoByProvider } from '../adapters/sites';
 import type { PingResponseMessage, Provider, SessionState, Workspace } from '../runtime/protocol';
 import { getClaimedTab, getClaimedTabByTabId, isClaimedTabStale } from './claimed-tabs';
+import { getRecoveryStatusError } from './recovery-semantics';
 import { pingContentTab, waitForContentStatus, waitForTabLoad } from './tab-runtime';
 
 export type DeliveryTarget = {
@@ -32,19 +33,12 @@ function assertDeliverableStatus(
   status: PingResponseMessage | null,
   expectedSessionId: string | null,
 ): asserts status is PingResponseMessage {
-  if (!status) {
-    throw new Error(`${provider} not ready`);
+  const recoveryError = getRecoveryStatusError(provider, status);
+  if (recoveryError) {
+    throw new Error(recoveryError);
   }
 
-  if (status.pageState === 'login-required') {
-    throw new Error(`${provider} login required`);
-  }
-
-  if (status.pageState === 'error') {
-    throw new Error(`${provider} error page`);
-  }
-
-  if (status.pageState !== 'ready') {
+  if (!status || status.pageState !== 'ready') {
     throw new Error(`${provider} not ready`);
   }
 

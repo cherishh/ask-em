@@ -16,7 +16,7 @@ The biggest remaining `Phase 4` issues are:
 
 ### 1. Split `background/presence.ts`
 
-Status: `in progress`
+Status: `done`
 
 Target outcomes:
 
@@ -33,10 +33,14 @@ Suggested slices:
 Relevant files:
 
 - [src/background/presence.ts](/Users/zhongxi/code/other/ask-em/src/background/presence.ts)
+- [src/background/presence-reconciliation.ts](/Users/zhongxi/code/other/ask-em/src/background/presence-reconciliation.ts)
+- [src/background/presence-issues.ts](/Users/zhongxi/code/other/ask-em/src/background/presence-issues.ts)
+- [src/background/presence-response.ts](/Users/zhongxi/code/other/ask-em/src/background/presence-response.ts)
+- [src/background/presence-persistence.ts](/Users/zhongxi/code/other/ask-em/src/background/presence-persistence.ts)
 
 ### 2. Finish `content/state.ts` cleanup
 
-Status: `in progress`
+Status: `done`
 
 Target outcomes:
 
@@ -57,10 +61,12 @@ Relevant files:
 - [src/content/submit-memory.ts](/Users/zhongxi/code/other/ask-em/src/content/submit-memory.ts)
 - [src/content/submit-fingerprint.ts](/Users/zhongxi/code/other/ask-em/src/content/submit-fingerprint.ts)
 - [src/content/sync-progress.ts](/Users/zhongxi/code/other/ask-em/src/content/sync-progress.ts)
+- [src/content/view-runtime.ts](/Users/zhongxi/code/other/ask-em/src/content/view-runtime.ts)
+- [src/content/submit-runtime.ts](/Users/zhongxi/code/other/ask-em/src/content/submit-runtime.ts)
 
 ### 3. Make recovery semantics more explicit
 
-Status: `in progress`
+Status: `done`
 
 Target outcomes:
 
@@ -72,6 +78,11 @@ Suggested slices:
 - review [src/background/delivery-targets.ts](/Users/zhongxi/code/other/ask-em/src/background/delivery-targets.ts) and [src/background/delivery-issues.ts](/Users/zhongxi/code/other/ask-em/src/background/delivery-issues.ts) together
 - decide whether `error-page` should be classified more directly during delivery failures
 - document which states are treated as terminal vs retryable
+
+Implemented notes and helpers:
+
+- [src/background/recovery-semantics.ts](/Users/zhongxi/code/other/ask-em/src/background/recovery-semantics.ts)
+- [docs/architecture/recovery-semantics.md](/Users/zhongxi/code/other/ask-em/docs/architecture/recovery-semantics.md)
 
 ### 4. Write down soft-detach vs hard-failure rules
 
