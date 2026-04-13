@@ -100,6 +100,15 @@ export function usePopupStatus() {
     await refresh({ silent: true });
   }, [refresh, status?.globalSyncEnabled]);
 
+  const toggleAutoSyncNewChats = useCallback(async () => {
+    const nextEnabled = !status?.autoSyncNewChatsEnabled;
+    await chrome.runtime.sendMessage({
+      type: 'SET_AUTO_SYNC_NEW_CHATS_ENABLED',
+      enabled: nextEnabled,
+    });
+    await refresh({ silent: true });
+  }, [refresh, status?.autoSyncNewChatsEnabled]);
+
   const toggleCloseTabsOnDeleteSet = useCallback(async () => {
     const nextEnabled = !status?.closeTabsOnDeleteSet;
     await chrome.runtime.sendMessage({
@@ -141,6 +150,7 @@ export function usePopupStatus() {
     clearWorkspace,
     clearProvider,
     toggleDefaultProvider,
+    toggleAutoSyncNewChats,
     toggleGlobalSync,
     toggleCloseTabsOnDeleteSet,
     updateShortcut,

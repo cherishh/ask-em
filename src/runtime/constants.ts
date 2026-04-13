@@ -14,8 +14,12 @@ export const STORAGE_KEYS = {
 
 export const ALL_PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek', 'manus'];
 
+export const DEFAULT_ENABLED_PROVIDER_LIST: Provider[] = ALL_PROVIDERS.filter(
+  (provider) => provider !== 'manus',
+);
+
 export function createDefaultEnabledProviders(
-  enabledProviders: Provider[] = ALL_PROVIDERS,
+  enabledProviders: Provider[] = DEFAULT_ENABLED_PROVIDER_LIST,
 ): DefaultEnabledProviders {
   return {
     claude: enabledProviders.includes('claude'),

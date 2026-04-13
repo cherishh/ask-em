@@ -33,6 +33,7 @@ export type UserSubmitMessage = {
   currentUrl: string;
   sessionId: string | null;
   pageKind: PageKind;
+  allowNewSetCreation: boolean;
   content: string;
   timestamp: number;
 };
@@ -85,6 +86,7 @@ export type GetStatusMessage = {
 export type StatusResponseMessage = {
   type: 'STATUS_RESPONSE';
   globalSyncEnabled: boolean;
+  autoSyncNewChatsEnabled: boolean;
   debugLoggingEnabled: boolean;
   closeTabsOnDeleteSet: boolean;
   workspaceLimit: number;
@@ -106,6 +108,7 @@ export type GetWorkspaceContextMessage = {
 export type WorkspaceContextResponseMessage = {
   type: 'WORKSPACE_CONTEXT_RESPONSE';
   globalSyncEnabled: boolean;
+  autoSyncNewChatsEnabled: boolean;
   workspaceSummary: WorkspaceSummary | null;
 };
 
@@ -153,6 +156,11 @@ export type SetCloseTabsOnDeleteSetMessage = {
 
 export type SetGlobalSyncEnabledMessage = {
   type: 'SET_GLOBAL_SYNC_ENABLED';
+  enabled: boolean;
+};
+
+export type SetAutoSyncNewChatsEnabledMessage = {
+  type: 'SET_AUTO_SYNC_NEW_CHATS_ENABLED';
   enabled: boolean;
 };
 
@@ -209,6 +217,7 @@ export type RuntimeMessage =
   | ClearDebugLogsMessage
   | SetDefaultEnabledProvidersMessage
   | SetWorkspaceProviderEnabledMessage
+  | SetAutoSyncNewChatsEnabledMessage
   | SetGlobalSyncEnabledMessage
   | SetCloseTabsOnDeleteSetMessage
   | SetShortcutsMessage

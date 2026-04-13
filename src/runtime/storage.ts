@@ -13,6 +13,7 @@ import { rebuildWorkspaceIndex } from './workspace';
 
 export const DEFAULT_LOCAL_STATE: LocalState = {
   globalSyncEnabled: true,
+  autoSyncNewChatsEnabled: true,
   debugLoggingEnabled: true,
   closeTabsOnDeleteSet: false,
   defaultEnabledProviders: createDefaultEnabledProviders(),

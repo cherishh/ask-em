@@ -117,6 +117,7 @@ export default function App() {
     clearWorkspace,
     clearProvider,
     toggleDefaultProvider,
+    toggleAutoSyncNewChats,
     toggleGlobalSync,
     toggleCloseTabsOnDeleteSet,
     updateShortcut,
@@ -163,6 +164,7 @@ export default function App() {
   const limit = status?.workspaceLimit ?? MAX_WORKSPACES;
   const atLimit = workspaceCount >= limit;
   const globalSyncEnabled = status?.globalSyncEnabled ?? true;
+  const autoSyncNewChatsEnabled = status?.autoSyncNewChatsEnabled ?? true;
   const persistedDevControl = window.localStorage.getItem(DEV_CONTROL_STORAGE_KEY) === 'true';
 
   if (window.dev_control === true && !persistedDevControl) {
@@ -335,9 +337,9 @@ export default function App() {
               <div className="askem-us-group">
                 <div className="askem-us-toggle-row">
                   <div>
-                    <span className="askem-us-row-title">Auto-sync new chats</span>
+                    <span className="askem-us-row-title">Default auto-sync new chats</span>
                     <span className="askem-us-row-sub">
-                      {globalSyncEnabled
+                      {autoSyncNewChatsEnabled
                         ? 'New chats automatically fan-out.'
                         : 'New chats stay solo.'}
                     </span>
@@ -345,10 +347,10 @@ export default function App() {
                   <button
                     type="button"
                     className="askem-us-switch"
-                    data-enabled={String(globalSyncEnabled)}
-                    onClick={() => void toggleGlobalSync()}
+                    data-enabled={String(autoSyncNewChatsEnabled)}
+                    onClick={() => void toggleAutoSyncNewChats()}
                     disabled={loading}
-                    aria-label={globalSyncEnabled ? 'Disable auto-sync' : 'Enable auto-sync'}
+                    aria-label={autoSyncNewChatsEnabled ? 'Disable auto-sync for new chats' : 'Enable auto-sync for new chats'}
                   />
                 </div>
               </div>

@@ -54,6 +54,7 @@ export async function handleGetStatus(): Promise<StatusResponseMessage> {
   return {
     type: 'STATUS_RESPONSE',
     globalSyncEnabled: localState.globalSyncEnabled,
+    autoSyncNewChatsEnabled: localState.autoSyncNewChatsEnabled,
     debugLoggingEnabled: localState.debugLoggingEnabled,
     closeTabsOnDeleteSet: localState.closeTabsOnDeleteSet ?? false,
     workspaceLimit: MAX_WORKSPACES,
@@ -71,6 +72,7 @@ export async function handleGetWorkspaceContext(message: GetWorkspaceContextMess
   return {
     type: 'WORKSPACE_CONTEXT_RESPONSE' as const,
     globalSyncEnabled: localState.globalSyncEnabled,
+    autoSyncNewChatsEnabled: localState.autoSyncNewChatsEnabled,
     workspaceSummary: workspace ? buildWorkspaceSummary(workspace, sessionState) : null,
   };
 }

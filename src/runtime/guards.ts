@@ -7,6 +7,7 @@ export function canCreateWorkspaceFromSubmit(
 ): boolean {
   return (
     state.globalSyncEnabled &&
+    message.allowNewSetCreation &&
     message.pageKind === 'new-chat' &&
     message.sessionId === null &&
     Object.keys(state.workspaces).length < limit

@@ -37,6 +37,7 @@ export function makeWorkspace(overrides: Partial<Workspace> & Pick<Workspace, 'i
 export function makeLocalState(overrides: Partial<LocalState> = {}): LocalState {
   return {
     globalSyncEnabled: true,
+    autoSyncNewChatsEnabled: true,
     debugLoggingEnabled: true,
     closeTabsOnDeleteSet: false,
     defaultEnabledProviders: createDefaultEnabledProviders(),
@@ -79,6 +80,7 @@ export function makeSubmitMessage(overrides: Partial<UserSubmitMessage> = {}): U
     currentUrl: 'https://claude.ai/chat/c-set',
     sessionId: 'c-set',
     pageKind: 'existing-session',
+    allowNewSetCreation: true,
     content: 'hello',
     timestamp: 100,
     ...overrides,

@@ -155,6 +155,23 @@ export async function handleSetGlobalSyncEnabled(
   return { ok: true };
 }
 
+export async function handleSetAutoSyncNewChatsEnabled(
+  message: Extract<RuntimeMessage, { type: 'SET_AUTO_SYNC_NEW_CHATS_ENABLED' }>,
+) {
+  const localState = await getLocalState();
+  await setLocalState({
+    ...localState,
+    autoSyncNewChatsEnabled: message.enabled,
+  });
+  await notifyAllTabsToRefreshContext();
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    message: message.enabled ? 'Auto-sync new chats enabled' : 'Auto-sync new chats disabled',
+  });
+  return { ok: true };
+}
+
 export async function handleSetDebugLoggingEnabled(
   message: Extract<RuntimeMessage, { type: 'SET_DEBUG_LOGGING_ENABLED' }>,
 ) {

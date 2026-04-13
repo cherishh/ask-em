@@ -16,6 +16,7 @@ export type PresenceResponse = {
   workspaceId?: string | null;
   providerEnabled?: boolean;
   globalSyncEnabled?: boolean;
+  autoSyncNewChatsEnabled?: boolean;
   canStartNewSet?: boolean;
   shortcuts?: ShortcutConfig;
   workspaceSummary?: WorkspaceSummary | null;
@@ -54,6 +55,8 @@ export function createContentState(
   let workspaceSummary: WorkspaceSummary | null = null;
   let syncProgress: SyncProgressSnapshot | null = null;
   let pendingSyncProgress: SyncProgressSnapshot | null = null;
+  let hasHydratedPresence = false;
+  let standaloneCreateSetTouched = false;
   let suppressSubmissionsUntil = 0;
   let lastFingerprint = '';
   let lastFingerprintAt = 0;
@@ -103,6 +106,7 @@ export function createContentState(
     getContentIndicatorPresentation(getIndicatorInput(pageState, null)).label;
 
   const setStandaloneCreateSetEnabled = (nextEnabled: boolean) => {
+    standaloneCreateSetTouched = true;
     uiContext = {
       ...uiContext,
       standaloneCreateSetEnabled: nextEnabled,
@@ -120,21 +124,33 @@ export function createContentState(
 
   const applyPresenceResponse = (response: PresenceResponse | null) => {
     const standaloneVisible = shouldShowStandaloneIndicator(adapter);
-    const standaloneCreateSetEnabled = response?.workspaceId
-      ? true
-      : uiContext.standaloneCreateSetEnabled;
+    const defaultStandaloneCreateSetEnabled = response?.autoSyncNewChatsEnabled ?? true;
+    const nextWorkspaceId = response?.workspaceId ?? null;
+    const leavingWorkspace = Boolean(uiContext.workspaceId) && !nextWorkspaceId;
+    const enteringWorkspace = Boolean(nextWorkspaceId);
+    let standaloneCreateSetEnabled = uiContext.standaloneCreateSetEnabled;
+
+    if (enteringWorkspace) {
+      standaloneCreateSetEnabled = true;
+      standaloneCreateSetTouched = false;
+    } else if (!hasHydratedPresence || leavingWorkspace || !standaloneCreateSetTouched) {
+      standaloneCreateSetEnabled = defaultStandaloneCreateSetEnabled;
+      standaloneCreateSetTouched = false;
+    }
+
     workspaceSummary = response?.workspaceSummary ?? null;
     uiContext = {
-      workspaceId: response?.workspaceId ?? null,
-      providerEnabled: response?.workspaceId ? (response.providerEnabled ?? false) : true,
+      workspaceId: nextWorkspaceId,
+      providerEnabled: nextWorkspaceId ? (response?.providerEnabled ?? false) : true,
       globalSyncEnabled: response?.globalSyncEnabled ?? true,
       standaloneReady: standaloneVisible,
       standaloneCreateSetEnabled,
       canStartNewSet: response?.canStartNewSet ?? true,
       shortcuts: resolveShortcutConfig(response?.shortcuts ?? uiContext.shortcuts),
     };
+    hasHydratedPresence = true;
     ui.setContext(uiContext);
-    ui.setVisible(Boolean(response?.workspaceId) || standaloneVisible);
+    ui.setVisible(Boolean(nextWorkspaceId) || standaloneVisible);
   };
 
   const applySubmitResponse = (response: SubmitResponse | null) => {
@@ -210,6 +226,7 @@ export function createContentState(
 
   return {
     getUiContext: () => uiContext,
+    hasHydratedPresence: () => hasHydratedPresence,
     getWorkspaceSummary: () => workspaceSummary,
     setWorkspaceSummary: (nextSummary: WorkspaceSummary | null) => {
       workspaceSummary = nextSummary;

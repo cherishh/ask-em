@@ -21,6 +21,7 @@ import {
   handleDebugLog,
   handleSetCloseTabsOnDeleteSet,
   handleClearPersistentStorage,
+  handleSetAutoSyncNewChatsEnabled,
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
   handleSetGlobalSyncEnabled,
@@ -51,6 +52,7 @@ export {
   handleGetWorkspaceContext,
   handleSetCloseTabsOnDeleteSet,
   handleClearPersistentStorage,
+  handleSetAutoSyncNewChatsEnabled,
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
   handleSetGlobalSyncEnabled,
@@ -119,6 +121,9 @@ export default defineBackground(() => {
           return;
         case 'SET_GLOBAL_SYNC_ENABLED':
           sendResponse(await handleSetGlobalSyncEnabled(message));
+          return;
+        case 'SET_AUTO_SYNC_NEW_CHATS_ENABLED':
+          sendResponse(await handleSetAutoSyncNewChatsEnabled(message));
           return;
         case 'SET_CLOSE_TABS_ON_DELETE_SET':
           sendResponse(await handleSetCloseTabsOnDeleteSet(message));

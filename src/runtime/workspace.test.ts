@@ -264,6 +264,7 @@ describe('workspace state', () => {
   it('enforces the configured workspace limit', () => {
     const state: LocalState = {
       globalSyncEnabled: true,
+      autoSyncNewChatsEnabled: true,
       debugLoggingEnabled: false,
       closeTabsOnDeleteSet: false,
       defaultEnabledProviders: createDefaultEnabledProviders(),

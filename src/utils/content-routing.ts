@@ -37,6 +37,7 @@ export function buildHeartbeatMessage(adapter: ProviderAdapter): HeartbeatMessag
 export function buildUserSubmitMessage(
   status: ProviderStatus,
   content: string,
+  allowNewSetCreation: boolean,
 ): UserSubmitMessage {
   return {
     type: 'USER_SUBMIT',
@@ -44,6 +45,7 @@ export function buildUserSubmitMessage(
     currentUrl: status.currentUrl,
     sessionId: status.sessionId,
     pageKind: status.pageKind,
+    allowNewSetCreation,
     content,
     timestamp: Date.now(),
   };

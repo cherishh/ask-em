@@ -21,6 +21,12 @@ export function createSubmitController(
       return;
     }
 
+    let status = adapter.session.getStatus();
+    if (status.pageKind === 'new-chat' && !state.hasHydratedPresence()) {
+      await dependencies.reportPresence('HELLO');
+      status = adapter.session.getStatus();
+    }
+
     if (state.shouldSuppressProgrammaticSubmit(content)) {
       await dependencies.logDebug({
         level: 'info',
@@ -30,7 +36,6 @@ export function createSubmitController(
       return;
     }
 
-    const status = adapter.session.getStatus();
     const fingerprint = `${status.currentUrl}::${content}`;
 
     if (
@@ -76,11 +81,14 @@ export function createSubmitController(
 
     state.setSyncing();
 
-    const response = await sendRuntimeMessage<SubmitResponse>(buildUserSubmitMessage(status, content), {
-      onError(error) {
-        console.warn('ask-em: failed to report user submit', error);
+    const response = await sendRuntimeMessage<SubmitResponse>(
+      buildUserSubmitMessage(status, content, uiContext.standaloneCreateSetEnabled),
+      {
+        onError(error) {
+          console.warn('ask-em: failed to report user submit', error);
+        },
       },
-    });
+    );
     state.applySubmitResponse(response);
     state.applyIndicatorPresentation();
   };
