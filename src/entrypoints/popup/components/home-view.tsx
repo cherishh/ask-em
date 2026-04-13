@@ -10,6 +10,7 @@ export function HomeView(props: {
   workspaceCount: number;
   workspaces: WorkspaceSummary[];
   onboardingProviders: Provider[];
+  version: string;
   globalSyncEnabled: boolean;
   loading: boolean;
   busyKey: string | null;
@@ -67,6 +68,8 @@ export function HomeView(props: {
           />
         </section>
       )}
+
+      <footer className="askem-version-note">version {props.version}</footer>
     </>
   );
 }

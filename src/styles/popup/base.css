@@ -191,3 +191,12 @@ body {
   color: var(--askem-ink);
   font: 700 12px/1 var(--askem-font-sans);
 }
+
+.askem-version-note {
+  margin-top: auto;
+  padding: 6px 2px 0;
+  text-align: center;
+  color: rgba(63, 58, 49, 0.42);
+  font: 500 10px/1.2 var(--askem-font-sans);
+  letter-spacing: 0.03em;
+}

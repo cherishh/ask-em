@@ -17,6 +17,7 @@ import { useProviderRequest } from './hooks/use-provider-request';
 type PopupView = 'home' | 'settings' | 'legal';
 
 export default function App() {
+  const popupVersion = chrome.runtime.getManifest().version;
   const [activeView, setActiveView] = useState<PopupView>('home');
   const [activeLegalPage, setActiveLegalPage] = useState<LegalPage>('terms');
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
@@ -154,6 +155,7 @@ export default function App() {
             workspaceCount={workspaceCount}
             workspaces={status?.workspaces ?? []}
             onboardingProviders={onboardingProviders}
+            version={popupVersion}
             globalSyncEnabled={globalSyncEnabled}
             loading={loading}
             busyKey={busyKey}
