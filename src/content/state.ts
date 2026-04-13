@@ -4,7 +4,13 @@ import type {
   ShortcutConfig,
   WorkspaceSummary,
 } from '../runtime/protocol';
-import { DEFAULT_SHORTCUTS, resolveShortcutConfig } from '../runtime/protocol';
+import { DEFAULT_SHORTCUTS } from '../runtime/protocol';
+import {
+  buildPresenceContextTransition,
+  buildSubmitContextTransition,
+  type PresenceResponse,
+  type SubmitResponse,
+} from './context';
 import {
   getContentIndicatorPresentation,
   getCurrentWarningIndicatorPresentation,
@@ -13,20 +19,7 @@ import {
   type SyncProgressSnapshot,
 } from './indicator';
 import type { UiContext } from './ui';
-
-export type PresenceResponse = {
-  workspaceId?: string | null;
-  providerEnabled?: boolean;
-  globalSyncEnabled?: boolean;
-  autoSyncNewChatsEnabled?: boolean;
-  canStartNewSet?: boolean;
-  shortcuts?: ShortcutConfig;
-  workspaceSummary?: WorkspaceSummary | null;
-};
-
-export type SubmitResponse = PresenceResponse & {
-  synced?: boolean;
-};
+export type { PresenceResponse, SubmitResponse } from './context';
 
 const PROGRAMMATIC_SUBMIT_SUPPRESS_MS = 30_000;
 
@@ -122,52 +115,33 @@ export function createContentState(
   };
 
   const applyPresenceResponse = (response: PresenceResponse | null) => {
-    const standaloneVisible = shouldShowStandaloneIndicator(adapter);
-    const defaultStandaloneCreateSetEnabled = response?.autoSyncNewChatsEnabled ?? true;
-    const nextWorkspaceId = response?.workspaceId ?? null;
-    const leavingWorkspace = Boolean(uiContext.workspaceId) && !nextWorkspaceId;
-    const enteringWorkspace = Boolean(nextWorkspaceId);
-    let standaloneCreateSetEnabled = uiContext.standaloneCreateSetEnabled;
+    const transition = buildPresenceContextTransition({
+      currentContext: uiContext,
+      response,
+      standaloneVisible: shouldShowStandaloneIndicator(adapter),
+      hasHydratedPresence,
+      standaloneCreateSetTouched,
+    });
 
-    if (enteringWorkspace) {
-      standaloneCreateSetEnabled = true;
-      standaloneCreateSetTouched = false;
-    } else if (!hasHydratedPresence || leavingWorkspace || !standaloneCreateSetTouched) {
-      standaloneCreateSetEnabled = defaultStandaloneCreateSetEnabled;
-      standaloneCreateSetTouched = false;
-    }
-
-    workspaceSummary = response?.workspaceSummary ?? null;
-    uiContext = {
-      workspaceId: nextWorkspaceId,
-      providerEnabled: nextWorkspaceId ? (response?.providerEnabled ?? false) : true,
-      globalSyncEnabled: response?.globalSyncEnabled ?? true,
-      standaloneReady: standaloneVisible,
-      standaloneCreateSetEnabled,
-      canStartNewSet: response?.canStartNewSet ?? true,
-      shortcuts: resolveShortcutConfig(response?.shortcuts ?? uiContext.shortcuts),
-    };
-    hasHydratedPresence = true;
+    workspaceSummary = transition.workspaceSummary;
+    uiContext = transition.uiContext;
+    standaloneCreateSetTouched = transition.standaloneCreateSetTouched;
+    hasHydratedPresence = transition.hasHydratedPresence;
     ui.setContext(uiContext);
-    ui.setVisible(Boolean(nextWorkspaceId) || standaloneVisible);
+    ui.setVisible(transition.visible);
   };
 
   const applySubmitResponse = (response: SubmitResponse | null) => {
-    const standaloneReady = shouldShowStandaloneIndicator(adapter);
-    workspaceSummary = response?.workspaceSummary ?? null;
-    uiContext = {
-      workspaceId: response?.workspaceId ?? null,
-      providerEnabled: response?.workspaceId ? (response.providerEnabled ?? true) : true,
-      globalSyncEnabled: response?.globalSyncEnabled ?? uiContext.globalSyncEnabled,
-      standaloneReady,
-      standaloneCreateSetEnabled: response?.workspaceId
-        ? true
-        : uiContext.standaloneCreateSetEnabled,
-      canStartNewSet: response?.canStartNewSet ?? uiContext.canStartNewSet,
-      shortcuts: uiContext.shortcuts,
-    };
+    const transition = buildSubmitContextTransition({
+      currentContext: uiContext,
+      response,
+      standaloneVisible: shouldShowStandaloneIndicator(adapter),
+    });
+
+    workspaceSummary = transition.workspaceSummary;
+    uiContext = transition.uiContext;
     ui.setContext(uiContext);
-    ui.setVisible(Boolean(uiContext.workspaceId) || standaloneReady);
+    ui.setVisible(transition.visible);
     syncProgress = null;
   };
 
