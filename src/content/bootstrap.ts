@@ -1,11 +1,11 @@
 import type { ProviderAdapter } from '../adapters/types';
 import type { WorkspaceContextResponseMessage } from '../runtime/protocol';
-import { sendRuntimeMessage } from './content-routing';
-import { createDeliveryController } from './content-delivery-controller';
-import { createPresenceController } from './content-presence-controller';
-import { createContentState } from './content-state';
-import { createSubmitController } from './content-submit-controller';
-import { createContentUi } from './content-ui';
+import { sendRuntimeMessage } from './routing';
+import { createDeliveryController } from './delivery-controller';
+import { createPresenceController } from './presence-controller';
+import { createContentState } from './state';
+import { createSubmitController } from './submit-controller';
+import { createContentUi } from './ui';
 
 export function bootstrapContentScript(adapter: ProviderAdapter): void {
   const ui = createContentUi(adapter, {

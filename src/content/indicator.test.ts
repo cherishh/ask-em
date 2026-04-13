@@ -4,7 +4,7 @@ import {
   countWorkspaceIssues,
   getContentIndicatorPresentation,
   type ContentIndicatorInput,
-} from './content-indicator';
+} from './indicator';
 
 function createWorkspaceSummary(
   overrides: Partial<WorkspaceSummary> = {},

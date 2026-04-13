@@ -4,8 +4,8 @@ import {
   buildHelloMessage,
   observeUrlChanges,
   sendRuntimeMessage,
-} from './content-routing';
-import type { ContentStateController, PresenceResponse } from './content-state';
+} from './routing';
+import type { ContentStateController, PresenceResponse } from './state';
 
 const STARTUP_PRESENCE_POLL_MS = 1_000;
 const STARTUP_PRESENCE_DURATION_MS = 10_000;

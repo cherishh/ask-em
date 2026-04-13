@@ -38,13 +38,13 @@ export function formatCooldownRemaining(cooldownUntil: number): string {
   return `in ${remainingDays} days`;
 }
 
-async function submitMoreProviderRequest(requestedProviders: string[]): Promise<'submitted' | 'coming-soon'> {
+async function submitMoreProviderRequest(
+  requestedProviders: string[],
+): Promise<'submitted' | 'not-configured'> {
   const endpoint = getMoreProvidersRequestEndpoint();
 
   if (!endpoint) {
-    // TODO: wire this modal to a real endpoint once provider requests are supported.
-    console.info('TODO: submit more provider request', requestedProviders);
-    return 'coming-soon';
+    return 'not-configured';
   }
 
   const originPattern = `${new URL(endpoint).origin}/*`;
@@ -85,7 +85,7 @@ export function useProviderRequest() {
   const [requestedProviders, setRequestedProviders] = useState<string[]>([]);
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [requestSubmitted, setRequestSubmitted] = useState(false);
-  const [requestComingSoon, setRequestComingSoon] = useState(false);
+  const [requestEndpointNotConfigured, setRequestEndpointNotConfigured] = useState(false);
   const [requestCooldownUntil, setRequestCooldownUntil] = useState<number | null>(null);
 
   const toggleRequestedProvider = useCallback((provider: string) => {
@@ -99,7 +99,7 @@ export function useProviderRequest() {
   const openRequestModal = useCallback(() => {
     setRequestedProviders([]);
     setRequestSubmitted(false);
-    setRequestComingSoon(false);
+    setRequestEndpointNotConfigured(false);
     setRequestCooldownUntil(getMoreProvidersCooldownUntil());
     setRequestModalOpen(true);
   }, []);
@@ -121,8 +121,8 @@ export function useProviderRequest() {
 
     try {
       const status = await submitMoreProviderRequest(requestedProviders);
-      if (status === 'coming-soon') {
-        setRequestComingSoon(true);
+      if (status === 'not-configured') {
+        setRequestEndpointNotConfigured(true);
         return;
       }
 
@@ -146,7 +146,7 @@ export function useProviderRequest() {
     requestedProviders,
     requestSubmitting,
     requestSubmitted,
-    requestComingSoon,
+    requestEndpointNotConfigured,
     requestCooldownUntil,
     toggleRequestedProvider,
     openRequestModal,

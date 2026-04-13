@@ -1,6 +1,6 @@
 import type { ProviderAdapter } from '../adapters/types';
-import { buildUserSubmitMessage, sendRuntimeMessage } from './content-routing';
-import type { ContentStateController, SubmitResponse } from './content-state';
+import { buildUserSubmitMessage, sendRuntimeMessage } from './routing';
+import type { ContentStateController, SubmitResponse } from './state';
 
 export function createSubmitController(
   adapter: ProviderAdapter,
@@ -17,7 +17,7 @@ export function createSubmitController(
 ) {
   const reportUserSubmit = async (rawContent: string) => {
     const content = rawContent.trim();
-    if (!content || Date.now() < state.getSuppressSubmissionsUntil()) {
+    if (!content || state.isSubmissionSuppressed()) {
       return;
     }
 
@@ -38,14 +38,11 @@ export function createSubmitController(
 
     const fingerprint = `${status.currentUrl}::${content}`;
 
-    if (
-      fingerprint === state.getLastFingerprint() &&
-      Date.now() - state.getLastFingerprintAt() < 1_500
-    ) {
+    if (state.shouldSkipDuplicateSubmit(fingerprint)) {
       return;
     }
 
-    state.setLastFingerprint(fingerprint, Date.now());
+    state.rememberSubmitFingerprint(fingerprint);
 
     if (status.pageState !== 'ready') {
       state.applyIndicatorPresentation(status);
@@ -96,7 +93,7 @@ export function createSubmitController(
   return {
     reportUserSubmit,
     suppressObservedSubmissionsFor(durationMs: number) {
-      state.setSuppressSubmissionsUntil(Date.now() + durationMs);
+      state.suppressObservedSubmissions(durationMs);
     },
     rememberProgrammaticSubmit(content: string) {
       state.rememberProgrammaticSubmit(content);

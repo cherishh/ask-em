@@ -5,7 +5,7 @@ import {
   getPanelPlacement,
   pixelsToPlacement,
   placementToPixels,
-} from './content-position';
+} from './position';
 
 describe('content position helpers', () => {
   it('maps default placement to the bottom-right safe area', () => {

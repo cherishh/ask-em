@@ -1,6 +1,6 @@
 import { getLocalState, getSessionState, setLocalState, setSessionState } from '../runtime/storage';
 import { cleanupPendingWorkspaces } from '../runtime/workspace';
-import { reconcileClaimedTabsWithBrowser } from '../runtime/recovery';
+import { reconcileClaimedTabsWithBrowser } from './tab-runtime';
 import { scheduleGroupGcIfEmpty } from './gc';
 import { logDebug } from './debug';
 

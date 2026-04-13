@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { getWorkspaceProviderDisplay } from './workspace-provider-display';
+import {
+  getWorkspaceProviderDisplay,
+  getWorkspaceProviderPresentation,
+} from './workspace-provider-display';
 
 describe('workspace provider display', () => {
   it('prefers paused over prior issues', () => {
@@ -79,6 +82,24 @@ describe('workspace provider display', () => {
       kind: 'needs-attention',
       label: 'Needs Attention',
       detail: 'This page is showing an error. Session may be deleted.',
+    });
+  });
+
+  it('returns a single presentation object with popup tone', () => {
+    expect(
+      getWorkspaceProviderPresentation({
+        memberState: 'inactive',
+        memberIssue: 'needs-login',
+        enabled: false,
+        globalSyncEnabled: true,
+        hasMember: false,
+      }),
+    ).toEqual({
+      kind: 'paused',
+      label: 'Paused',
+      detail: 'Sync is paused for this model.',
+      tone: 'sync-paused',
+      dotState: 'warning',
     });
   });
 });

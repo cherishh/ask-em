@@ -13,9 +13,9 @@ const uiMocks = vi.hoisted(() => ({
   createContentUi: vi.fn(),
 }));
 
-vi.mock('./content-routing', () => routingMocks);
-vi.mock('./content-ui', async () => {
-  const actual = await vi.importActual<typeof import('./content-ui')>('./content-ui');
+vi.mock('./routing', () => routingMocks);
+vi.mock('./ui', async () => {
+  const actual = await vi.importActual<typeof import('./ui')>('./ui');
   return {
     ...actual,
     createContentUi: uiMocks.createContentUi,
@@ -140,7 +140,7 @@ describe('content bootstrap wiring', () => {
   });
 
   async function bootstrap() {
-    const { bootstrapContentScript } = await import('./content-bootstrap');
+    const { bootstrapContentScript } = await import('./bootstrap');
     bootstrapContentScript({
       name: 'claude',
       getUiSpec() {
@@ -266,7 +266,7 @@ describe('content bootstrap wiring', () => {
     await flushMicrotasks();
 
     expect(ui.setState).toHaveBeenCalledWith('syncing', 'current model is in sync');
-    expect(ui.setSyncStatus).toHaveBeenCalledWith('syncing…');
+    expect(ui.setSyncStatus).toHaveBeenCalledWith('syncing…', 'neutral');
     expect(ui.setState).toHaveBeenLastCalledWith('idle', 'current model is in sync');
     expect(ui.setSyncStatus).toHaveBeenLastCalledWith('all models synced', 'neutral');
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('normal');
@@ -312,7 +312,7 @@ describe('content bootstrap wiring', () => {
       submit: vi.fn(),
     };
 
-    const { bootstrapContentScript } = await import('./content-bootstrap');
+    const { bootstrapContentScript } = await import('./bootstrap');
     bootstrapContentScript({
       name: 'claude',
       getUiSpec() {

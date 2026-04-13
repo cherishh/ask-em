@@ -1,13 +1,6 @@
-import type {
-  GroupMemberState,
-  Provider,
-  ShortcutBinding,
-  WorkspaceIssue,
-  WorkspaceContextResponseMessage,
-  WorkspaceSummary,
-} from '../runtime/protocol';
-import type { ContentTooltipSpec } from './content-tooltip';
-import { getWorkspaceProviderDisplay } from './workspace-provider-display';
+import type { Provider, ShortcutBinding, WorkspaceContextResponseMessage, WorkspaceSummary } from '../runtime/protocol';
+import type { ContentTooltipSpec } from './tooltip';
+import { getWorkspaceProviderPresentation } from '../utils/workspace-provider-display';
 
 function isApplePlatform(): boolean {
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
@@ -82,56 +75,6 @@ export function getStandaloneTooltipSpec(input: {
   };
 }
 
-function getProviderMeta(
-  provider: Provider,
-  workspaceSummary: WorkspaceSummary,
-  memberState: GroupMemberState,
-  memberIssue: WorkspaceIssue | null,
-  enabled: boolean,
-  globalSyncEnabled: boolean,
-) {
-  return getWorkspaceProviderDisplay({
-    memberState,
-    memberIssue,
-    enabled,
-    globalSyncEnabled,
-    hasMember: Boolean(workspaceSummary.workspace.members[provider]),
-  }).detail.toLowerCase();
-}
-
-function getProviderDotState(
-  memberState: GroupMemberState,
-  memberIssue: WorkspaceIssue | null,
-  enabled: boolean,
-  globalSyncEnabled: boolean,
-): 'active' | 'pending' | 'frozen' | 'warning' | 'inactive' {
-  if ((!globalSyncEnabled || !enabled) && memberState === 'ready') {
-    return 'frozen';
-  }
-
-  if (memberIssue === 'needs-login' || memberIssue === 'loading' || memberIssue === 'delivery-failed') {
-    return 'warning';
-  }
-
-  if (memberIssue === 'error-page') {
-    return 'warning';
-  }
-
-  if (memberState === 'ready') {
-    return 'active';
-  }
-
-  if (memberState === 'pending') {
-    return 'pending';
-  }
-
-  if (memberState === 'login-required' || memberState === 'not-ready' || memberState === 'error') {
-    return 'warning';
-  }
-
-  return 'inactive';
-}
-
 function getWorkspaceTitle(workspaceSummary: WorkspaceSummary) {
   const label = workspaceSummary.workspace.label;
   return label
@@ -176,28 +119,26 @@ export function renderWorkspacePanelHtml(input: {
           const memberState = workspaceSummary.memberStates[provider] ?? 'inactive';
           const enabled = workspaceSummary.workspace.enabledProviders.includes(provider);
           const memberIssue = workspaceSummary.memberIssues[provider] ?? null;
-          const dotState = getProviderDotState(memberState, memberIssue, enabled, response.globalSyncEnabled);
-          const meta = getProviderMeta(
-            provider,
-            workspaceSummary,
+          const presentation = getWorkspaceProviderPresentation({
             memberState,
             memberIssue,
             enabled,
-            response.globalSyncEnabled,
-          );
+            globalSyncEnabled: response.globalSyncEnabled,
+            hasMember: Boolean(workspaceSummary.workspace.members[provider]),
+          });
           const isCurrent = provider === currentProvider;
 
           return `
             <div class="ask-em-panel-row" data-current="${String(isCurrent)}">
               <div>
                 <div class="ask-em-panel-row-top">
-                  <span class="ask-em-panel-status-dot" data-state="${dotState}"></span>
+                  <span class="ask-em-panel-status-dot" data-state="${presentation.dotState}"></span>
                   <span class="ask-em-panel-provider">
                     ${provider}
                     ${isCurrent ? '<span class="ask-em-panel-current">this tab</span>' : ''}
                   </span>
                 </div>
-                <p class="ask-em-panel-meta">${meta}</p>
+                <p class="ask-em-panel-meta">${presentation.detail.toLowerCase()}</p>
               </div>
               <button
                 type="button"

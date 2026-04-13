@@ -15,15 +15,15 @@ import {
   pixelsToPlacement,
   placementToPixels,
   saveIndicatorPlacement,
-} from './content-position';
-import { renderContentTooltipHtml, type ContentTooltipSpec } from './content-tooltip';
-import type { IndicatorAlertLevel, IndicatorUiState, SyncIndicatorTone } from './content-indicator';
+} from './position';
+import { renderContentTooltipHtml, type ContentTooltipSpec } from './tooltip';
+import type { IndicatorAlertLevel, IndicatorUiState, SyncIndicatorTone } from './indicator';
 import {
   formatBindingKeys,
   getStandaloneTooltipSpec,
   renderPillCopyHtml,
   renderWorkspacePanelHtml,
-} from './content-ui-render';
+} from './ui-render';
 
 export type UiState = IndicatorUiState | 'listening';
 
@@ -270,46 +270,6 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     }
   };
 
-  const getDefaultLabel = () => {
-    if (!context.workspaceId) {
-      if (!context.globalSyncEnabled || !context.standaloneCreateSetEnabled) {
-        return 'Local only';
-      }
-
-      return 'ready';
-    }
-
-    if (!context.globalSyncEnabled || !context.providerEnabled) {
-      return 'current model sync paused';
-    }
-
-    return 'current model is in sync';
-  };
-
-  const syncPrimaryLabel = () => {
-    updateLabel(getDefaultLabel());
-  };
-
-  const syncStandaloneStatusLabel = () => {
-    if (context.workspaceId || !context.standaloneReady) {
-      return;
-    }
-
-    if (!context.globalSyncEnabled) {
-      updateSyncLabel('Prompt stays here');
-      return;
-    }
-
-    if (!context.canStartNewSet) {
-      updateSyncLabel('Set limit reached', 'warning');
-      return;
-    }
-
-    updateSyncLabel(
-      context.standaloneCreateSetEnabled ? 'Next prompt will fan out' : 'Next prompt stays here',
-    );
-  };
-
   const setPanelVisible = (visible: boolean) => {
     const nextVisible = visible && Boolean(context.workspaceId || context.standaloneReady);
     panel.dataset.visible = String(nextVisible);
@@ -395,7 +355,6 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       context.providerEnabled = nextEnabled;
       mount.dataset.providerEnabled = String(nextEnabled);
       await refreshPanel();
-      updateSyncLabel(nextEnabled ? 'Ready for next prompt' : 'This tab is paused');
       refreshLayout();
     } finally {
       setCurrentProviderToggleBusy(false);
@@ -411,8 +370,6 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     handlers.onStandaloneSetCreationToggle(nextEnabled);
     context.standaloneCreateSetEnabled = nextEnabled;
     mount.dataset.standaloneCreateSetEnabled = String(nextEnabled);
-    updateLabel(nextEnabled ? 'ready' : 'Local only');
-    updateSyncLabel(nextEnabled ? 'Next prompt will fan out' : 'Next prompt stays here');
     refreshLayout();
 
     if (panel.dataset.visible === 'true' && panel.dataset.mode === 'tooltip') {
@@ -435,7 +392,6 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
 
     context.globalSyncEnabled = response.globalSyncEnabled;
     mount.dataset.globalSyncEnabled = String(context.globalSyncEnabled);
-    syncPrimaryLabel();
     renderPanel(response);
     applyPanelPlacement();
   };
@@ -684,10 +640,8 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     },
     setState(state: UiState, labelText?: string) {
       mount.dataset.state = state;
-      if (labelText) {
+      if (labelText !== undefined) {
         updateLabel(labelText);
-      } else {
-        syncPrimaryLabel();
       }
 
       refreshLayout();
@@ -720,8 +674,6 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         panel.dataset.mode = '';
       }
 
-      syncPrimaryLabel();
-      syncStandaloneStatusLabel();
       refreshLayout();
     },
     async resetPosition() {

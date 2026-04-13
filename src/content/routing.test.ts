@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { sendRuntimeMessage } from './content-routing';
+import { sendRuntimeMessage } from './routing';
 
 describe('content routing', () => {
   afterEach(() => {

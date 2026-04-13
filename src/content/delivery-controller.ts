@@ -5,9 +5,9 @@ import type {
   PingResponseMessage,
   RuntimeMessage,
 } from '../runtime/protocol';
-import { buildHeartbeatMessage, sendRuntimeMessage } from './content-routing';
-import type { ContentStateController } from './content-state';
-import type { ContentSubmitController } from './content-submit-controller';
+import { buildHeartbeatMessage, sendRuntimeMessage } from './routing';
+import type { ContentStateController } from './state';
+import type { ContentSubmitController } from './submit-controller';
 
 export function createDeliveryController(
   adapter: ProviderAdapter,

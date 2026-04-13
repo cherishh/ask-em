@@ -16,7 +16,7 @@ export function RequestProvidersModal(props: {
   requestedProviders: string[];
   requestSubmitting: boolean;
   requestSubmitted: boolean;
-  requestComingSoon: boolean;
+  requestEndpointNotConfigured: boolean;
   requestCooldownUntil: number | null;
   onToggleProvider: (provider: string) => void;
   onClose: () => void;
@@ -60,10 +60,10 @@ export function RequestProvidersModal(props: {
             <p className="askem-card-copy">
               Pick the providers you want us to add next. Choose as many as you want.
             </p>
-            {props.requestComingSoon ? (
+            {props.requestEndpointNotConfigured ? (
               <div className="askem-modal-state" style={{ marginBottom: 14 }}>
-                <p>Coming soon.</p>
-                <span>Request sending isn&apos;t live yet.</span>
+                <p>Request endpoint is not configured.</p>
+                <span>This build cannot send provider requests yet.</span>
               </div>
             ) : null}
             <div className="askem-request-grid">

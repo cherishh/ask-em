@@ -277,3 +277,37 @@ export function getContentIndicatorPresentation(
     alertLevel: getIndicatorAlertLevel(input),
   };
 }
+
+export function getSyncingIndicatorPresentation(
+  input: ContentIndicatorInput,
+): ContentIndicatorPresentation {
+  const presentation = getContentIndicatorPresentation({
+    ...input,
+    syncProgress: null,
+  });
+
+  return {
+    ...presentation,
+    state: 'syncing',
+    syncLabel: 'syncing…',
+    syncTone: 'neutral',
+  };
+}
+
+export function getCurrentWarningIndicatorPresentation(
+  input: ContentIndicatorInput,
+  syncLabel: string,
+): ContentIndicatorPresentation {
+  const presentation = getContentIndicatorPresentation({
+    ...input,
+    syncProgress: null,
+  });
+
+  return {
+    ...presentation,
+    state: 'blocked',
+    syncLabel,
+    syncTone: 'warning',
+    alertLevel: 'current-warning',
+  };
+}

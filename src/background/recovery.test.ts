@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { SessionState, Workspace } from './protocol';
-import { reconcileClaimedTabsWithBrowser, resolveDeliveryTarget } from './recovery';
+import type { SessionState, Workspace } from '../runtime/protocol';
+import { reconcileClaimedTabsWithBrowser, waitForContentStatus } from './tab-runtime';
+import { resolveDeliveryTarget } from './delivery-targets';
 import {
   makeClaimedTab,
   makeConversationRef,
@@ -218,8 +219,39 @@ describe('recovery', () => {
     });
   });
 
-  it('removes claimed tabs whose browser tabs no longer exist', async () => {
-    const get = vi.fn().mockRejectedValue(new Error('No tab with id: 9'));
+  it('treats error pages as terminal content status', async () => {
+    const sendMessage = vi.fn().mockResolvedValue({
+      provider: 'claude',
+      currentUrl: 'https://claude.ai/chat/missing',
+      sessionId: null,
+      pageState: 'error',
+      pageKind: 'existing-session',
+    });
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        sendMessage,
+      },
+    });
+
+    const status = await waitForContentStatus(12, 'claude', 1_000);
+
+    expect(status).toEqual({
+      provider: 'claude',
+      currentUrl: 'https://claude.ai/chat/missing',
+      sessionId: null,
+      pageState: 'error',
+      pageKind: 'existing-session',
+    });
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(12, { type: 'PING' });
+  });
+
+  it('reconciles claimed tabs whose browser tabs are gone', async () => {
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce({ id: 1 })
+      .mockRejectedValueOnce(new Error('missing'));
 
     vi.stubGlobal('chrome', {
       tabs: {
@@ -227,24 +259,15 @@ describe('recovery', () => {
       },
     });
 
-    const sessionState: SessionState = {
-      claimedTabs: {
-        'w1:deepseek': {
-          provider: 'deepseek',
-          workspaceId: 'w1',
-          tabId: 9,
-          currentUrl: 'https://chat.deepseek.com/a/chat/s/d-1',
-          sessionId: 'd-1',
-          pageState: 'ready',
-          lastSeenAt: Date.now(),
-        },
-      },
-    };
+    const sessionState = makeSessionState({
+      'w1:claude': makeClaimedTab({ workspaceId: 'w1', provider: 'claude', tabId: 1 }),
+      'w1:chatgpt': makeClaimedTab({ workspaceId: 'w1', provider: 'chatgpt', tabId: 2 }),
+    });
 
     const result = await reconcileClaimedTabsWithBrowser(sessionState);
 
-    expect(get).toHaveBeenCalledWith(9);
+    expect(Object.keys(result.sessionState.claimedTabs)).toEqual(['w1:claude']);
     expect(result.removedClaimedTabs).toHaveLength(1);
-    expect(result.sessionState.claimedTabs).toEqual({});
+    expect(result.removedClaimedTabs[0]?.provider).toBe('chatgpt');
   });
 });

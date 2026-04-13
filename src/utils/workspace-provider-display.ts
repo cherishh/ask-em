@@ -15,13 +15,37 @@ export type WorkspaceProviderDisplay = {
   detail: string;
 };
 
-export function getWorkspaceProviderDisplay(input: {
+export type WorkspaceProviderTone =
+  | 'active'
+  | 'inactive'
+  | 'pending'
+  | 'sync-paused'
+  | 'frozen'
+  | 'warning';
+
+export type WorkspaceProviderDotState =
+  | 'active'
+  | 'pending'
+  | 'frozen'
+  | 'warning'
+  | 'inactive';
+
+export type WorkspaceProviderDisplayInput = {
   memberState: GroupMemberState;
   memberIssue: WorkspaceIssue | null;
   enabled: boolean;
   globalSyncEnabled: boolean;
   hasMember: boolean;
-}): WorkspaceProviderDisplay {
+};
+
+export type WorkspaceProviderPresentation = WorkspaceProviderDisplay & {
+  tone: WorkspaceProviderTone;
+  dotState: WorkspaceProviderDotState;
+};
+
+export function getWorkspaceProviderDisplay(
+  input: WorkspaceProviderDisplayInput,
+): WorkspaceProviderDisplay {
   if (input.memberState === 'pending') {
     return {
       kind: 'connecting',
@@ -82,5 +106,72 @@ export function getWorkspaceProviderDisplay(input: {
     kind: 'ready',
     label: 'Ready',
     detail: 'Next prompt will be synced',
+  };
+}
+
+export function getWorkspaceProviderTone(
+  display: WorkspaceProviderDisplay,
+  globalSyncEnabled: boolean,
+): WorkspaceProviderTone {
+  switch (display.kind) {
+    case 'ready':
+      return 'active';
+    case 'connecting':
+      return 'pending';
+    case 'paused':
+      return globalSyncEnabled ? 'sync-paused' : 'frozen';
+    case 'needs-login':
+    case 'loading':
+    case 'needs-attention':
+      return 'warning';
+    case 'will-reopen':
+      return 'inactive';
+  }
+}
+
+export function getWorkspaceProviderDotState(
+  input: WorkspaceProviderDisplayInput,
+): WorkspaceProviderDotState {
+  if ((!input.globalSyncEnabled || !input.enabled) && input.memberState === 'ready') {
+    return 'frozen';
+  }
+
+  if (
+    input.memberIssue === 'needs-login' ||
+    input.memberIssue === 'loading' ||
+    input.memberIssue === 'delivery-failed' ||
+    input.memberIssue === 'error-page'
+  ) {
+    return 'warning';
+  }
+
+  if (input.memberState === 'ready') {
+    return 'active';
+  }
+
+  if (input.memberState === 'pending') {
+    return 'pending';
+  }
+
+  if (
+    input.memberState === 'login-required' ||
+    input.memberState === 'not-ready' ||
+    input.memberState === 'error'
+  ) {
+    return 'warning';
+  }
+
+  return 'inactive';
+}
+
+export function getWorkspaceProviderPresentation(
+  input: WorkspaceProviderDisplayInput,
+): WorkspaceProviderPresentation {
+  const display = getWorkspaceProviderDisplay(input);
+
+  return {
+    ...display,
+    tone: getWorkspaceProviderTone(display, input.globalSyncEnabled),
+    dotState: getWorkspaceProviderDotState(input),
   };
 }
