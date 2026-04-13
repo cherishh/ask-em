@@ -20,6 +20,7 @@ import {
   handleClearDebugLogs,
   handleDebugLog,
   handleSetCloseTabsOnDeleteSet,
+  handleClearPersistentStorage,
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
   handleSetGlobalSyncEnabled,
@@ -49,6 +50,7 @@ export {
   handleGetStatus,
   handleGetWorkspaceContext,
   handleSetCloseTabsOnDeleteSet,
+  handleClearPersistentStorage,
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
   handleSetGlobalSyncEnabled,
@@ -132,6 +134,9 @@ export default defineBackground(() => {
           return;
         case 'CLEAR_DEBUG_LOGS':
           sendResponse(await handleClearDebugLogs());
+          return;
+        case 'CLEAR_PERSISTENT_STORAGE':
+          sendResponse(await handleClearPersistentStorage());
           return;
         case 'RESET_INDICATOR_POSITIONS':
           sendResponse(await handleResetIndicatorPositions());

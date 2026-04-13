@@ -189,6 +189,10 @@ export type ResetIndicatorPositionsMessage = {
   type: 'RESET_INDICATOR_POSITIONS';
 };
 
+export type ClearPersistentStorageMessage = {
+  type: 'CLEAR_PERSISTENT_STORAGE';
+};
+
 export type RuntimeMessage =
   | HelloMessage
   | HeartbeatMessage
@@ -214,6 +218,7 @@ export type RuntimeMessage =
   | RefreshContentContextMessage
   | ResetIndicatorPositionMessage
   | ResetIndicatorPositionsMessage
+  | ClearPersistentStorageMessage
   | DebugLogsResponseMessage
   | WorkspaceContextResponseMessage
   | StatusResponseMessage;

@@ -125,6 +125,11 @@ export function usePopupStatus() {
     await refresh({ silent: true });
   }, [refresh]);
 
+  const clearPersistentStorage = useCallback(async () => {
+    await chrome.runtime.sendMessage({ type: 'CLEAR_PERSISTENT_STORAGE' });
+    await refresh();
+  }, [refresh]);
+
   return {
     status,
     loading,
@@ -141,5 +146,6 @@ export function usePopupStatus() {
     updateShortcut,
     resetShortcuts,
     resetIndicatorPositions,
+    clearPersistentStorage,
   };
 }

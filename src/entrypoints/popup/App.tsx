@@ -102,6 +102,8 @@ export default function App() {
   const [activeView, setActiveView] = useState<PopupView>('home');
   const [activeLegalPage, setActiveLegalPage] = useState<LegalPage>('terms');
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [devModalOpen, setDevModalOpen] = useState(false);
+  const [devActionBusy, setDevActionBusy] = useState(false);
   const [recordingShortcutId, setRecordingShortcutId] = useState<ShortcutId | null>(null);
   const {
     status,
@@ -118,6 +120,7 @@ export default function App() {
     updateShortcut,
     resetShortcuts,
     resetIndicatorPositions,
+    clearPersistentStorage,
   } = usePopupStatus();
   const {
     logActionBusy,
@@ -148,6 +151,18 @@ export default function App() {
   const atLimit = workspaceCount >= limit;
   const globalSyncEnabled = status?.globalSyncEnabled ?? true;
 
+  const handleClearPersistentStorage = useCallback(async () => {
+    setDevActionBusy(true);
+
+    try {
+      window.localStorage.clear();
+      await clearPersistentStorage();
+      setDevModalOpen(false);
+    } finally {
+      setDevActionBusy(false);
+    }
+  }, [clearPersistentStorage]);
+
   return (
     <main className="askem-popup-shell">
       <div className="askem-popup-backdrop" />
@@ -160,9 +175,14 @@ export default function App() {
           {/* <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => void refresh()} disabled={loading}>
             {loading ? 'Syncing' : 'Refresh'}
           </button> */}
-          <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => setFeedbackModalOpen(true)} type="button">
-            Feedback
-          </button>
+          <div className="askem-hero-actions">
+            <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => setDevModalOpen(true)} type="button">
+              Dev
+            </button>
+            <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => setFeedbackModalOpen(true)} type="button">
+              Feedback
+            </button>
+          </div>
         </header>
 
         <nav className="askem-view-tabs" aria-label="Popup sections">
@@ -477,6 +497,43 @@ export default function App() {
             </div>
             <div className="askem-modal-state">
               <p>TODO</p>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {devModalOpen ? (
+        <div className="askem-modal-overlay" onClick={() => !devActionBusy && setDevModalOpen(false)} role="presentation">
+          <section
+            className="askem-modal askem-dev-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="askem-modal-top">
+              <div>
+                <p className="askem-card-label">Development</p>
+                <h2>Dev Tools</h2>
+              </div>
+              <button className="askem-modal-close" onClick={() => setDevModalOpen(false)} type="button" disabled={devActionBusy}>
+                Close
+              </button>
+            </div>
+            <div className="askem-dev-list">
+              <div className="askem-dev-row">
+                <div className="askem-dev-copy">
+                  <p className="askem-dev-title">Clear persistent storage</p>
+                  <span className="askem-dev-desc">Reset popup settings, workspace state, logs, and saved indicator positions.</span>
+                </div>
+                <button
+                  className="askem-provider-clear"
+                  onClick={() => void handleClearPersistentStorage()}
+                  disabled={devActionBusy}
+                  type="button"
+                >
+                  {devActionBusy ? 'Clearing' : 'Run'}
+                </button>
+              </div>
             </div>
           </section>
         </div>

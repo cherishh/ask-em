@@ -204,3 +204,12 @@ export async function handleResetIndicatorPositions() {
   await notifyAllTabsToResetIndicatorPosition();
   return { ok: true };
 }
+
+export async function handleClearPersistentStorage() {
+  await chrome.storage.local.clear();
+  await Promise.all([
+    notifyAllTabsToRefreshContext(),
+    notifyAllTabsToResetIndicatorPosition(),
+  ]);
+  return { ok: true };
+}

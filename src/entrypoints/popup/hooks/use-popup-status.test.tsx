@@ -76,4 +76,54 @@ describe('usePopupStatus', () => {
     expect(hook.current.busyKey).toBeNull();
     hook.unmount();
   });
+
+  it('clears persistent storage through the runtime and refreshes status', async () => {
+    popupRuntimeMocks.requestStatus
+      .mockResolvedValueOnce({
+        workspaces: [],
+        globalSyncEnabled: true,
+        defaultEnabledProviders: {
+          claude: true,
+          chatgpt: true,
+          gemini: true,
+          deepseek: true,
+          manus: true,
+        },
+        shortcuts: undefined,
+        debugLoggingEnabled: false,
+        closeTabsOnDeleteSet: false,
+      })
+      .mockResolvedValueOnce({
+        workspaces: [],
+        globalSyncEnabled: true,
+        defaultEnabledProviders: {
+          claude: true,
+          chatgpt: true,
+          gemini: true,
+          deepseek: true,
+          manus: true,
+        },
+        shortcuts: undefined,
+        debugLoggingEnabled: false,
+        closeTabsOnDeleteSet: false,
+      });
+
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const hook = renderHookHarness(() => usePopupStatus());
+    await flushMicrotasks();
+
+    await act(async () => {
+      await hook.current.clearPersistentStorage();
+    });
+
+    expect(sendMessage).toHaveBeenCalledWith({ type: 'CLEAR_PERSISTENT_STORAGE' });
+    expect(popupRuntimeMocks.requestStatus).toHaveBeenCalledTimes(2);
+    hook.unmount();
+  });
 });
