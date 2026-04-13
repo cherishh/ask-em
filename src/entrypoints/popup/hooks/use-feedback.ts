@@ -37,6 +37,7 @@ async function ensureHostPermission(endpoint: string): Promise<void> {
 }
 
 export function useFeedback() {
+  const feedbackConfigured = getFeedbackEndpoint().length > 0;
   const [feedbackText, setFeedbackText] = useState('');
   const [includeLogs, setIncludeLogs] = useState(true);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
@@ -93,6 +94,7 @@ export function useFeedback() {
   }, [feedbackSubmitting, feedbackText, includeLogs]);
 
   return {
+    feedbackConfigured,
     feedbackText,
     includeLogs,
     feedbackSubmitting,
