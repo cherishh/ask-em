@@ -266,7 +266,7 @@ describe('content bootstrap wiring', () => {
     await flushMicrotasks();
 
     expect(ui.setState).toHaveBeenCalledWith('syncing', 'current model is in sync');
-    expect(ui.setSyncStatus).toHaveBeenCalledWith('syncing…');
+    expect(ui.setSyncStatus).toHaveBeenCalledWith('syncing…', 'neutral');
     expect(ui.setState).toHaveBeenLastCalledWith('idle', 'current model is in sync');
     expect(ui.setSyncStatus).toHaveBeenLastCalledWith('all models synced', 'neutral');
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('normal');

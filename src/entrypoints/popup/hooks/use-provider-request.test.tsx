@@ -15,7 +15,7 @@ describe('useProviderRequest', () => {
     vi.restoreAllMocks();
   });
 
-  it('does not mark the request as submitted when no endpoint is configured', async () => {
+  it('surfaces endpoint-not-configured when no request endpoint is available', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const hook = renderHookHarness(() => useProviderRequest());
 
@@ -30,7 +30,7 @@ describe('useProviderRequest', () => {
     });
 
     expect(hook.current.requestSubmitted).toBe(false);
-    expect(hook.current.requestComingSoon).toBe(true);
+    expect(hook.current.requestEndpointNotConfigured).toBe(true);
     expect(hook.current.requestCooldownUntil).toBeNull();
     expect(window.localStorage.getItem('askem-more-providers-last-submitted-at')).toBeNull();
 

@@ -7,6 +7,8 @@ import type {
 import { DEFAULT_SHORTCUTS, resolveShortcutConfig } from '../runtime/protocol';
 import {
   getContentIndicatorPresentation,
+  getCurrentWarningIndicatorPresentation,
+  getSyncingIndicatorPresentation,
   type IndicatorAlertLevel,
   type SyncProgressSnapshot,
 } from './content-indicator';
@@ -102,9 +104,6 @@ export function createContentState(
     ui.setAlertLevel(presentation.alertLevel);
   };
 
-  const getCurrentIndicatorLabel = (pageState: PageState) =>
-    getContentIndicatorPresentation(getIndicatorInput(pageState, null)).label;
-
   const setStandaloneCreateSetEnabled = (nextEnabled: boolean) => {
     standaloneCreateSetTouched = true;
     uiContext = {
@@ -184,17 +183,21 @@ export function createContentState(
 
   const setSyncing = () => {
     const status = adapter.session.getStatus();
-    const presentation = getContentIndicatorPresentation(getIndicatorInput(status.pageState, null));
-    ui.setState('syncing', getCurrentIndicatorLabel(status.pageState));
-    ui.setSyncStatus('syncing…');
+    const presentation = getSyncingIndicatorPresentation(getIndicatorInput(status.pageState, null));
+    ui.setState(presentation.state, presentation.label);
+    ui.setSyncStatus(presentation.syncLabel, presentation.syncTone);
     ui.setAlertLevel(presentation.alertLevel);
   };
 
   const showCurrentWarning = (syncLabel: string) => {
     const pageState = adapter.session.getStatus().pageState;
-    ui.setState('blocked', getCurrentIndicatorLabel(pageState));
-    ui.setSyncStatus(syncLabel, 'warning');
-    ui.setAlertLevel('current-warning');
+    const presentation = getCurrentWarningIndicatorPresentation(
+      getIndicatorInput(pageState, null),
+      syncLabel,
+    );
+    ui.setState(presentation.state, presentation.label);
+    ui.setSyncStatus(presentation.syncLabel, presentation.syncTone);
+    ui.setAlertLevel(presentation.alertLevel);
   };
 
   const rememberProgrammaticSubmit = (content: string) => {
@@ -245,7 +248,6 @@ export function createContentState(
     rememberProgrammaticSubmit,
     shouldShowStandaloneIndicator: () => shouldShowStandaloneIndicator(adapter),
     applyIndicatorPresentation,
-    getCurrentIndicatorLabel,
     applyPresenceResponse,
     applySubmitResponse,
     handleSyncProgress,

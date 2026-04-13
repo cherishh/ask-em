@@ -54,7 +54,7 @@ export default function App() {
     requestedProviders,
     requestSubmitting,
     requestSubmitted,
-    requestComingSoon,
+    requestEndpointNotConfigured,
     requestCooldownUntil,
     toggleRequestedProvider,
     openRequestModal,
@@ -107,9 +107,6 @@ export default function App() {
             <h1>ask&apos;em</h1>
             <p className="askem-slogan">One prompt, every official AI chat — full features, zero compromise.</p>
           </div>
-          {/* <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => void refresh()} disabled={loading}>
-            {loading ? 'Syncing' : 'Refresh'}
-          </button> */}
           <div className="askem-hero-actions">
             {showDevControl ? (
               <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => setDevModalOpen(true)} type="button">
@@ -201,7 +198,7 @@ export default function App() {
         requestedProviders={requestedProviders}
         requestSubmitting={requestSubmitting}
         requestSubmitted={requestSubmitted}
-        requestComingSoon={requestComingSoon}
+        requestEndpointNotConfigured={requestEndpointNotConfigured}
         requestCooldownUntil={requestCooldownUntil}
         onToggleProvider={toggleRequestedProvider}
         onClose={closeRequestModal}

@@ -1,7 +1,7 @@
 import type { GroupMemberState, Provider, WorkspaceSummary } from '../../../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../../../runtime/workspace';
 import { SUPPORTED_SITES } from '../../../adapters/sites';
-import { getWorkspaceProviderDisplay } from '../../../utils/workspace-provider-display';
+import { getWorkspaceProviderPresentation } from '../../../utils/workspace-provider-display';
 
 function formatTime(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -15,66 +15,6 @@ function formatTime(timestamp: number): string {
 function getProviderOrigin(provider: Provider): string {
   const site = SUPPORTED_SITES.find((s) => s.name === provider);
   return site?.origin ?? '#';
-}
-
-function getDisplayMemberStateTone(
-  state: GroupMemberState,
-  issue: WorkspaceSummary['memberIssues'][Provider],
-  enabled: boolean,
-  globalSyncEnabled: boolean,
-): 'active' | 'inactive' | 'pending' | 'sync-paused' | 'frozen' | 'warning' {
-  const display = getWorkspaceProviderDisplay({
-    memberState: state,
-    memberIssue: issue ?? null,
-    enabled,
-    globalSyncEnabled,
-    hasMember: state !== 'inactive',
-  });
-
-  switch (display.kind) {
-    case 'ready':
-      return 'active';
-    case 'connecting':
-      return 'pending';
-    case 'paused':
-      return globalSyncEnabled ? 'sync-paused' : 'frozen';
-    case 'needs-login':
-    case 'loading':
-    case 'needs-attention':
-      return 'warning';
-    case 'will-reopen':
-      return 'inactive';
-  }
-}
-
-function getDisplayMemberStateLabel(
-  state: GroupMemberState,
-  issue: WorkspaceSummary['memberIssues'][Provider],
-  enabled: boolean,
-  globalSyncEnabled: boolean,
-): string {
-  return getWorkspaceProviderDisplay({
-    memberState: state,
-    memberIssue: issue ?? null,
-    enabled,
-    globalSyncEnabled,
-    hasMember: state !== 'inactive',
-  }).label;
-}
-
-function getMemberOutcomeCopy(
-  state: GroupMemberState,
-  issue: WorkspaceSummary['memberIssues'][Provider],
-  enabled: boolean,
-  globalSyncEnabled: boolean,
-): string {
-  return getWorkspaceProviderDisplay({
-    memberState: state,
-    memberIssue: issue ?? null,
-    enabled,
-    globalSyncEnabled,
-    hasMember: state !== 'inactive',
-  }).detail;
 }
 
 export function WorkspaceCard({
@@ -136,24 +76,13 @@ export function WorkspaceCard({
           const enabled = workspace.enabledProviders.includes(provider);
           const rawState = memberStates[provider] ?? 'inactive';
           const issue = workspace.memberIssues?.[provider] ?? null;
-          const stateTone = getDisplayMemberStateTone(
-            rawState,
-            issue,
+          const presentation = getWorkspaceProviderPresentation({
+            memberState: rawState,
+            memberIssue: issue,
             enabled,
             globalSyncEnabled,
-          );
-          const stateLabel = getDisplayMemberStateLabel(
-            rawState,
-            issue,
-            enabled,
-            globalSyncEnabled,
-          );
-          const outcomeCopy = getMemberOutcomeCopy(
-            rawState,
-            issue,
-            enabled,
-            globalSyncEnabled,
-          );
+            hasMember: rawState !== 'inactive',
+          });
           const showOpenLink = rawState === 'inactive' && !member?.sessionId && !issue;
 
           return (
@@ -161,7 +90,9 @@ export function WorkspaceCard({
               <div className="askem-provider-main">
                 <span className="askem-provider-name">{provider}</span>
                 <div className="askem-provider-statusline">
-                  <span className={`askem-state askem-state-${stateTone}`}>{stateLabel}</span>
+                  <span className={`askem-state askem-state-${presentation.tone}`}>
+                    {presentation.label}
+                  </span>
                   {showOpenLink ? (
                     <a
                       className="askem-provider-open-link"
@@ -176,7 +107,7 @@ export function WorkspaceCard({
                       Open {provider}
                     </a>
                   ) : (
-                    <span className="askem-provider-subcopy">{outcomeCopy}</span>
+                    <span className="askem-provider-subcopy">{presentation.detail}</span>
                   )}
                 </div>
               </div>
