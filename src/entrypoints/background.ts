@@ -6,9 +6,9 @@ import { logDebug } from '../background/debug';
 import { handlePresenceMessage } from '../background/presence';
 import {
   deliverPromptToWorkspaceTargets,
-  handleSwitchProviderTab,
   handleUserSubmit,
 } from '../background/delivery';
+import { handleSwitchProviderTab } from '../background/provider-switch';
 import {
   buildWorkspaceSummary,
   canStartNewSet,
