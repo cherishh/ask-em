@@ -8,7 +8,7 @@ import {
 } from '../runtime/workspace';
 import { setLocalState, upsertClaimedTab } from '../runtime/storage';
 import { logDebug } from './debug';
-import { reconcileClaimedTabContext } from './presence';
+import { reconcileClaimedTabContext } from './presence-reconciliation';
 import { refreshPendingState } from './state';
 
 type PrepareSubmitWorkspaceContextInput = {

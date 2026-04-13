@@ -13,6 +13,10 @@ export function classifyDeliveryIssue(result: ProviderDeliveryResult): Workspace
     return 'needs-login';
   }
 
+  if (normalizedReason.includes('error page') || normalizedReason.includes('pagestate=error')) {
+    return 'error-page';
+  }
+
   if (normalizedReason.includes('not ready') || normalizedReason.includes('blocked')) {
     return 'loading';
   }

@@ -25,11 +25,17 @@ import {
 import {
   rememberProgrammaticSubmit as rememberProgrammaticSubmitEntry,
   shouldSuppressProgrammaticSubmit as shouldSuppressProgrammaticSubmitEntry,
+  type RecentProgrammaticSubmitState,
 } from './submit-memory';
 import {
   rememberSubmitFingerprint,
   shouldSkipDuplicateSubmit,
 } from './submit-fingerprint';
+import {
+  isSubmissionSuppressed,
+  suppressObservedSubmissions,
+  type SubmitSuppressionState,
+} from './submit-suppression';
 import type { UiContext } from './ui';
 export type { PresenceResponse, SubmitResponse } from './context';
 
@@ -48,51 +54,69 @@ export function createContentState(
     setAlertLevel(level: IndicatorAlertLevel): void;
   },
 ) {
-  let uiContext: UiContext = {
-    workspaceId: null,
-    providerEnabled: true,
-    globalSyncEnabled: true,
-    standaloneReady: false,
-    standaloneCreateSetEnabled: true,
-    canStartNewSet: true,
-    shortcuts: DEFAULT_SHORTCUTS,
+  const viewRuntime: {
+    uiContext: UiContext;
+    workspaceSummary: WorkspaceSummary | null;
+    hasHydratedPresence: boolean;
+    standaloneCreateSetTouched: boolean;
+  } = {
+    uiContext: {
+      workspaceId: null,
+      providerEnabled: true,
+      globalSyncEnabled: true,
+      standaloneReady: false,
+      standaloneCreateSetEnabled: true,
+      canStartNewSet: true,
+      shortcuts: DEFAULT_SHORTCUTS,
+    },
+    workspaceSummary: null,
+    hasHydratedPresence: false,
+    standaloneCreateSetTouched: false,
   };
-  let workspaceSummary: WorkspaceSummary | null = null;
-  let syncProgress: SyncProgressSnapshot | null = null;
-  let pendingSyncProgress: SyncProgressSnapshot | null = null;
-  let hasHydratedPresence = false;
-  let standaloneCreateSetTouched = false;
-  let suppressSubmissionsUntil = 0;
-  let lastFingerprint = '';
-  let lastFingerprintAt = 0;
-  const recentProgrammaticSubmits = new Map<string, number>();
+  const syncRuntime: {
+    syncProgress: SyncProgressSnapshot | null;
+    pendingSyncProgress: SyncProgressSnapshot | null;
+  } = {
+    syncProgress: null,
+    pendingSyncProgress: null,
+  };
+  const submitRuntime: SubmitSuppressionState &
+    RecentProgrammaticSubmitState & {
+      lastFingerprint: string;
+      lastFingerprintAt: number;
+    } = {
+    suppressSubmissionsUntil: 0,
+    lastFingerprint: '',
+    lastFingerprintAt: 0,
+    recentProgrammaticSubmits: new Map<string, number>(),
+  };
 
   const syncPendingProgress = () => {
     const nextState = reconcileSyncProgressForWorkspace(
       {
-        syncProgress,
-        pendingSyncProgress,
+        syncProgress: syncRuntime.syncProgress,
+        pendingSyncProgress: syncRuntime.pendingSyncProgress,
       },
-      uiContext.workspaceId,
+      viewRuntime.uiContext.workspaceId,
     );
-    syncProgress = nextState.syncProgress;
-    pendingSyncProgress = nextState.pendingSyncProgress;
+    syncRuntime.syncProgress = nextState.syncProgress;
+    syncRuntime.pendingSyncProgress = nextState.pendingSyncProgress;
   };
 
   const getIndicatorInput = (
     pageState: PageState,
-    overrideSyncProgress: SyncProgressSnapshot | null = syncProgress,
+    overrideSyncProgress: SyncProgressSnapshot | null = syncRuntime.syncProgress,
   ) => ({
-    hasWorkspace: Boolean(uiContext.workspaceId),
-    globalSyncEnabled: uiContext.globalSyncEnabled,
-    providerEnabled: uiContext.providerEnabled,
-    standaloneReady: uiContext.standaloneReady,
-    standaloneCreateSetEnabled: uiContext.standaloneCreateSetEnabled,
-    canStartNewSet: uiContext.canStartNewSet,
+    hasWorkspace: Boolean(viewRuntime.uiContext.workspaceId),
+    globalSyncEnabled: viewRuntime.uiContext.globalSyncEnabled,
+    providerEnabled: viewRuntime.uiContext.providerEnabled,
+    standaloneReady: viewRuntime.uiContext.standaloneReady,
+    standaloneCreateSetEnabled: viewRuntime.uiContext.standaloneCreateSetEnabled,
+    canStartNewSet: viewRuntime.uiContext.canStartNewSet,
     pageState,
-    workspaceSummary,
+    workspaceSummary: viewRuntime.workspaceSummary,
     syncProgress:
-      overrideSyncProgress && overrideSyncProgress.workspaceId === uiContext.workspaceId
+      overrideSyncProgress && overrideSyncProgress.workspaceId === viewRuntime.uiContext.workspaceId
         ? overrideSyncProgress
         : null,
   });
@@ -106,66 +130,66 @@ export function createContentState(
   };
 
   const setStandaloneCreateSetEnabled = (nextEnabled: boolean) => {
-    standaloneCreateSetTouched = true;
-    uiContext = {
-      ...uiContext,
+    viewRuntime.standaloneCreateSetTouched = true;
+    viewRuntime.uiContext = {
+      ...viewRuntime.uiContext,
       standaloneCreateSetEnabled: nextEnabled,
     };
-    ui.setContext(uiContext);
+    ui.setContext(viewRuntime.uiContext);
   };
 
   const setProviderEnabled = (nextEnabled: boolean) => {
-    uiContext = {
-      ...uiContext,
+    viewRuntime.uiContext = {
+      ...viewRuntime.uiContext,
       providerEnabled: nextEnabled,
     };
-    ui.setContext(uiContext);
+    ui.setContext(viewRuntime.uiContext);
   };
 
   const applyPresenceResponse = (response: PresenceResponse | null) => {
     const transition = buildPresenceContextTransition({
-      currentContext: uiContext,
+      currentContext: viewRuntime.uiContext,
       response,
       standaloneVisible: shouldShowStandaloneIndicator(adapter),
-      hasHydratedPresence,
-      standaloneCreateSetTouched,
+      hasHydratedPresence: viewRuntime.hasHydratedPresence,
+      standaloneCreateSetTouched: viewRuntime.standaloneCreateSetTouched,
     });
 
-    workspaceSummary = transition.workspaceSummary;
-    uiContext = transition.uiContext;
-    standaloneCreateSetTouched = transition.standaloneCreateSetTouched;
-    hasHydratedPresence = transition.hasHydratedPresence;
-    ui.setContext(uiContext);
+    viewRuntime.workspaceSummary = transition.workspaceSummary;
+    viewRuntime.uiContext = transition.uiContext;
+    viewRuntime.standaloneCreateSetTouched = transition.standaloneCreateSetTouched;
+    viewRuntime.hasHydratedPresence = transition.hasHydratedPresence;
+    ui.setContext(viewRuntime.uiContext);
     ui.setVisible(transition.visible);
   };
 
   const applySubmitResponse = (response: SubmitResponse | null) => {
     const transition = buildSubmitContextTransition({
-      currentContext: uiContext,
+      currentContext: viewRuntime.uiContext,
       response,
       standaloneVisible: shouldShowStandaloneIndicator(adapter),
     });
 
-    workspaceSummary = transition.workspaceSummary;
-    uiContext = transition.uiContext;
-    ui.setContext(uiContext);
+    viewRuntime.workspaceSummary = transition.workspaceSummary;
+    viewRuntime.uiContext = transition.uiContext;
+    ui.setContext(viewRuntime.uiContext);
     ui.setVisible(transition.visible);
-    syncProgress = null;
+    syncRuntime.syncProgress = null;
   };
 
   const handleSyncProgress = (progress: SyncProgressSnapshot) => {
     const nextState = applyIncomingSyncProgress(
       {
-        syncProgress,
-        pendingSyncProgress,
+        syncProgress: syncRuntime.syncProgress,
+        pendingSyncProgress: syncRuntime.pendingSyncProgress,
       },
-      uiContext.workspaceId,
+      viewRuntime.uiContext.workspaceId,
       progress,
     );
-    syncProgress = nextState.syncProgress;
-    pendingSyncProgress = nextState.pendingSyncProgress;
+    syncRuntime.syncProgress = nextState.syncProgress;
+    syncRuntime.pendingSyncProgress = nextState.pendingSyncProgress;
 
-    if (uiContext.workspaceId === progress.workspaceId) {
+    if (viewRuntime.uiContext.workspaceId === progress.workspaceId) {
       applyIndicatorPresentation();
     }
   };
@@ -191,34 +215,31 @@ export function createContentState(
 
   const rememberProgrammaticSubmit = (content: string) => {
     rememberProgrammaticSubmitEntry(
-      { recentProgrammaticSubmits },
+      submitRuntime,
       content,
     );
   };
 
   const shouldSuppressProgrammaticSubmit = (content: string) => {
     return shouldSuppressProgrammaticSubmitEntry(
-      { recentProgrammaticSubmits },
+      submitRuntime,
       content,
     );
   };
 
   return {
-    getUiContext: () => uiContext,
-    hasHydratedPresence: () => hasHydratedPresence,
-    getWorkspaceSummary: () => workspaceSummary,
+    getUiContext: () => viewRuntime.uiContext,
+    hasHydratedPresence: () => viewRuntime.hasHydratedPresence,
+    getWorkspaceSummary: () => viewRuntime.workspaceSummary,
     setWorkspaceSummary: (nextSummary: WorkspaceSummary | null) => {
-      workspaceSummary = nextSummary;
+      viewRuntime.workspaceSummary = nextSummary;
     },
-    getSuppressSubmissionsUntil: () => suppressSubmissionsUntil,
-    setSuppressSubmissionsUntil: (nextValue: number) => {
-      suppressSubmissionsUntil = nextValue;
-    },
+    isSubmissionSuppressed: (now = Date.now()) => isSubmissionSuppressed(submitRuntime, now),
     shouldSkipDuplicateSubmit(fingerprint: string, now = Date.now()) {
       return shouldSkipDuplicateSubmit(
         {
-          lastFingerprint,
-          lastFingerprintAt,
+          lastFingerprint: submitRuntime.lastFingerprint,
+          lastFingerprintAt: submitRuntime.lastFingerprintAt,
         },
         fingerprint,
         now,
@@ -226,12 +247,12 @@ export function createContentState(
     },
     rememberSubmitFingerprint(fingerprint: string, now = Date.now()) {
       const state = {
-        lastFingerprint,
-        lastFingerprintAt,
+        lastFingerprint: submitRuntime.lastFingerprint,
+        lastFingerprintAt: submitRuntime.lastFingerprintAt,
       };
       rememberSubmitFingerprint(state, fingerprint, now);
-      lastFingerprint = state.lastFingerprint;
-      lastFingerprintAt = state.lastFingerprintAt;
+      submitRuntime.lastFingerprint = state.lastFingerprint;
+      submitRuntime.lastFingerprintAt = state.lastFingerprintAt;
     },
     shouldSuppressProgrammaticSubmit,
     rememberProgrammaticSubmit,
@@ -244,6 +265,9 @@ export function createContentState(
     setProviderEnabled,
     setSyncing,
     showCurrentWarning,
+    suppressObservedSubmissions(durationMs: number, now = Date.now()) {
+      suppressObservedSubmissions(submitRuntime, durationMs, now);
+    },
   };
 }
 

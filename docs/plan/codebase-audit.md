@@ -19,6 +19,20 @@ The main quality issues are elsewhere:
 
 The plan below is phased so we can improve quality without destabilizing the extension.
 
+## Progress Snapshot
+
+Current rollout status:
+
+- Phase 0: completed
+- Phase 1: completed
+- Phase 2: substantially completed
+- Phase 3: completed
+- Phase 4: partially completed
+- Phase 5: partially completed
+- Phase 6: in progress
+
+The findings below are the original audit inputs. Some of them have already been addressed by the work above.
+
 ## Current Findings
 
 ### 1. Trust and legal copy drift
@@ -79,7 +93,7 @@ Examples:
 
 ### 5. Popup refresh model is wasteful
 
-[use-popup-status.ts](/Users/zhongxi/code/other/ask-em/src/entrypoints/popup/hooks/use-popup-status.ts) polls background every 1200ms.
+[use-popup-status.ts](/Users/zhongxi/code/other/ask-em/src/entrypoints/popup/hooks/use-popup-status.ts) still relies on polling and explicit refreshes, even though the polling is now lighter than it was originally.
 
 This is simple, but not elegant:
 
@@ -92,8 +106,8 @@ This is simple, but not elegant:
 Examples:
 
 - redundant recalculation in [settings.ts](/Users/zhongxi/code/other/ask-em/src/background/settings.ts)
-- dead or unused UI pieces such as `PremiumCard` in [App.tsx](/Users/zhongxi/code/other/ask-em/src/entrypoints/popup/App.tsx)
-- stale TODO fallback in [use-provider-request.ts](/Users/zhongxi/code/other/ask-em/src/entrypoints/popup/hooks/use-provider-request.ts)
+- stale docs or architecture notes after structural refactors
+- helper modules without direct unit tests after extraction
 
 These are not urgent by themselves, but they signal code hygiene debt.
 

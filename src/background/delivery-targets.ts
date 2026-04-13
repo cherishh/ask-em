@@ -40,6 +40,10 @@ function assertDeliverableStatus(
     throw new Error(`${provider} login required`);
   }
 
+  if (status.pageState === 'error') {
+    throw new Error(`${provider} error page`);
+  }
+
   if (status.pageState !== 'ready') {
     throw new Error(`${provider} not ready`);
   }

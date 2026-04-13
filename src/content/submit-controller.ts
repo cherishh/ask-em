@@ -17,7 +17,7 @@ export function createSubmitController(
 ) {
   const reportUserSubmit = async (rawContent: string) => {
     const content = rawContent.trim();
-    if (!content || Date.now() < state.getSuppressSubmissionsUntil()) {
+    if (!content || state.isSubmissionSuppressed()) {
       return;
     }
 
@@ -93,7 +93,7 @@ export function createSubmitController(
   return {
     reportUserSubmit,
     suppressObservedSubmissionsFor(durationMs: number) {
-      state.setSuppressSubmissionsUntil(Date.now() + durationMs);
+      state.suppressObservedSubmissions(durationMs);
     },
     rememberProgrammaticSubmit(content: string) {
       state.rememberProgrammaticSubmit(content);

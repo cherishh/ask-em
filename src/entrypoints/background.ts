@@ -36,7 +36,7 @@ import {
   detachClaimedTabForUnresolvedExistingSession,
   reconcileClaimedTabContext,
   transferClaimedTabToWorkspace,
-} from '../background/presence';
+} from '../background/presence-reconciliation';
 import { refreshPendingState } from '../background/state';
 
 export {
