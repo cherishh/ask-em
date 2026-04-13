@@ -91,6 +91,22 @@ describe('content indicator presentation', () => {
     });
   });
 
+  it('shows standalone error pages as needing a valid chat', () => {
+    expect(
+      getContentIndicatorPresentation(
+        createInput({
+          pageState: 'error',
+        }),
+      ),
+    ).toEqual({
+      state: 'blocked',
+      label: 'page has an error',
+      syncLabel: 'open a valid chat to sync',
+      syncTone: 'warning',
+      alertLevel: 'current-warning',
+    });
+  });
+
   it('shows standalone set limit warning', () => {
     expect(
       getContentIndicatorPresentation(
@@ -223,6 +239,37 @@ describe('content indicator presentation', () => {
       state: 'blocked',
       label: 'current model is loading',
       syncLabel: 'wait for page to become ready',
+      syncTone: 'warning',
+      alertLevel: 'current-warning',
+    });
+  });
+
+  it('surfaces current-tab error pages as current warnings', () => {
+    const summary = createWorkspaceSummary({
+      memberStates: {
+        claude: 'error',
+        chatgpt: 'ready',
+        gemini: 'ready',
+      },
+      memberIssues: {
+        claude: 'error-page',
+        chatgpt: null,
+        gemini: null,
+      },
+    });
+
+    expect(
+      getContentIndicatorPresentation(
+        createInput({
+          hasWorkspace: true,
+          pageState: 'error',
+          workspaceSummary: summary,
+        }),
+      ),
+    ).toEqual({
+      state: 'blocked',
+      label: 'current model page has an error',
+      syncLabel: 'page needs attention',
       syncTone: 'warning',
       alertLevel: 'current-warning',
     });

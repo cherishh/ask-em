@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { detectLoginRequired, findClickableByText, getVisibleButtonTexts } from './dom';
+import { detectLoginRequired, detectObviousErrorPage, findClickableByText, getVisibleButtonTexts } from './dom';
 
 function mockVisibleLayout() {
   return vi
@@ -60,5 +60,16 @@ describe('adapter dom detection', () => {
     `;
 
     expect(detectLoginRequired(['sign in'])).toBe(false);
+  });
+
+  it('detects obvious error pages from visible copy', () => {
+    document.body.innerHTML = `
+      <main>
+        <h1>Page not found</h1>
+        <p>Claude can help with many things, but finding this page isn't one of them.</p>
+      </main>
+    `;
+
+    expect(detectObviousErrorPage()).toBe(true);
   });
 });

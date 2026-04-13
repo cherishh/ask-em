@@ -1,0 +1,313 @@
+[
+  {
+    "detail": "test deletion. this is the first msg & should be fan out without issue.",
+    "id": "45676ae8-5541-4944-b149-1572cee0f488",
+    "level": "info",
+    "message": "Detected user submit",
+    "provider": "claude",
+    "scope": "content",
+    "timestamp": 1776080094004
+  },
+  {
+    "detail": "chatgpt, claude, deepseek",
+    "id": "74649b4c-80dc-4808-bca5-761a2d554913",
+    "level": "info",
+    "message": "Created workspace from new-chat submit",
+    "provider": "claude",
+    "scope": "background",
+    "timestamp": 1776080094206,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "test deletion. this is the first msg & should be fan out without issue.",
+    "id": "96022874-c118-4a9e-928e-421a8223a6c7",
+    "level": "info",
+    "message": "User submit routed",
+    "provider": "claude",
+    "scope": "background",
+    "timestamp": 1776080094207,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "open-new-tab: no claimed tab was available for this provider",
+    "id": "33370c44-9173-43d1-aa60-19ac28e406b9",
+    "level": "info",
+    "message": "Resolved delivery target",
+    "provider": "chatgpt",
+    "scope": "background",
+    "timestamp": 1776080097518,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "claude -> chatgpt @ new-chat",
+    "id": "3401828f-79b8-4597-bef4-ed8c36101ce2",
+    "level": "info",
+    "message": "Delivering prompt",
+    "provider": "chatgpt",
+    "scope": "background",
+    "timestamp": 1776080097519,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "test deletion. this is the first msg & should be fan out without issue.",
+    "id": "63c9aae2-9a9b-48ce-a226-e1e7e9a1a4b9",
+    "level": "info",
+    "message": "Starting prompt delivery in content",
+    "provider": "chatgpt",
+    "scope": "content",
+    "timestamp": 1776080097571,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "open-new-tab: no claimed tab was available for this provider",
+    "id": "ba05e769-5306-41c9-a1b5-5c068f8a1da9",
+    "level": "info",
+    "message": "Resolved delivery target",
+    "provider": "deepseek",
+    "scope": "background",
+    "timestamp": 1776080097855,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "claude -> deepseek @ new-chat",
+    "id": "52857634-6135-4605-b1ef-a64eeca73616",
+    "level": "info",
+    "message": "Delivering prompt",
+    "provider": "deepseek",
+    "scope": "background",
+    "timestamp": 1776080097858,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "test deletion. this is the first msg & should be fan out without issue.",
+    "id": "b400b98b-51b4-4ab8-bf12-b445c37d0589",
+    "level": "info",
+    "message": "Starting prompt delivery in content",
+    "provider": "deepseek",
+    "scope": "content",
+    "timestamp": 1776080097864,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "https://chat.deepseek.com/a/chat/s/e9224873-6556-411b-b175-b45cb47c6dd7",
+    "id": "b730d88b-086b-447f-a58c-6bcc10549589",
+    "level": "info",
+    "message": "Observed session ref update",
+    "provider": "deepseek",
+    "scope": "content",
+    "timestamp": 1776080099184,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "claude -> deepseek",
+    "id": "dead94ed-810b-42c2-9a02-c1b0c85d9b84",
+    "level": "info",
+    "message": "Prompt delivery accepted",
+    "provider": "deepseek",
+    "scope": "background",
+    "timestamp": 1776080099202,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "claude -> deepseek",
+    "id": "73141ec1-e17f-4f72-88e2-e09079adb6c9",
+    "level": "info",
+    "message": "Prompt delivery confirmed",
+    "provider": "deepseek",
+    "scope": "background",
+    "timestamp": 1776080099202,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "https://chatgpt.com/c/69dcd4e1-f7a0-8330-9fb3-81fea4a46b37",
+    "id": "074fd456-8fa2-4c7e-82c6-ccdf78ab96ae",
+    "level": "info",
+    "message": "Observed session ref update",
+    "provider": "chatgpt",
+    "scope": "content",
+    "timestamp": 1776080100208,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "not-ready -> ready (existing-session) @ https://chatgpt.com/c/69dcd4e1-f7a0-8330-9fb3-81fea4a46b37",
+    "id": "c7df7681-c03e-4a16-a805-8ac93488744d",
+    "level": "info",
+    "message": "Observed local page state change",
+    "provider": "chatgpt",
+    "scope": "content",
+    "timestamp": 1776080100211
+  },
+  {
+    "detail": "claude -> chatgpt",
+    "id": "fdcbef23-b2f6-405d-bf27-e369ed571fe7",
+    "level": "info",
+    "message": "Prompt delivery accepted",
+    "provider": "chatgpt",
+    "scope": "background",
+    "timestamp": 1776080100341,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "2/2 ok",
+    "id": "d43f4e7f-fc74-4c42-be58-fc616107c862",
+    "level": "info",
+    "message": "Sync fan-out completed",
+    "provider": "claude",
+    "scope": "background",
+    "timestamp": 1776080100348,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "id": "8fddfcce-b424-400b-a61d-4e0344261752",
+    "level": "info",
+    "message": "Detached claimed tab from previous group on new-chat navigation",
+    "provider": "chatgpt",
+    "scope": "background",
+    "timestamp": 1776080110993,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "id": "bdf4f365-7b12-402c-9ddc-e676270e6df9",
+    "level": "info",
+    "message": "Detached claimed tab from previous group on new-chat navigation",
+    "provider": "chatgpt",
+    "scope": "background",
+    "timestamp": 1776080110994,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "id": "13213152-772a-4be7-92b0-f489c7c9fc5a",
+    "level": "info",
+    "message": "Detached claimed tab from previous group on new-chat navigation",
+    "provider": "claude",
+    "scope": "background",
+    "timestamp": 1776080117935,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "deleted claude & chatgpt. this one is from deepseek",
+    "id": "98c6588f-bc57-47d7-a89c-ffc61839fd6e",
+    "level": "info",
+    "message": "Detected user submit",
+    "provider": "deepseek",
+    "scope": "content",
+    "timestamp": 1776080133981,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "deleted claude & chatgpt. this one is from deepseek",
+    "id": "000df187-f793-4d2d-a9d9-5ad3491253ce",
+    "level": "info",
+    "message": "User submit routed",
+    "provider": "deepseek",
+    "scope": "background",
+    "timestamp": 1776080134014,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "open-new-tab: no claimed tab was available for this provider",
+    "id": "51ccd320-1966-4810-bde7-ea6d1c1d48c1",
+    "level": "info",
+    "message": "Resolved delivery target",
+    "provider": "chatgpt",
+    "scope": "background",
+    "timestamp": 1776080137420,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "deepseek -> chatgpt @ 69dcd4e1-f7a0-8330-9fb3-81fea4a46b37",
+    "id": "df32995e-7b86-4e82-b369-60077cb23647",
+    "level": "info",
+    "message": "Delivering prompt",
+    "provider": "chatgpt",
+    "scope": "background",
+    "timestamp": 1776080137421,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "deleted claude & chatgpt. this one is from deepseek",
+    "id": "78395e83-8ea1-44bd-a38b-72ebf04d4c6a",
+    "level": "info",
+    "message": "Starting prompt delivery in content",
+    "provider": "chatgpt",
+    "scope": "content",
+    "timestamp": 1776080137493,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "deepseek -> chatgpt",
+    "id": "a4c08cb3-8b96-46eb-91b2-e5e8c4cadcb4",
+    "level": "info",
+    "message": "Prompt delivery accepted",
+    "provider": "chatgpt",
+    "scope": "background",
+    "timestamp": 1776080138217,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "deepseek -> chatgpt",
+    "id": "24b01e16-9d29-4b66-93b9-4acaf225ad58",
+    "level": "info",
+    "message": "Prompt delivery confirmed",
+    "provider": "chatgpt",
+    "scope": "background",
+    "timestamp": 1776080138218,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "id": "423e5a03-f66e-402f-9604-6c4688768dd3",
+    "level": "info",
+    "message": "Detached claimed tab from previous group on new-chat navigation",
+    "provider": "chatgpt",
+    "scope": "background",
+    "timestamp": 1776080139183,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "not-ready -> ready (new-chat) @ https://chatgpt.com/",
+    "id": "cf8ade4a-3b74-4480-b889-89ade6b8bbf0",
+    "level": "info",
+    "message": "Observed local page state change",
+    "provider": "chatgpt",
+    "scope": "content",
+    "timestamp": 1776080151209
+  },
+  {
+    "detail": "ready -> not-ready (existing-session) @ https://claude.ai/chat/36c17528-8b8a-4bd3-9d25-9daf608eb81f",
+    "id": "1dc7919b-3cc5-4237-b3b8-b3d95de65880",
+    "level": "warn",
+    "message": "Observed local page state change",
+    "provider": "claude",
+    "scope": "content",
+    "timestamp": 1776080152175,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "claude not ready",
+    "id": "f67290ed-5baf-4976-95b5-d9c79b0e9c7e",
+    "level": "error",
+    "message": "Prompt delivery threw",
+    "provider": "claude",
+    "scope": "background",
+    "timestamp": 1776080152835,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "1/2 ok; failed: claude (claude not ready)",
+    "id": "d295a060-6050-4178-a66d-f18d6655aef3",
+    "level": "warn",
+    "message": "Sync fan-out completed",
+    "provider": "deepseek",
+    "scope": "background",
+    "timestamp": 1776080152847,
+    "workspaceId": "1c77ea46-a899-4ca5-9ea9-e733595c47d2"
+  },
+  {
+    "detail": "claude, chatgpt, deepseek, gemini",
+    "id": "db44e94f-aea4-43bb-b7a7-97deecb696f2",
+    "level": "info",
+    "message": "Updated default enabled providers",
+    "scope": "background",
+    "timestamp": 1776080181176
+  }
+]

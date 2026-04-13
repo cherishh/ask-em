@@ -2,7 +2,7 @@ import type { ShortcutConfig } from './shortcuts';
 
 export type Provider = 'claude' | 'chatgpt' | 'gemini' | 'deepseek' | 'manus';
 
-export type PageState = 'ready' | 'login-required' | 'not-ready';
+export type PageState = 'ready' | 'login-required' | 'not-ready' | 'error';
 
 export type PageKind = 'new-chat' | 'existing-session';
 
@@ -33,7 +33,7 @@ export type Workspace = {
   pendingSource?: Provider;
 };
 
-export type WorkspaceIssue = 'needs-login' | 'loading' | 'delivery-failed';
+export type WorkspaceIssue = 'needs-login' | 'loading' | 'delivery-failed' | 'error-page';
 
 export type DefaultEnabledProviders = Record<Provider, boolean>;
 
@@ -86,5 +86,6 @@ export type GroupMemberState =
   | 'ready'
   | 'login-required'
   | 'not-ready'
+  | 'error'
   | 'inactive'
   | 'pending';

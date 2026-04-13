@@ -113,6 +113,10 @@ function getProviderDotState(
     return 'warning';
   }
 
+  if (memberIssue === 'error-page') {
+    return 'warning';
+  }
+
   if (memberState === 'ready') {
     return 'active';
   }
@@ -121,7 +125,7 @@ function getProviderDotState(
     return 'pending';
   }
 
-  if (memberState === 'login-required' || memberState === 'not-ready') {
+  if (memberState === 'login-required' || memberState === 'not-ready' || memberState === 'error') {
     return 'warning';
   }
 

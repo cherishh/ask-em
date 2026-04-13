@@ -64,7 +64,7 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     const isLoginRequired = authClassification.isLoginRequired;
     const hasObviousError = detectObviousErrorPage(config.errorKeywords ?? []);
     const isReady = Boolean(findComposer()) && !hasObviousError;
-    const pageState = isLoginRequired ? 'login-required' : isReady ? 'ready' : 'not-ready';
+    const pageState = isLoginRequired ? 'login-required' : hasObviousError ? 'error' : isReady ? 'ready' : 'not-ready';
 
     return {
       provider: config.provider,

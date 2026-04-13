@@ -65,4 +65,20 @@ describe('workspace provider display', () => {
       detail: 'Last sync did not reach this model. Session may be deleted.',
     });
   });
+
+  it('surfaces provider error pages as needs attention', () => {
+    expect(
+      getWorkspaceProviderDisplay({
+        memberState: 'error',
+        memberIssue: 'error-page',
+        enabled: true,
+        globalSyncEnabled: true,
+        hasMember: true,
+      }),
+    ).toEqual({
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'This page is showing an error. Session may be deleted.',
+    });
+  });
 });

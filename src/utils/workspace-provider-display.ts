@@ -46,6 +46,14 @@ export function getWorkspaceProviderDisplay(input: {
     };
   }
 
+  if (input.memberIssue === 'error-page' || input.memberState === 'error') {
+    return {
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'This page is showing an error. Session may be deleted.',
+    };
+  }
+
   if (input.memberIssue === 'loading' || input.memberState === 'not-ready') {
     return {
       kind: 'loading',

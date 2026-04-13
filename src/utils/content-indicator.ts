@@ -43,11 +43,11 @@ function formatAttentionCount(count: number): string {
 }
 
 function isWarningMemberState(state: GroupMemberState | undefined) {
-  return state === 'login-required' || state === 'not-ready';
+  return state === 'login-required' || state === 'not-ready' || state === 'error';
 }
 
 function isWarningIssue(issue: WorkspaceIssue | null | undefined) {
-  return issue === 'needs-login' || issue === 'loading' || issue === 'delivery-failed';
+  return issue === 'needs-login' || issue === 'loading' || issue === 'delivery-failed' || issue === 'error-page';
 }
 
 export function countWorkspaceIssues(summary: WorkspaceSummary | null): number {
@@ -70,6 +70,10 @@ function getCurrentTabLabel(input: ContentIndicatorInput): string {
       return 'loading';
     }
 
+    if (input.pageState === 'error') {
+      return 'page has an error';
+    }
+
     if (!input.globalSyncEnabled || !input.standaloneCreateSetEnabled) {
       return 'Local only';
     }
@@ -89,6 +93,10 @@ function getCurrentTabLabel(input: ContentIndicatorInput): string {
     return 'current model is loading';
   }
 
+  if (input.pageState === 'error') {
+    return 'current model page has an error';
+  }
+
   return 'current model is in sync';
 }
 
@@ -103,6 +111,13 @@ function getStandaloneSyncStatus(input: ContentIndicatorInput) {
   if (input.pageState === 'not-ready') {
     return {
       label: 'wait for page to become ready',
+      tone: 'warning' as const,
+    };
+  }
+
+  if (input.pageState === 'error') {
+    return {
+      label: 'open a valid chat to sync',
       tone: 'warning' as const,
     };
   }
@@ -163,6 +178,13 @@ function getWorkspaceSyncStatus(input: ContentIndicatorInput) {
   if (input.pageState === 'not-ready') {
     return {
       label: 'wait for page to become ready',
+      tone: 'warning' as const,
+    };
+  }
+
+  if (input.pageState === 'error') {
+    return {
+      label: 'page needs attention',
       tone: 'warning' as const,
     };
   }

@@ -359,12 +359,15 @@ export async function handlePresenceMessage(message: HelloMessage | HeartbeatMes
     localState = clearWorkspaceProviderIssue(localState, workspaceLookup.workspaceId, message.provider);
   } else if (message.pageState === 'login-required') {
     localState = setWorkspaceProviderIssue(localState, workspaceLookup.workspaceId, message.provider, 'needs-login');
+  } else if (message.pageState === 'error') {
+    localState = setWorkspaceProviderIssue(localState, workspaceLookup.workspaceId, message.provider, 'error-page');
   } else if (message.pageState === 'not-ready') {
     localState = setWorkspaceProviderIssue(localState, workspaceLookup.workspaceId, message.provider, 'loading');
   }
 
   if (
     message.pageState === 'ready' ||
+    message.pageState === 'error' ||
     message.pageState === 'login-required' ||
     message.pageState === 'not-ready'
   ) {
