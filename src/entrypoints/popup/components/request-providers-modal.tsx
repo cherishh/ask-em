@@ -21,7 +21,6 @@ export function RequestProvidersModal(props: {
   onToggleProvider: (provider: string) => void;
   onClose: () => void;
   onSubmit: () => void;
-  onResetCooldownForDev: () => void;
 }) {
   if (!props.open) {
     return null;
@@ -55,14 +54,6 @@ export function RequestProvidersModal(props: {
           <div className="askem-modal-state">
             <p>You already sent a request recently.</p>
             <span>You can send another one {formatCooldownRemaining(props.requestCooldownUntil)}.</span>
-            <button
-              type="button"
-              className="askem-provider-clear"
-              style={{ marginTop: 12 }}
-              onClick={props.onResetCooldownForDev}
-            >
-              DEV: Reset Cooldown
-            </button>
           </div>
         ) : (
           <>

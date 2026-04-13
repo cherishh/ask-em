@@ -20,6 +20,7 @@ import { getVisibleWorkspaceProviders } from '../../runtime/workspace';
 import { SUPPORTED_SITES } from '../../adapters/sites';
 import { getWorkspaceProviderDisplay } from '../../utils/workspace-provider-display';
 import { RequestProvidersModal } from './components/request-providers-modal';
+import { useFeedback } from './hooks/use-feedback';
 import { useDiagnostics } from './hooks/use-diagnostics';
 import { usePopupStatus } from './hooks/use-popup-status';
 import { useProviderRequest } from './hooks/use-provider-request';
@@ -28,6 +29,7 @@ type PopupView = 'home' | 'settings' | 'legal';
 type LegalPage = 'terms' | 'privacy';
 
 const MIN_WORKSPACES_FOR_FREEZE_CONTROL = 2;
+const DEV_CONTROL_STORAGE_KEY = 'askem-dev-control';
 
 function formatTime(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -141,6 +143,17 @@ export default function App() {
     submitRequestModal,
     resetRequestCooldownForDev,
   } = useProviderRequest();
+  const {
+    feedbackText,
+    includeLogs,
+    feedbackSubmitting,
+    feedbackSubmitted,
+    feedbackError,
+    setFeedbackText,
+    setIncludeLogs,
+    resetFeedback,
+    submitFeedback,
+  } = useFeedback();
   const onboardingProviders = useMemo(
     () => selectedProviders,
     [selectedProviders],
@@ -150,6 +163,19 @@ export default function App() {
   const limit = status?.workspaceLimit ?? MAX_WORKSPACES;
   const atLimit = workspaceCount >= limit;
   const globalSyncEnabled = status?.globalSyncEnabled ?? true;
+  const persistedDevControl = window.localStorage.getItem(DEV_CONTROL_STORAGE_KEY) === 'true';
+
+  if (window.dev_control === true && !persistedDevControl) {
+    window.localStorage.setItem(DEV_CONTROL_STORAGE_KEY, 'true');
+  }
+
+  if (window.dev_control === false && persistedDevControl) {
+    window.localStorage.removeItem(DEV_CONTROL_STORAGE_KEY);
+  }
+
+  const showDevControl =
+    window.dev_control === true ||
+    window.localStorage.getItem(DEV_CONTROL_STORAGE_KEY) === 'true';
 
   const handleClearPersistentStorage = useCallback(async () => {
     setDevActionBusy(true);
@@ -176,10 +202,19 @@ export default function App() {
             {loading ? 'Syncing' : 'Refresh'}
           </button> */}
           <div className="askem-hero-actions">
-            <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => setDevModalOpen(true)} type="button">
-              Dev
-            </button>
-            <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => setFeedbackModalOpen(true)} type="button">
+            {showDevControl ? (
+              <button className="askem-refresh askem-refresh-subtle askem-refresh-corner" onClick={() => setDevModalOpen(true)} type="button">
+                Dev
+              </button>
+            ) : null}
+            <button
+              className="askem-refresh askem-refresh-subtle askem-refresh-corner"
+              onClick={() => {
+                resetFeedback();
+                setFeedbackModalOpen(true);
+              }}
+              type="button"
+            >
               Feedback
             </button>
           </div>
@@ -475,11 +510,10 @@ export default function App() {
         onToggleProvider={toggleRequestedProvider}
         onClose={closeRequestModal}
         onSubmit={() => void submitRequestModal()}
-        onResetCooldownForDev={resetRequestCooldownForDev}
       />
 
       {feedbackModalOpen ? (
-        <div className="askem-modal-overlay" onClick={() => setFeedbackModalOpen(false)} role="presentation">
+        <div className="askem-modal-overlay" onClick={() => !feedbackSubmitting && setFeedbackModalOpen(false)} role="presentation">
           <section
             className="askem-modal"
             onClick={(event) => event.stopPropagation()}
@@ -491,13 +525,64 @@ export default function App() {
                 <p className="askem-card-label">Feedback</p>
                 <h2>Send Feedback</h2>
               </div>
-              <button className="askem-modal-close" onClick={() => setFeedbackModalOpen(false)} type="button">
+              <button className="askem-modal-close" onClick={() => setFeedbackModalOpen(false)} type="button" disabled={feedbackSubmitting}>
                 Close
               </button>
             </div>
-            <div className="askem-modal-state">
-              <p>TODO</p>
-            </div>
+            {feedbackSubmitted ? (
+              <div className="askem-modal-state">
+                <p>Thanks. Your feedback is in.</p>
+                <span>We&apos;ll review it together with the attached context.</span>
+              </div>
+            ) : (
+              <>
+                <div className="askem-feedback-field">
+                  <label className="askem-feedback-label" htmlFor="askem-feedback-input">
+                    Feedback
+                  </label>
+                  <textarea
+                    id="askem-feedback-input"
+                    className="askem-feedback-textarea"
+                    placeholder="What happened? What felt wrong? What should change?"
+                    value={feedbackText}
+                    onChange={(event) => setFeedbackText(event.target.value)}
+                    rows={6}
+                    disabled={feedbackSubmitting}
+                  />
+                </div>
+                <label className="askem-feedback-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={includeLogs}
+                    onChange={(event) => setIncludeLogs(event.target.checked)}
+                    disabled={feedbackSubmitting}
+                  />
+                  <span>Include logs</span>
+                </label>
+                {feedbackError ? (
+                  <p className="askem-feedback-error">{feedbackError}</p>
+                ) : (
+                  <p className="askem-feedback-note">
+                    {includeLogs
+                      ? 'Current debug logs snapshot will be attached to this report.'
+                      : 'Only your written feedback will be sent.'}
+                  </p>
+                )}
+                <div className="askem-modal-actions">
+                  <button className="askem-provider-clear" onClick={() => setFeedbackModalOpen(false)} type="button" disabled={feedbackSubmitting}>
+                    Cancel
+                  </button>
+                  <button
+                    className="askem-clear-workspace"
+                    onClick={() => void submitFeedback()}
+                    disabled={feedbackSubmitting || feedbackText.trim().length === 0}
+                    type="button"
+                  >
+                    {feedbackSubmitting ? 'Sending' : 'Send Feedback'}
+                  </button>
+                </div>
+              </>
+            )}
           </section>
         </div>
       ) : null}
@@ -532,6 +617,20 @@ export default function App() {
                   type="button"
                 >
                   {devActionBusy ? 'Clearing' : 'Run'}
+                </button>
+              </div>
+              <div className="askem-dev-row">
+                <div className="askem-dev-copy">
+                  <p className="askem-dev-title">Reset request cooldown</p>
+                  <span className="askem-dev-desc">Clear the local cooldown for Request more providers.</span>
+                </div>
+                <button
+                  className="askem-provider-clear"
+                  onClick={() => resetRequestCooldownForDev()}
+                  disabled={devActionBusy}
+                  type="button"
+                >
+                  Run
                 </button>
               </div>
             </div>

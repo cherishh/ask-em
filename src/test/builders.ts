@@ -37,7 +37,7 @@ export function makeWorkspace(overrides: Partial<Workspace> & Pick<Workspace, 'i
 export function makeLocalState(overrides: Partial<LocalState> = {}): LocalState {
   return {
     globalSyncEnabled: true,
-    debugLoggingEnabled: false,
+    debugLoggingEnabled: true,
     closeTabsOnDeleteSet: false,
     defaultEnabledProviders: createDefaultEnabledProviders(),
     shortcuts: DEFAULT_SHORTCUTS,

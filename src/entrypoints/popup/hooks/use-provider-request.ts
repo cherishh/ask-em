@@ -1,8 +1,11 @@
 import { useCallback, useState } from 'react';
 
-const MORE_PROVIDERS_REQUEST_ENDPOINT = '';
 const MORE_PROVIDERS_REQUEST_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const MORE_PROVIDERS_REQUEST_STORAGE_KEY = 'askem-more-providers-last-submitted-at';
+
+function getMoreProvidersRequestEndpoint(): string {
+  return import.meta.env.WXT_MORE_PROVIDERS_REQUEST_ENDPOINT?.trim() ?? '';
+}
 
 function getMoreProvidersCooldownUntil(): number | null {
   const rawValue = window.localStorage.getItem(MORE_PROVIDERS_REQUEST_STORAGE_KEY);
@@ -36,18 +39,38 @@ export function formatCooldownRemaining(cooldownUntil: number): string {
 }
 
 async function submitMoreProviderRequest(requestedProviders: string[]): Promise<'submitted' | 'coming-soon'> {
-  if (!MORE_PROVIDERS_REQUEST_ENDPOINT) {
+  const endpoint = getMoreProvidersRequestEndpoint();
+
+  if (!endpoint) {
     // TODO: wire this modal to a real endpoint once provider requests are supported.
     console.info('TODO: submit more provider request', requestedProviders);
     return 'coming-soon';
   }
 
-  const response = await fetch(MORE_PROVIDERS_REQUEST_ENDPOINT, {
+  const originPattern = `${new URL(endpoint).origin}/*`;
+  const hasPermission = await chrome.permissions?.contains?.({
+    origins: [originPattern],
+  });
+
+  if (!hasPermission) {
+    const granted = await chrome.permissions?.request?.({
+      origins: [originPattern],
+    });
+
+    if (!granted) {
+      throw new Error(`Host permission denied for ${originPattern}`);
+    }
+  }
+
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ requestedProviders }),
+    body: JSON.stringify({
+      requestedProviders,
+      extensionVersion: chrome.runtime.getManifest().version,
+    }),
   });
 
   if (!response.ok) {

@@ -139,3 +139,58 @@
   font-size: 12px;
   line-height: 1.45;
 }
+
+.askem-feedback-field {
+  margin-top: 14px;
+}
+
+.askem-feedback-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--askem-ink);
+  font: 700 12px/1.2 var(--askem-font-sans);
+  letter-spacing: 0.03em;
+}
+
+.askem-feedback-textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  border: 1px solid var(--askem-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 12px 14px;
+  color: var(--askem-ink);
+  font: 500 14px/1.5 var(--askem-font-sans);
+  box-sizing: border-box;
+}
+
+.askem-feedback-textarea:focus {
+  outline: 0;
+  border-color: var(--askem-border-accent);
+  box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.12);
+}
+
+.askem-feedback-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--askem-ink);
+  font: 600 12px/1.2 var(--askem-font-sans);
+}
+
+.askem-feedback-note,
+.askem-feedback-error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.askem-feedback-note {
+  color: var(--askem-muted);
+}
+
+.askem-feedback-error {
+  color: #9d3c10;
+}

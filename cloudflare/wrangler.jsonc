@@ -1,0 +1,16 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "ask-em-model-requests",
+	"main": "src/index.js",
+	"compatibility_date": "2026-04-13",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "ask-em-model-requests",
+			"database_id": "5b1bd69d-80d2-473d-b13c-c63d1480f1f0",
+			"preview_database_id": "5b1bd69d-80d2-473d-b13c-c63d1480f1f0",
+			"migrations_dir": "migrations",
+			"remote": true
+		}
+	]
+}
