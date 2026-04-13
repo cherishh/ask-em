@@ -13,6 +13,8 @@ import type {
 } from '../../../runtime/protocol';
 import { requestStatus } from '../popup-runtime';
 
+const POPUP_STATUS_POLL_MS = 3_000;
+
 export function usePopupStatus() {
   const [status, setStatus] = useState<StatusResponseMessage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,33 +52,64 @@ export function usePopupStatus() {
     void refresh();
   }, [refresh]);
 
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      void refresh({ silent: true });
-    }, 1200);
+  const refreshIfVisible = useCallback(async () => {
+    if (document.visibilityState === 'hidden') {
+      return;
+    }
 
-    return () => window.clearInterval(intervalId);
+    await refresh({ silent: true });
   }, [refresh]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refresh({ silent: true });
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshIfVisible();
+    }, POPUP_STATUS_POLL_MS);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refresh, refreshIfVisible]);
+
+  const sendRuntimeMessage = useCallback(
+    async (message: Record<string, unknown>, options: { silentRefresh?: boolean } = {}) => {
+      await chrome.runtime.sendMessage(message);
+      await refresh(options.silentRefresh ? { silent: true } : undefined);
+    },
+    [refresh],
+  );
+
+  const runBusyAction = useCallback(
+    async (key: string, action: () => Promise<void>) => {
+      setBusyKey(key);
+      try {
+        await action();
+      } finally {
+        setBusyKey(null);
+      }
+    },
+    [],
+  );
 
   const clearWorkspace = useCallback(async (workspaceId: string) => {
-    setBusyKey(workspaceId);
-    try {
-      await chrome.runtime.sendMessage({ type: 'CLEAR_WORKSPACE', workspaceId });
-      await refresh();
-    } finally {
-      setBusyKey(null);
-    }
-  }, [refresh]);
+    await runBusyAction(workspaceId, async () => {
+      await sendRuntimeMessage({ type: 'CLEAR_WORKSPACE', workspaceId });
+    });
+  }, [runBusyAction, sendRuntimeMessage]);
 
   const clearProvider = useCallback(async (workspaceId: string, provider: Provider) => {
-    setBusyKey(`${workspaceId}:${provider}`);
-    try {
-      await chrome.runtime.sendMessage({ type: 'CLEAR_WORKSPACE_PROVIDER', workspaceId, provider });
-      await refresh();
-    } finally {
-      setBusyKey(null);
-    }
-  }, [refresh]);
+    await runBusyAction(`${workspaceId}:${provider}`, async () => {
+      await sendRuntimeMessage({ type: 'CLEAR_WORKSPACE_PROVIDER', workspaceId, provider });
+    });
+  }, [runBusyAction, sendRuntimeMessage]);
 
   const toggleDefaultProvider = useCallback(async (provider: Provider) => {
     const nextProviders = selectedProviders.includes(provider)
@@ -84,39 +117,35 @@ export function usePopupStatus() {
       : [...selectedProviders, provider];
 
     setSelectedProviders(nextProviders);
-    await chrome.runtime.sendMessage({
+    await sendRuntimeMessage({
       type: 'SET_DEFAULT_ENABLED_PROVIDERS',
       providers: nextProviders,
     });
-    await refresh();
-  }, [refresh, selectedProviders]);
+  }, [selectedProviders, sendRuntimeMessage]);
 
   const toggleGlobalSync = useCallback(async () => {
     const nextEnabled = !status?.globalSyncEnabled;
-    await chrome.runtime.sendMessage({
+    await sendRuntimeMessage({
       type: 'SET_GLOBAL_SYNC_ENABLED',
       enabled: nextEnabled,
-    });
-    await refresh({ silent: true });
-  }, [refresh, status?.globalSyncEnabled]);
+    }, { silentRefresh: true });
+  }, [sendRuntimeMessage, status?.globalSyncEnabled]);
 
   const toggleAutoSyncNewChats = useCallback(async () => {
     const nextEnabled = !status?.autoSyncNewChatsEnabled;
-    await chrome.runtime.sendMessage({
+    await sendRuntimeMessage({
       type: 'SET_AUTO_SYNC_NEW_CHATS_ENABLED',
       enabled: nextEnabled,
-    });
-    await refresh({ silent: true });
-  }, [refresh, status?.autoSyncNewChatsEnabled]);
+    }, { silentRefresh: true });
+  }, [sendRuntimeMessage, status?.autoSyncNewChatsEnabled]);
 
   const toggleCloseTabsOnDeleteSet = useCallback(async () => {
     const nextEnabled = !status?.closeTabsOnDeleteSet;
-    await chrome.runtime.sendMessage({
+    await sendRuntimeMessage({
       type: 'SET_CLOSE_TABS_ON_DELETE_SET',
       enabled: nextEnabled,
-    });
-    await refresh({ silent: true });
-  }, [refresh, status?.closeTabsOnDeleteSet]);
+    }, { silentRefresh: true });
+  }, [sendRuntimeMessage, status?.closeTabsOnDeleteSet]);
 
   const updateShortcut = useCallback(async (id: ShortcutId, binding: ShortcutBinding) => {
     const next = { ...resolvedShortcuts, [id]: binding };
@@ -130,14 +159,12 @@ export function usePopupStatus() {
   }, []);
 
   const resetIndicatorPositions = useCallback(async () => {
-    await chrome.runtime.sendMessage({ type: 'RESET_INDICATOR_POSITIONS' });
-    await refresh({ silent: true });
-  }, [refresh]);
+    await sendRuntimeMessage({ type: 'RESET_INDICATOR_POSITIONS' }, { silentRefresh: true });
+  }, [sendRuntimeMessage]);
 
   const clearPersistentStorage = useCallback(async () => {
-    await chrome.runtime.sendMessage({ type: 'CLEAR_PERSISTENT_STORAGE' });
-    await refresh();
-  }, [refresh]);
+    await sendRuntimeMessage({ type: 'CLEAR_PERSISTENT_STORAGE' });
+  }, [sendRuntimeMessage]);
 
   return {
     status,

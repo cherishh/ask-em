@@ -38,14 +38,11 @@ export function createSubmitController(
 
     const fingerprint = `${status.currentUrl}::${content}`;
 
-    if (
-      fingerprint === state.getLastFingerprint() &&
-      Date.now() - state.getLastFingerprintAt() < 1_500
-    ) {
+    if (state.shouldSkipDuplicateSubmit(fingerprint)) {
       return;
     }
 
-    state.setLastFingerprint(fingerprint, Date.now());
+    state.rememberSubmitFingerprint(fingerprint);
 
     if (status.pageState !== 'ready') {
       state.applyIndicatorPresentation(status);

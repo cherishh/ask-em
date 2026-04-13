@@ -12,16 +12,26 @@ import {
   type SubmitResponse,
 } from './context';
 import {
+  applyIncomingSyncProgress,
+  reconcileSyncProgressForWorkspace,
+} from './sync-progress';
+import {
   getContentIndicatorPresentation,
   getCurrentWarningIndicatorPresentation,
   getSyncingIndicatorPresentation,
   type IndicatorAlertLevel,
   type SyncProgressSnapshot,
 } from './indicator';
+import {
+  rememberProgrammaticSubmit as rememberProgrammaticSubmitEntry,
+  shouldSuppressProgrammaticSubmit as shouldSuppressProgrammaticSubmitEntry,
+} from './submit-memory';
+import {
+  rememberSubmitFingerprint,
+  shouldSkipDuplicateSubmit,
+} from './submit-fingerprint';
 import type { UiContext } from './ui';
 export type { PresenceResponse, SubmitResponse } from './context';
-
-const PROGRAMMATIC_SUBMIT_SUPPRESS_MS = 30_000;
 
 export function shouldShowStandaloneIndicator(adapter: ProviderAdapter): boolean {
   const status = adapter.session.getStatus();
@@ -57,18 +67,16 @@ export function createContentState(
   let lastFingerprintAt = 0;
   const recentProgrammaticSubmits = new Map<string, number>();
 
-  const getSubmitContentFingerprint = (content: string) => content.trim();
-
   const syncPendingProgress = () => {
-    if (pendingSyncProgress && pendingSyncProgress.workspaceId === uiContext.workspaceId) {
-      syncProgress = pendingSyncProgress.completed < pendingSyncProgress.total ? pendingSyncProgress : null;
-      pendingSyncProgress = null;
-      return;
-    }
-
-    if (syncProgress && syncProgress.workspaceId !== uiContext.workspaceId) {
-      syncProgress = null;
-    }
+    const nextState = reconcileSyncProgressForWorkspace(
+      {
+        syncProgress,
+        pendingSyncProgress,
+      },
+      uiContext.workspaceId,
+    );
+    syncProgress = nextState.syncProgress;
+    pendingSyncProgress = nextState.pendingSyncProgress;
   };
 
   const getIndicatorInput = (
@@ -146,12 +154,19 @@ export function createContentState(
   };
 
   const handleSyncProgress = (progress: SyncProgressSnapshot) => {
+    const nextState = applyIncomingSyncProgress(
+      {
+        syncProgress,
+        pendingSyncProgress,
+      },
+      uiContext.workspaceId,
+      progress,
+    );
+    syncProgress = nextState.syncProgress;
+    pendingSyncProgress = nextState.pendingSyncProgress;
+
     if (uiContext.workspaceId === progress.workspaceId) {
-      syncProgress = progress.completed < progress.total ? progress : null;
-      pendingSyncProgress = null;
       applyIndicatorPresentation();
-    } else {
-      pendingSyncProgress = progress;
     }
   };
 
@@ -175,30 +190,17 @@ export function createContentState(
   };
 
   const rememberProgrammaticSubmit = (content: string) => {
-    recentProgrammaticSubmits.set(
-      getSubmitContentFingerprint(content),
-      Date.now() + PROGRAMMATIC_SUBMIT_SUPPRESS_MS,
+    rememberProgrammaticSubmitEntry(
+      { recentProgrammaticSubmits },
+      content,
     );
   };
 
   const shouldSuppressProgrammaticSubmit = (content: string) => {
-    const now = Date.now();
-
-    for (const [fingerprint, expiresAt] of recentProgrammaticSubmits) {
-      if (expiresAt <= now) {
-        recentProgrammaticSubmits.delete(fingerprint);
-      }
-    }
-
-    const fingerprint = getSubmitContentFingerprint(content);
-    const expiresAt = recentProgrammaticSubmits.get(fingerprint);
-
-    if (!expiresAt || expiresAt <= now) {
-      return false;
-    }
-
-    recentProgrammaticSubmits.delete(fingerprint);
-    return true;
+    return shouldSuppressProgrammaticSubmitEntry(
+      { recentProgrammaticSubmits },
+      content,
+    );
   };
 
   return {
@@ -212,11 +214,24 @@ export function createContentState(
     setSuppressSubmissionsUntil: (nextValue: number) => {
       suppressSubmissionsUntil = nextValue;
     },
-    getLastFingerprint: () => lastFingerprint,
-    getLastFingerprintAt: () => lastFingerprintAt,
-    setLastFingerprint(nextFingerprint: string, nextTimestamp: number) {
-      lastFingerprint = nextFingerprint;
-      lastFingerprintAt = nextTimestamp;
+    shouldSkipDuplicateSubmit(fingerprint: string, now = Date.now()) {
+      return shouldSkipDuplicateSubmit(
+        {
+          lastFingerprint,
+          lastFingerprintAt,
+        },
+        fingerprint,
+        now,
+      );
+    },
+    rememberSubmitFingerprint(fingerprint: string, now = Date.now()) {
+      const state = {
+        lastFingerprint,
+        lastFingerprintAt,
+      };
+      rememberSubmitFingerprint(state, fingerprint, now);
+      lastFingerprint = state.lastFingerprint;
+      lastFingerprintAt = state.lastFingerprintAt;
     },
     shouldSuppressProgrammaticSubmit,
     rememberProgrammaticSubmit,

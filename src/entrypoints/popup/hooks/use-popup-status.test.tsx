@@ -126,4 +126,46 @@ describe('usePopupStatus', () => {
     expect(popupRuntimeMocks.requestStatus).toHaveBeenCalledTimes(2);
     hook.unmount();
   });
+
+  it('skips polling while the popup document is hidden', async () => {
+    popupRuntimeMocks.requestStatus.mockResolvedValue(null);
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    });
+
+    const hook = renderHookHarness(() => usePopupStatus());
+    await flushMicrotasks();
+    expect(popupRuntimeMocks.requestStatus).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(3_000);
+      await flushMicrotasks();
+    });
+
+    expect(popupRuntimeMocks.requestStatus).toHaveBeenCalledTimes(1);
+    hook.unmount();
+  });
+
+  it('refreshes when the popup becomes visible again', async () => {
+    popupRuntimeMocks.requestStatus.mockResolvedValue(null);
+    let visibilityState: DocumentVisibilityState = 'hidden';
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => visibilityState,
+    });
+
+    const hook = renderHookHarness(() => usePopupStatus());
+    await flushMicrotasks();
+    expect(popupRuntimeMocks.requestStatus).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      visibilityState = 'visible';
+      document.dispatchEvent(new Event('visibilitychange'));
+      await flushMicrotasks();
+    });
+
+    expect(popupRuntimeMocks.requestStatus).toHaveBeenCalledTimes(2);
+    hook.unmount();
+  });
 });
