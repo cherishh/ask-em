@@ -388,7 +388,7 @@ export default function App() {
                 <div className="askem-us-row-header">
                   <div>
                     <span className="askem-us-row-title">Indicator position</span>
-                    <span className="askem-us-row-sub">Reset the floating page indicator back to its default spot.</span>
+                    <span className="askem-us-row-sub">Drag the page indicator anywhere. Reset it here.</span>
                   </div>
                   <button
                     type="button"
