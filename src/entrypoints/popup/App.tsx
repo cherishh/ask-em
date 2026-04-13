@@ -8,14 +8,13 @@ import { AdvancedView } from './components/advanced-view';
 import { RequestProvidersModal } from './components/request-providers-modal';
 import { FeedbackModal } from './components/feedback-modal';
 import { DevToolsModal } from './components/dev-tools-modal';
+import { useDevControl } from './hooks/use-dev-control';
 import { useFeedback } from './hooks/use-feedback';
 import { useDiagnostics } from './hooks/use-diagnostics';
 import { usePopupStatus } from './hooks/use-popup-status';
 import { useProviderRequest } from './hooks/use-provider-request';
 
 type PopupView = 'home' | 'settings' | 'legal';
-
-const DEV_CONTROL_STORAGE_KEY = 'askem-dev-control';
 
 export default function App() {
   const [activeView, setActiveView] = useState<PopupView>('home');
@@ -79,25 +78,13 @@ export default function App() {
     () => selectedProviders,
     [selectedProviders],
   );
+  const showDevControl = useDevControl();
 
   const workspaceCount = status?.workspaces.length ?? 0;
   const limit = status?.workspaceLimit ?? MAX_WORKSPACES;
   const atLimit = workspaceCount >= limit;
   const globalSyncEnabled = status?.globalSyncEnabled ?? true;
   const autoSyncNewChatsEnabled = status?.autoSyncNewChatsEnabled ?? true;
-  const persistedDevControl = window.localStorage.getItem(DEV_CONTROL_STORAGE_KEY) === 'true';
-
-  if (window.dev_control === true && !persistedDevControl) {
-    window.localStorage.setItem(DEV_CONTROL_STORAGE_KEY, 'true');
-  }
-
-  if (window.dev_control === false && persistedDevControl) {
-    window.localStorage.removeItem(DEV_CONTROL_STORAGE_KEY);
-  }
-
-  const showDevControl =
-    window.dev_control === true ||
-    window.localStorage.getItem(DEV_CONTROL_STORAGE_KEY) === 'true';
 
   const handleClearPersistentStorage = useCallback(async () => {
     setDevActionBusy(true);
