@@ -58,7 +58,7 @@ export function getWorkspaceProviderDisplay(input: {
     return {
       kind: 'needs-attention',
       label: 'Needs Attention',
-      detail: 'Last sync did not reach this model',
+      detail: 'Last sync did not reach this model. Session may be deleted.',
     };
   }
 
