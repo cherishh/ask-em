@@ -16,11 +16,9 @@ import {
 } from '../runtime/storage';
 import {
   bindWorkspaceMember,
-  clearWorkspaceProviderIssue,
   createPendingWorkspace,
   getDefaultEnabledProviderList,
   getWorkspacesOrdered,
-  setWorkspaceProviderIssue,
 } from '../runtime/workspace';
 import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
 import {
@@ -28,6 +26,7 @@ import {
   resolveReadyProviderTabForWorkspace,
 } from './delivery-targets';
 import { getClaimedTabByTabId } from './claimed-tabs';
+import { applyDeliveryResultsToWorkspaceIssues } from './delivery-issues';
 import { cancelScheduledGroupGc } from './gc';
 import { logDebug } from './debug';
 import { notifySyncProgress } from './tabs';
@@ -283,21 +282,7 @@ export async function deliverPromptToWorkspaceTargets(
   });
 
   await updateLocalState((currentState) =>
-    deliveryResults.reduce((nextState, result) => {
-      if (result.ok) {
-        return clearWorkspaceProviderIssue(nextState, workspaceId, result.provider);
-      }
-
-      const normalizedReason = (result.reason ?? '').toLowerCase();
-      const issue =
-        normalizedReason.includes('login required')
-          ? 'needs-login'
-          : normalizedReason.includes('not ready') || normalizedReason.includes('blocked')
-            ? 'loading'
-            : 'delivery-failed';
-
-      return setWorkspaceProviderIssue(nextState, workspaceId, result.provider, issue);
-    }, currentState),
+    applyDeliveryResultsToWorkspaceIssues(currentState, workspaceId, deliveryResults),
   );
 
   return deliveryResults;
