@@ -6,7 +6,7 @@ import {
   lookupWorkspaceBySession,
   setWorkspaceProviderIssue,
 } from '../runtime/workspace';
-import { getClaimedTabByTabId } from '../runtime/recovery';
+import { getClaimedTabByTabId } from './claimed-tabs';
 import { cancelScheduledGroupGc, scheduleGroupGcIfEmpty } from './gc';
 import { logDebug } from './debug';
 import { refreshPendingState } from './state';

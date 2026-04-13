@@ -24,10 +24,10 @@ import {
 } from '../runtime/workspace';
 import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
 import {
-  getClaimedTabByTabId,
   resolveDeliveryTarget,
   resolveReadyProviderTabForWorkspace,
-} from '../runtime/recovery';
+} from './delivery-targets';
+import { getClaimedTabByTabId } from './claimed-tabs';
 import { cancelScheduledGroupGc } from './gc';
 import { logDebug } from './debug';
 import { notifySyncProgress } from './tabs';

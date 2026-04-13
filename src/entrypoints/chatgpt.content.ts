@@ -1,3 +1,3 @@
-import { createProviderContentScript } from '../utils/provider-content-script';
+import { createProviderContentScript } from '../content/provider-content-script';
 
 export default createProviderContentScript('chatgpt');

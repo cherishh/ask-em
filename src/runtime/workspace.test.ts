@@ -29,7 +29,11 @@ import {
   setWorkspaceProviderEnabled,
   setWorkspaceProviderIssue,
 } from './workspace';
-import { countClaimedTabsForWorkspace, isClaimedTabStale, removeClaimedTabsForTabId } from './recovery';
+import {
+  countClaimedTabsForWorkspace,
+  isClaimedTabStale,
+  removeClaimedTabsForTabId,
+} from '../background/claimed-tabs';
 
 function createEmptyState(): LocalState {
   return makeLocalState({

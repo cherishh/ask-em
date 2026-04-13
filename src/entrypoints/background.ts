@@ -1,6 +1,6 @@
 import type { RuntimeMessage } from '../runtime/protocol';
 import { getSessionState, setSessionState } from '../runtime/storage';
-import { removeClaimedTabsForTabId } from '../runtime/recovery';
+import { removeClaimedTabsForTabId } from '../background/claimed-tabs';
 import { scheduleGroupGcIfEmpty } from '../background/gc';
 import { logDebug } from '../background/debug';
 import { handlePresenceMessage } from '../background/presence';

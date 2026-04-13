@@ -1,6 +1,6 @@
 import { getSessionState, getLocalState, setLocalState, setSessionState } from '../runtime/storage';
 import { clearWorkspace } from '../runtime/workspace';
-import { countClaimedTabsForWorkspace, removeClaimedTabsForWorkspace } from '../runtime/recovery';
+import { countClaimedTabsForWorkspace, removeClaimedTabsForWorkspace } from './claimed-tabs';
 import { logDebug } from './debug';
 
 const AUTO_CLEAR_GROUP_DELAY_MS = 7_000;

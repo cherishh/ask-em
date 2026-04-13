@@ -1,7 +1,7 @@
 import { createDefaultEnabledProviders, STORAGE_KEYS, type RuntimeMessage } from '../runtime/protocol';
 import { clearDebugLogs, getLocalState, getSessionState, setLocalState, setSessionState } from '../runtime/storage';
 import { clearWorkspace, clearWorkspaceProvider, setWorkspaceProviderEnabled } from '../runtime/workspace';
-import { removeClaimedTabsForWorkspace } from '../runtime/recovery';
+import { removeClaimedTabsForWorkspace } from './claimed-tabs';
 import { logDebug } from './debug';
 import { scheduleEmptyGroupDeletion } from './gc';
 import {
