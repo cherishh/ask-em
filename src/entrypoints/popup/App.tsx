@@ -914,7 +914,7 @@ function OnboardingCard({ providers }: { providers: Provider[] }) {
       </div>
       <div className="askem-onboarding-body">
         <p className="askem-onboarding-desc">
-          ask&apos;em uses official chat interfaces so you get the full experience — artifacts, web search, file uploads, and all features each provider offers.
+          ask&apos;em lets you compare models without leaving their official apps, so you keep artifacts, web search, file uploads, long-term memory, and every new feature each provider ships.
         </p>
         <div className="askem-onboarding-steps">
           <div className="askem-onboarding-step-item">
