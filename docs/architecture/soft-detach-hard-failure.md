@@ -1,3 +1,5 @@
+last modified: 2026-04-13 23:32:08 +08
+
 # Soft-Detach vs Hard-Failure
 
 This note defines the internal distinction between normal tab movement and true sync failure.

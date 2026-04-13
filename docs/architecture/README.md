@@ -1,3 +1,5 @@
+last modified: 2026-04-13 23:32:08 +08
+
 # Architecture Notes
 
 This folder contains short design rules that came out of the codebase audit cleanup.

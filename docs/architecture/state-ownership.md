@@ -1,3 +1,5 @@
+last modified: 2026-04-13 23:32:08 +08
+
 # State Ownership
 
 This document defines where state truth lives in ask'em and where it should not live.

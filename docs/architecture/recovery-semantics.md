@@ -1,3 +1,5 @@
+last modified: 2026-04-13 23:32:08 +08
+
 # Recovery Semantics
 
 This note captures the shared meaning of observed content `pageState` values during background

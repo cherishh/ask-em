@@ -1,3 +1,5 @@
+last modified: 2026-04-13 23:32:08 +08
+
 # Codebase Audit Plan
 
 ## Goal
@@ -27,8 +29,8 @@ Current rollout status:
 - Phase 1: completed
 - Phase 2: substantially completed
 - Phase 3: completed
-- Phase 4: partially completed
-- Phase 5: partially completed
+- Phase 4: completed
+- Phase 5: substantially completed
 - Phase 6: in progress
 
 The findings below are the original audit inputs. Some of them have already been addressed by the work above.
@@ -73,10 +75,10 @@ This makes small changes expensive and increases regression risk.
 
 Indicator and provider-display copy is derived in multiple places:
 
-- [content-indicator.ts](/Users/zhongxi/code/other/ask-em/src/utils/content-indicator.ts)
+- [indicator.ts](/Users/zhongxi/code/other/ask-em/src/content/indicator.ts)
 - [workspace-provider-display.ts](/Users/zhongxi/code/other/ask-em/src/utils/workspace-provider-display.ts)
-- [content-ui.ts](/Users/zhongxi/code/other/ask-em/src/utils/content-ui.ts)
-- [App.tsx](/Users/zhongxi/code/other/ask-em/src/entrypoints/popup/App.tsx)
+- [ui-render.ts](/Users/zhongxi/code/other/ask-em/src/content/ui-render.ts)
+- popup components under [src/entrypoints/popup/components](</Users/zhongxi/code/other/ask-em/src/entrypoints/popup/components>)
 
 This is a real maintenance risk. Once copy changes, issue states evolve, or i18n begins, drift is likely.
 
@@ -87,9 +89,9 @@ This is a real maintenance risk. Once copy changes, issue states evolve, or i18n
 Examples:
 
 - [workspace.ts](/Users/zhongxi/code/other/ask-em/src/runtime/workspace.ts) is a clean domain-state module
-- [recovery.ts](/Users/zhongxi/code/other/ask-em/src/runtime/recovery.ts) directly touches Chrome tabs and content readiness
+- background recovery/tab orchestration now lives under [src/background](</Users/zhongxi/code/other/ask-em/src/background>), which is healthier than before but still worth guarding
 
-`utils/` is also acting as a broad catch-all, especially for content-side behavior.
+`utils/` is less overloaded than before, but shared presentation helpers still need deliberate ownership.
 
 ### 5. Popup refresh model is wasteful
 
@@ -289,8 +291,8 @@ Focus on:
 
 - [delivery.ts](/Users/zhongxi/code/other/ask-em/src/background/delivery.ts)
 - [presence.ts](/Users/zhongxi/code/other/ask-em/src/background/presence.ts)
-- [recovery.ts](/Users/zhongxi/code/other/ask-em/src/runtime/recovery.ts)
-- [content-state.ts](/Users/zhongxi/code/other/ask-em/src/utils/content-state.ts)
+- [recovery-semantics.ts](/Users/zhongxi/code/other/ask-em/src/background/recovery-semantics.ts)
+- [state.ts](/Users/zhongxi/code/other/ask-em/src/content/state.ts)
 
 Recommended direction:
 
@@ -319,6 +321,7 @@ Possible sub-slices:
 ### Exit criteria
 
 - edge-case fixes in sync/recovery do not require editing one giant decision tree every time
+- Status: completed. The remaining work here is no longer major structural debt.
 
 ## Phase 5: Popup Data Flow and Performance
 
@@ -351,6 +354,7 @@ Recommended direction:
 ### Exit criteria
 
 - popup state updates feel simpler and are easier to trace
+- Status: substantially completed. Polling is lighter and visibility-aware, but popup data flow can still be polished further.
 
 ## Phase 6: Hygiene and Guardrails
 
@@ -374,6 +378,7 @@ Keep the cleaned-up structure from decaying again.
 ### Exit criteria
 
 - future contributors have fewer easy ways to reintroduce the same structural problems
+- Status: in progress. Core docs and helper tests exist now; this phase remains a maintenance pass, not a blocker.
 
 ## Recommended Execution Order
 

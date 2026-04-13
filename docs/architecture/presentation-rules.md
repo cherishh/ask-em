@@ -1,3 +1,5 @@
+last modified: 2026-04-13 23:32:08 +08
+
 # Presentation Rules
 
 This document defines how user-visible display state should be produced.
