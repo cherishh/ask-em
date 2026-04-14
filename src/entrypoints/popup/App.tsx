@@ -65,11 +65,20 @@ export default function App() {
   } = useProviderRequest();
   const {
     feedbackConfigured,
+    feedbackStep,
+    feedbackKind,
+    featureRequestChoice,
+    customFeatureRequestText,
     feedbackText,
     includeLogs,
     feedbackSubmitting,
     feedbackSubmitted,
     feedbackError,
+    canSubmit,
+    selectFeedbackKind,
+    goBack,
+    setFeatureRequestChoice,
+    setCustomFeatureRequestText,
     setFeedbackText,
     setIncludeLogs,
     resetFeedback,
@@ -210,12 +219,21 @@ export default function App() {
       <FeedbackModal
         open={feedbackModalOpen}
         feedbackConfigured={feedbackConfigured}
+        feedbackStep={feedbackStep}
+        feedbackKind={feedbackKind}
+        featureRequestChoice={featureRequestChoice}
+        customFeatureRequestText={customFeatureRequestText}
         feedbackText={feedbackText}
         includeLogs={includeLogs}
         feedbackSubmitting={feedbackSubmitting}
         feedbackSubmitted={feedbackSubmitted}
         feedbackError={feedbackError}
+        canSubmit={canSubmit}
         onClose={() => setFeedbackModalOpen(false)}
+        onBack={goBack}
+        onSelectFeedbackKind={selectFeedbackKind}
+        onFeatureRequestChoiceChange={setFeatureRequestChoice}
+        onCustomFeatureRequestTextChange={setCustomFeatureRequestText}
         onFeedbackTextChange={setFeedbackText}
         onIncludeLogsChange={setIncludeLogs}
         onSubmit={() => void submitFeedback()}

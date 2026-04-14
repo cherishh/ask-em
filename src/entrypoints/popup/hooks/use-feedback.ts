@@ -1,61 +1,109 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { requestFullLogs } from '../popup-runtime';
+import {
+  type FeedbackKind,
+  type FeedbackStep,
+  type FeatureRequestChoice,
+  getFeatureRequestLabel,
+} from '../feedback';
+import { getFeedbackEndpoint } from '../support-endpoints';
 
 const FEEDBACK_MAX_LENGTH = 4000;
 
-function getFeedbackEndpoint(): string {
-  const explicitEndpoint = import.meta.env.WXT_FEEDBACK_ENDPOINT?.trim();
-  if (explicitEndpoint) {
-    return explicitEndpoint;
-  }
-
-  const requestEndpoint = import.meta.env.WXT_MORE_PROVIDERS_REQUEST_ENDPOINT?.trim();
-  if (!requestEndpoint) {
-    return '';
-  }
-
-  return `${new URL(requestEndpoint).origin}/feedback`;
+function normalizeMessage(value: string): string {
+  return value.trim().slice(0, FEEDBACK_MAX_LENGTH);
 }
 
-async function ensureHostPermission(endpoint: string): Promise<void> {
-  const originPattern = `${new URL(endpoint).origin}/*`;
-  const hasPermission = await chrome.permissions?.contains?.({
-    origins: [originPattern],
-  });
-
-  if (hasPermission) {
-    return;
+function createFeatureRequestMessage(
+  choice: FeatureRequestChoice | null,
+  customText: string,
+): string {
+  if (choice === 'custom') {
+    return normalizeMessage(customText);
   }
 
-  const granted = await chrome.permissions?.request?.({
-    origins: [originPattern],
-  });
-
-  if (!granted) {
-    throw new Error(`Host permission denied for ${originPattern}`);
-  }
+  return getFeatureRequestLabel(choice).slice(0, FEEDBACK_MAX_LENGTH);
 }
 
 export function useFeedback() {
   const feedbackConfigured = getFeedbackEndpoint().length > 0;
+  const [feedbackStep, setFeedbackStep] = useState<FeedbackStep>('category');
+  const [feedbackKind, setFeedbackKind] = useState<FeedbackKind | null>(null);
+  const [featureRequestChoice, setFeatureRequestChoice] = useState<FeatureRequestChoice | null>(null);
+  const [customFeatureRequestText, setCustomFeatureRequestText] = useState('');
   const [feedbackText, setFeedbackText] = useState('');
   const [includeLogs, setIncludeLogs] = useState(true);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
+  const featureRequestMessage = useMemo(
+    () => createFeatureRequestMessage(featureRequestChoice, customFeatureRequestText),
+    [customFeatureRequestText, featureRequestChoice],
+  );
+
+  const canSubmit = useMemo(() => {
+    if (!feedbackConfigured || feedbackSubmitting || !feedbackKind) {
+      return false;
+    }
+
+    if (feedbackKind === 'feature-request') {
+      return featureRequestMessage.length > 0;
+    }
+
+    return normalizeMessage(feedbackText).length > 0;
+  }, [
+    feedbackConfigured,
+    feedbackKind,
+    feedbackSubmitting,
+    feedbackText,
+    featureRequestMessage,
+  ]);
+
   const resetFeedback = useCallback(() => {
+    setFeedbackStep('category');
+    setFeedbackKind(null);
+    setFeatureRequestChoice(null);
+    setCustomFeatureRequestText('');
     setFeedbackText('');
     setIncludeLogs(true);
     setFeedbackSubmitted(false);
     setFeedbackError(null);
   }, []);
 
+  const selectFeedbackKind = useCallback((kind: FeedbackKind) => {
+    setFeedbackKind(kind);
+    setFeedbackSubmitted(false);
+    setFeedbackError(null);
+
+    if (kind === 'feature-request') {
+      setFeedbackStep('feature-request');
+      setIncludeLogs(false);
+      return;
+    }
+
+    setFeedbackStep('message');
+    setIncludeLogs(kind === 'bug-report');
+  }, []);
+
+  const goBack = useCallback(() => {
+    if (feedbackSubmitting) {
+      return;
+    }
+
+    setFeedbackStep('category');
+    setFeedbackSubmitted(false);
+    setFeedbackError(null);
+  }, [feedbackSubmitting]);
+
   const submitFeedback = useCallback(async () => {
     const endpoint = getFeedbackEndpoint();
-    const message = feedbackText.trim();
+    const message =
+      feedbackKind === 'feature-request'
+        ? featureRequestMessage
+        : normalizeMessage(feedbackText);
 
-    if (!endpoint || !message || feedbackSubmitting) {
+    if (!endpoint || !feedbackKind || !message || feedbackSubmitting) {
       return;
     }
 
@@ -63,18 +111,24 @@ export function useFeedback() {
     setFeedbackError(null);
 
     try {
-      await ensureHostPermission(endpoint);
-
-      const logs = includeLogs ? await requestFullLogs() : [];
+      const shouldIncludeLogs = feedbackKind !== 'feature-request' && includeLogs;
+      const logs = shouldIncludeLogs ? await requestFullLogs() : [];
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: message.slice(0, FEEDBACK_MAX_LENGTH),
-          includeLogs,
+          kind: feedbackKind,
+          message,
+          includeLogs: shouldIncludeLogs,
           logs,
+          featureRequestChoice:
+            feedbackKind === 'feature-request' ? featureRequestChoice : null,
+          featureRequestDetail:
+            feedbackKind === 'feature-request' && featureRequestChoice === 'custom'
+              ? message
+              : null,
           extensionVersion: chrome.runtime.getManifest().version,
         }),
       });
@@ -91,18 +145,34 @@ export function useFeedback() {
     } finally {
       setFeedbackSubmitting(false);
     }
-  }, [feedbackSubmitting, feedbackText, includeLogs]);
+  }, [
+    feedbackKind,
+    feedbackSubmitting,
+    feedbackText,
+    featureRequestChoice,
+    featureRequestMessage,
+    includeLogs,
+  ]);
 
   return {
     feedbackConfigured,
+    feedbackStep,
+    feedbackKind,
+    featureRequestChoice,
+    customFeatureRequestText,
     feedbackText,
     includeLogs,
     feedbackSubmitting,
     feedbackSubmitted,
     feedbackError,
+    canSubmit,
     setFeedbackText,
     setIncludeLogs,
+    setFeatureRequestChoice,
+    setCustomFeatureRequestText,
     resetFeedback,
+    selectFeedbackKind,
+    goBack,
     submitFeedback,
   };
 }

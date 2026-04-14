@@ -1,11 +1,8 @@
 import { useCallback, useState } from 'react';
+import { getMoreProvidersRequestEndpoint } from '../support-endpoints';
 
 const MORE_PROVIDERS_REQUEST_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const MORE_PROVIDERS_REQUEST_STORAGE_KEY = 'askem-more-providers-last-submitted-at';
-
-function getMoreProvidersRequestEndpoint(): string {
-  return import.meta.env.WXT_MORE_PROVIDERS_REQUEST_ENDPOINT?.trim() ?? '';
-}
 
 function getMoreProvidersCooldownUntil(): number | null {
   const rawValue = window.localStorage.getItem(MORE_PROVIDERS_REQUEST_STORAGE_KEY);
@@ -45,21 +42,6 @@ async function submitMoreProviderRequest(
 
   if (!endpoint) {
     return 'not-configured';
-  }
-
-  const originPattern = `${new URL(endpoint).origin}/*`;
-  const hasPermission = await chrome.permissions?.contains?.({
-    origins: [originPattern],
-  });
-
-  if (!hasPermission) {
-    const granted = await chrome.permissions?.request?.({
-      origins: [originPattern],
-    });
-
-    if (!granted) {
-      throw new Error(`Host permission denied for ${originPattern}`);
-    }
   }
 
   const response = await fetch(endpoint, {

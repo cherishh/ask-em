@@ -76,8 +76,8 @@ export function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => 
           <h3>2. Optional Remote Submissions</h3>
           <p>
             If you choose to send feedback or request more providers, that submission is sent to an
-            ask&apos;em-operated, Cloudflare-backed service. Feedback can include the message you write
-            and, if you opt in, a snapshot of local debug logs.
+            ask&apos;em-operated support endpoint. Feedback can include the message you write and, if
+            you opt in, a snapshot of local debug logs.
           </p>
 
           <h3>3. What Stays Out of Our Servers</h3>

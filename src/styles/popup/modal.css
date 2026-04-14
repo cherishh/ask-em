@@ -12,10 +12,8 @@
   width: min(100%, 420px);
   border: 1px solid var(--askem-border);
   border-radius: var(--askem-radius-card-lg);
-  background:
-    linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(247, 243, 236, 0.96)),
-    radial-gradient(circle at top right, rgba(201, 100, 66, 0.1), transparent 28%);
-  box-shadow: 0 28px 50px rgba(55, 35, 0, 0.16);
+  background: rgba(250, 248, 243, 0.98);
+  box-shadow: 0 18px 40px rgba(55, 35, 0, 0.1);
   padding: 18px;
 }
 
@@ -30,8 +28,8 @@
 .askem-modal-top h2 {
   margin: 0;
   font-family: var(--askem-font-serif);
-  font-size: 30px;
-  line-height: 0.98;
+  font-size: 28px;
+  line-height: 1;
 }
 
 .askem-modal-close {
@@ -80,6 +78,19 @@
 
 .askem-modal-state {
   margin-top: 14px;
+}
+
+.askem-modal-top-compact {
+  align-items: center;
+}
+
+.askem-modal-top-compact .askem-card-label {
+  margin: 0;
+}
+
+.askem-modal-state-compact {
+  margin-top: 18px;
+  padding-right: 32px;
 }
 
 .askem-modal-state p {
@@ -144,24 +155,126 @@
   margin-top: 14px;
 }
 
+.askem-feedback-modal {
+  width: min(100%, 396px);
+  padding: 16px;
+  max-height: min(calc(100vh - 36px), 720px);
+  overflow-y: auto;
+}
+
+.askem-feedback-modal .askem-modal-top {
+  align-items: center;
+}
+
+.askem-feedback-modal .askem-modal-top h2 {
+  font-size: 24px;
+  line-height: 1.04;
+}
+
+.askem-feedback-intro {
+  margin: 12px 0 0;
+  color: var(--askem-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.askem-feedback-back {
+  border: 0;
+  background: transparent;
+  margin-top: 12px;
+  padding: 0;
+  color: var(--askem-muted);
+  cursor: pointer;
+  font: 600 11px/1 var(--askem-font-sans);
+}
+
+.askem-feedback-choice-list {
+  display: grid;
+  gap: 0;
+  margin-top: 12px;
+  border-top: 1px solid rgba(52, 38, 12, 0.08);
+}
+
+.askem-feedback-choice-list-compact {
+  margin-top: 10px;
+}
+
+.askem-feedback-choice-card {
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid rgba(52, 38, 12, 0.08);
+  border-radius: 0;
+  background: transparent;
+  padding: 13px 0;
+  text-align: left;
+  cursor: pointer;
+  transition: color 140ms ease, opacity 140ms ease;
+}
+
+.askem-feedback-choice-card:hover {
+  opacity: 0.78;
+}
+
+.askem-feedback-choice-card strong {
+  color: var(--askem-ink);
+  font: 600 13px/1.25 var(--askem-font-sans);
+}
+
+.askem-feedback-choice-card span {
+  color: var(--askem-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: left;
+  max-width: none;
+}
+
+.askem-feedback-radio-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 10px;
+  justify-items: stretch;
+}
+
+.askem-feedback-radio-card input {
+  margin: 2px 0 0;
+}
+
+.askem-feedback-radio-card.is-active {
+  color: var(--askem-ink);
+}
+
+.askem-feedback-radio-copy {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+}
+
+.askem-feedback-radio-copy span {
+  max-width: none;
+}
+
 .askem-feedback-label {
   display: block;
   margin-bottom: 8px;
   color: var(--askem-ink);
-  font: 700 12px/1.2 var(--askem-font-sans);
+  font: 600 12px/1.2 var(--askem-font-sans);
   letter-spacing: 0.03em;
 }
 
 .askem-feedback-textarea {
   width: 100%;
-  min-height: 140px;
+  min-height: 128px;
   resize: vertical;
-  border: 1px solid var(--askem-border);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.82);
-  padding: 12px 14px;
+  border: 1px solid rgba(52, 38, 12, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 11px 12px;
   color: var(--askem-ink);
-  font: 500 14px/1.5 var(--askem-font-sans);
+  font: 500 13px/1.5 var(--askem-font-sans);
   box-sizing: border-box;
 }
 
@@ -171,19 +284,24 @@
   box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.12);
 }
 
-.askem-feedback-checkbox {
+.askem-feedback-log-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-  color: var(--askem-ink);
-  font: 600 12px/1.2 var(--askem-font-sans);
+  gap: 6px;
+  margin-top: 10px;
+  opacity: 0.62;
+  color: var(--askem-muted);
+  font: 500 10px/1.2 var(--askem-font-sans);
+}
+
+.askem-feedback-log-toggle input {
+  transform: scale(0.88);
 }
 
 .askem-feedback-note,
 .askem-feedback-error {
-  margin: 10px 0 0;
-  font-size: 12px;
+  margin: 8px 0 0;
+  font-size: 11px;
   line-height: 1.45;
 }
 

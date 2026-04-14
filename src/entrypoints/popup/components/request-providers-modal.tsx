@@ -35,28 +35,43 @@ export function RequestProvidersModal(props: {
         aria-modal="true"
         aria-labelledby="askem-request-modal-title"
       >
-        <div className="askem-modal-top">
-          <div>
-            <p className="askem-card-label">Requests</p>
-            <h2 id="askem-request-modal-title">Request More Providers</h2>
-          </div>
-          <button className="askem-modal-close" onClick={props.onClose} type="button">
-            Close
-          </button>
-        </div>
-
         {props.requestSubmitted ? (
-          <div className="askem-modal-state">
-            <p>Thanks. Your request is in.</p>
-            <span>We&apos;re on it. Stay tuned.</span>
-          </div>
+          <>
+            <div className="askem-modal-top askem-modal-top-compact">
+              <p className="askem-card-label">Requests</p>
+              <button className="askem-modal-close" onClick={props.onClose} type="button">
+                Close
+              </button>
+            </div>
+            <div className="askem-modal-state askem-modal-state-compact">
+              <p>Thanks. We got your request.</p>
+              <span>We&apos;ll use it to shape what comes next.</span>
+            </div>
+          </>
         ) : props.requestCooldownUntil ? (
-          <div className="askem-modal-state">
-            <p>You already sent a request recently.</p>
-            <span>You can send another one {formatCooldownRemaining(props.requestCooldownUntil)}.</span>
-          </div>
+          <>
+            <div className="askem-modal-top askem-modal-top-compact">
+              <p className="askem-card-label">Requests</p>
+              <button className="askem-modal-close" onClick={props.onClose} type="button">
+                Close
+              </button>
+            </div>
+            <div className="askem-modal-state askem-modal-state-compact">
+              <p>Request already sent.</p>
+              <span>You can send another one {formatCooldownRemaining(props.requestCooldownUntil)}.</span>
+            </div>
+          </>
         ) : (
           <>
+            <div className="askem-modal-top">
+              <div>
+                <p className="askem-card-label">Requests</p>
+                <h2 id="askem-request-modal-title">Request More Providers</h2>
+              </div>
+              <button className="askem-modal-close" onClick={props.onClose} type="button">
+                Close
+              </button>
+            </div>
             <p className="askem-card-copy">
               Pick the providers you want us to add next. Choose as many as you want.
             </p>

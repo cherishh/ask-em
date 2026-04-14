@@ -50,7 +50,7 @@ Relevant files:
 Examples:
 
 - privacy text says no data is transmitted to external servers
-- feedback can send user-entered feedback and optional logs to Cloudflare
+- feedback can send user-entered feedback and optional logs to a remote support endpoint
 - request-more-models can submit data to a remote endpoint
 
 This is the highest-priority quality issue because it affects user trust, not just code shape.
@@ -132,7 +132,7 @@ Fix the highest-risk mismatches between what the product does and what the UI/le
 
 ### Scope
 
-- update privacy / legal / feedback copy to match current Cloudflare-backed flows
+- update privacy / legal / feedback copy to match current support-endpoint flows
 - audit user-visible claims about local-only storage and remote transmission
 - review settings/help text for outdated behavior
 

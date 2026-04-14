@@ -1,0 +1,4 @@
+project_id = "ask-em"
+
+[functions.support]
+verify_jwt = false
