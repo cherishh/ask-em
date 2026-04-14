@@ -47,6 +47,22 @@ supabase secrets set SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
 supabase functions deploy support --no-verify-jwt
 ```
 
+## Secret rotation
+
+To rotate the support function secret and redeploy in one step:
+
+```bash
+export SUPABASE_PROJECT_REF="your-project-ref"
+export SUPABASE_SERVICE_ROLE_KEY="your-new-service-role-key"
+scripts/rotate-supabase-support-secret.sh
+```
+
+If your CLI is not already logged in, also export:
+
+```bash
+export SUPABASE_ACCESS_TOKEN="your-personal-access-token"
+```
+
 ## Local dev
 
 ```bash
