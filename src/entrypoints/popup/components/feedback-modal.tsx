@@ -282,23 +282,25 @@ export function FeedbackModal(props: {
                 disabled={props.feedbackSubmitting}
               />
             </div>
-            <div className={`askem-feedback-log-note ${props.includeLogs ? 'is-attached' : 'is-detached'}`}>
-              <div className="askem-feedback-log-copy">
-                <button
-                  className="askem-feedback-log-kicker"
-                  onClick={() => props.onIncludeLogsChange(!props.includeLogs)}
-                  type="button"
-                  disabled={props.feedbackSubmitting || !props.feedbackConfigured}
-                >
-                  Diagnostics
-                </button>
-                <p>
-                  {props.includeLogs
-                    ? 'Local debug logs will be attached to help reproduce this issue faster.'
-                    : 'Local debug logs will not be attached to this report.'}
-                </p>
+            {props.feedbackKind === 'bug-report' ? (
+              <div className={`askem-feedback-log-note ${props.includeLogs ? 'is-attached' : 'is-detached'}`}>
+                <div className="askem-feedback-log-copy">
+                  <button
+                    className="askem-feedback-log-kicker"
+                    onClick={() => props.onIncludeLogsChange(!props.includeLogs)}
+                    type="button"
+                    disabled={props.feedbackSubmitting || !props.feedbackConfigured}
+                  >
+                    Diagnostics
+                  </button>
+                  <p>
+                    {props.includeLogs
+                      ? 'Local debug logs will be attached to help reproduce this issue faster.'
+                      : 'Local debug logs will not be attached to this report.'}
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : null}
             {props.feedbackError ? (
               <p className="askem-feedback-error">{props.feedbackError}</p>
             ) : !props.feedbackConfigured ? (

@@ -78,7 +78,7 @@ describe('useFeedback', () => {
     expect(hook.current.canSubmit).toBe(false);
 
     await act(async () => {
-      hook.current.setFeatureRequestChoice('history');
+      hook.current.setFeatureRequestChoice('more-providers');
     });
 
     expect(hook.current.canSubmit).toBe(true);
@@ -135,6 +135,7 @@ describe('useFeedback', () => {
     await act(async () => {
       hook.current.resetFeedback();
       hook.current.selectFeedbackKind('say-something-nice');
+      hook.current.setIncludeLogs(true);
       hook.current.setFeedbackText('The workspace indicator feels great.');
     });
 
@@ -152,6 +153,53 @@ describe('useFeedback', () => {
       includeLogs: false,
       logs: [],
       message: 'The workspace indicator feels great.',
+    });
+
+    hook.unmount();
+  });
+
+  it('supports the new feature request presets', async () => {
+    const hook = renderHookHarness(() => useFeedback());
+
+    await act(async () => {
+      hook.current.selectFeedbackKind('feature-request');
+      hook.current.setFeatureRequestChoice('more-providers');
+    });
+
+    await act(async () => {
+      await hook.current.submitFeedback();
+    });
+
+    let [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    let payload = JSON.parse(String(init?.body));
+
+    expect(payload).toMatchObject({
+      kind: 'feature-request',
+      message: 'More providers',
+      includeLogs: false,
+      featureRequestChoice: 'more-providers',
+      featureRequestDetail: null,
+    });
+
+    await act(async () => {
+      hook.current.resetFeedback();
+      hook.current.selectFeedbackKind('feature-request');
+      hook.current.setFeatureRequestChoice('switch-models');
+    });
+
+    await act(async () => {
+      await hook.current.submitFeedback();
+    });
+
+    [, init] = vi.mocked(globalThis.fetch).mock.calls[1];
+    payload = JSON.parse(String(init?.body));
+
+    expect(payload).toMatchObject({
+      kind: 'feature-request',
+      message: 'Switch models',
+      includeLogs: false,
+      featureRequestChoice: 'switch-models',
+      featureRequestDetail: null,
     });
 
     hook.unmount();

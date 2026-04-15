@@ -111,7 +111,7 @@ export function useFeedback() {
     setFeedbackError(null);
 
     try {
-      const shouldIncludeLogs = feedbackKind !== 'feature-request' && includeLogs;
+      const shouldIncludeLogs = feedbackKind === 'bug-report' && includeLogs;
       const logs = shouldIncludeLogs ? await requestFullLogs() : [];
       const response = await fetch(endpoint, {
         method: 'POST',
