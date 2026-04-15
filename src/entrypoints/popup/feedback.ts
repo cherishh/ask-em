@@ -2,6 +2,10 @@ export type FeedbackStep = 'category' | 'feature-request' | 'message';
 
 export type FeedbackKind = 'feature-request' | 'bug-report' | 'say-something-nice';
 
+export const FEEDBACK_ATTACHMENT_LIMIT = 3;
+export const FEEDBACK_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+export const FEEDBACK_ATTACHMENT_ACCEPT = 'image/png,image/jpeg,image/webp';
+
 export type FeatureRequestChoice =
   | 'multilingual'
   | 'incognito-chat'

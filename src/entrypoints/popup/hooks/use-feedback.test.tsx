@@ -22,6 +22,15 @@ vi.mock('../popup-runtime', () => ({
 }));
 
 describe('useFeedback', () => {
+  function readPayloadFromFormData(body: unknown) {
+    expect(body).toBeInstanceOf(FormData);
+    const formData = body as FormData;
+    return {
+      payload: JSON.parse(String(formData.get('payload'))),
+      attachments: formData.getAll('attachments'),
+    };
+  }
+
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
@@ -102,7 +111,7 @@ describe('useFeedback', () => {
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
 
     const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
-    const payload = JSON.parse(String(init?.body));
+    const { payload, attachments } = readPayloadFromFormData(init?.body);
 
     expect(payload).toMatchObject({
       kind: 'feature-request',
@@ -113,17 +122,21 @@ describe('useFeedback', () => {
       featureRequestDetail: 'Custom workspace history filters',
       extensionVersion: '0.1.0',
     });
+    expect(attachments).toHaveLength(0);
 
     expect(hook.current.feedbackSubmitted).toBe(true);
     hook.unmount();
   });
 
-  it('keeps logs enabled by default for bug reports and disabled for praise', async () => {
+  it('keeps logs enabled by default for bug reports, includes screenshots, and disables logs for praise', async () => {
     const hook = renderHookHarness(() => useFeedback());
+    const bugScreenshot = new File(['bug'], 'bug.png', { type: 'image/png' });
+    const praiseScreenshot = new File(['nice'], 'nice.png', { type: 'image/png' });
 
     await act(async () => {
       hook.current.selectFeedbackKind('bug-report');
       hook.current.setFeedbackText('Gemini delivery sometimes stalls.');
+      hook.current.addAttachmentFiles([bugScreenshot]);
     });
 
     await act(async () => {
@@ -131,12 +144,23 @@ describe('useFeedback', () => {
     });
 
     expect(requestFullLogs).toHaveBeenCalledTimes(1);
+    let [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    let { payload, attachments } = readPayloadFromFormData(init?.body);
+
+    expect(payload).toMatchObject({
+      kind: 'bug-report',
+      includeLogs: true,
+      message: 'Gemini delivery sometimes stalls.',
+    });
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]).toBeInstanceOf(File);
 
     await act(async () => {
       hook.current.resetFeedback();
       hook.current.selectFeedbackKind('say-something-nice');
       hook.current.setIncludeLogs(true);
       hook.current.setFeedbackText('The workspace indicator feels great.');
+      hook.current.addAttachmentFiles([praiseScreenshot]);
     });
 
     await act(async () => {
@@ -145,15 +169,16 @@ describe('useFeedback', () => {
 
     expect(requestFullLogs).toHaveBeenCalledTimes(1);
 
-    const [, secondInit] = vi.mocked(globalThis.fetch).mock.calls[1];
-    const secondPayload = JSON.parse(String(secondInit?.body));
+    [, init] = vi.mocked(globalThis.fetch).mock.calls[1];
+    ({ payload, attachments } = readPayloadFromFormData(init?.body));
 
-    expect(secondPayload).toMatchObject({
+    expect(payload).toMatchObject({
       kind: 'say-something-nice',
       includeLogs: false,
       logs: [],
       message: 'The workspace indicator feels great.',
     });
+    expect(attachments).toHaveLength(1);
 
     hook.unmount();
   });
@@ -171,7 +196,7 @@ describe('useFeedback', () => {
     });
 
     let [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
-    let payload = JSON.parse(String(init?.body));
+    let { payload, attachments } = readPayloadFromFormData(init?.body);
 
     expect(payload).toMatchObject({
       kind: 'feature-request',
@@ -180,6 +205,7 @@ describe('useFeedback', () => {
       featureRequestChoice: 'more-providers',
       featureRequestDetail: null,
     });
+    expect(attachments).toHaveLength(0);
 
     await act(async () => {
       hook.current.resetFeedback();
@@ -192,7 +218,7 @@ describe('useFeedback', () => {
     });
 
     [, init] = vi.mocked(globalThis.fetch).mock.calls[1];
-    payload = JSON.parse(String(init?.body));
+    ({ payload, attachments } = readPayloadFromFormData(init?.body));
 
     expect(payload).toMatchObject({
       kind: 'feature-request',
@@ -201,7 +227,26 @@ describe('useFeedback', () => {
       featureRequestChoice: 'switch-models',
       featureRequestDetail: null,
     });
+    expect(attachments).toHaveLength(0);
 
+    hook.unmount();
+  });
+
+  it('limits attachments to three images', async () => {
+    const hook = renderHookHarness(() => useFeedback());
+
+    await act(async () => {
+      hook.current.selectFeedbackKind('bug-report');
+      hook.current.addAttachmentFiles([
+        new File(['1'], '1.png', { type: 'image/png' }),
+        new File(['2'], '2.png', { type: 'image/png' }),
+        new File(['3'], '3.png', { type: 'image/png' }),
+        new File(['4'], '4.png', { type: 'image/png' }),
+      ]);
+    });
+
+    expect(hook.current.attachments).toHaveLength(3);
+    expect(hook.current.attachmentError).toBe('You can attach up to 3 images.');
     hook.unmount();
   });
 });

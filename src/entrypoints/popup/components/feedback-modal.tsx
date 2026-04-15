@@ -1,10 +1,13 @@
 import {
+  FEEDBACK_ATTACHMENT_ACCEPT,
+  FEEDBACK_ATTACHMENT_LIMIT,
   FEEDBACK_KIND_OPTIONS,
   FEATURE_REQUEST_OPTIONS,
   type FeedbackKind,
   type FeedbackStep,
   type FeatureRequestChoice,
 } from '../feedback';
+import type { FeedbackAttachmentDraft } from '../hooks/use-feedback';
 
 function getMessagePageCopy(kind: FeedbackKind | null) {
   if (kind === 'say-something-nice') {
@@ -24,7 +27,7 @@ function getMessagePageCopy(kind: FeedbackKind | null) {
     placeholder: 'What happened? What felt wrong? What should change?',
     submitLabel: 'Send Report',
     successLine: 'Thanks. Your report is in.',
-    successSubline: 'We\'ll review it together with any optional logs you attached.',
+    successSubline: 'We\'ll review it together with any screenshots and logs you attached.',
   };
 }
 
@@ -52,6 +55,8 @@ export function FeedbackModal(props: {
   customFeatureRequestText: string;
   feedbackText: string;
   includeLogs: boolean;
+  attachments: FeedbackAttachmentDraft[];
+  attachmentError: string | null;
   feedbackSubmitting: boolean;
   feedbackSubmitted: boolean;
   feedbackError: string | null;
@@ -63,6 +68,8 @@ export function FeedbackModal(props: {
   onCustomFeatureRequestTextChange: (value: string) => void;
   onFeedbackTextChange: (value: string) => void;
   onIncludeLogsChange: (checked: boolean) => void;
+  onAddAttachments: (files: FileList | File[] | null) => void;
+  onRemoveAttachment: (attachmentId: string) => void;
   onSubmit: () => void;
 }) {
   if (!props.open) {
@@ -278,10 +285,74 @@ export function FeedbackModal(props: {
                 placeholder={messagePageCopy.placeholder}
                 value={props.feedbackText}
                 onChange={(event) => props.onFeedbackTextChange(event.target.value)}
+                onPaste={(event) => {
+                  const pastedFiles = Array.from(event.clipboardData.files);
+                  const hasImage = pastedFiles.some((file) => file.type.startsWith('image/'));
+
+                  if (!hasImage) {
+                    return;
+                  }
+
+                  event.preventDefault();
+                  props.onAddAttachments(pastedFiles);
+                }}
                 rows={6}
                 disabled={props.feedbackSubmitting}
               />
             </div>
+            <div className="askem-feedback-attachments">
+              <div className="askem-feedback-attachments-top">
+                <div className="askem-feedback-attachments-copy">
+                  <span className="askem-feedback-attachments-kicker">Screenshots</span>
+                  <p>
+                    Paste or add up to {FEEDBACK_ATTACHMENT_LIMIT} images to show what you saw.
+                  </p>
+                </div>
+                {props.attachments.length < FEEDBACK_ATTACHMENT_LIMIT ? (
+                  <label className="askem-feedback-upload">
+                    <input
+                      type="file"
+                      accept={FEEDBACK_ATTACHMENT_ACCEPT}
+                      multiple
+                      onChange={(event) => {
+                        props.onAddAttachments(event.currentTarget.files);
+                        event.currentTarget.value = '';
+                      }}
+                      disabled={props.feedbackSubmitting || !props.feedbackConfigured}
+                    />
+                    Add screenshots
+                  </label>
+                ) : (
+                  <span className="askem-feedback-upload-cap">
+                    {props.attachments.length}/{FEEDBACK_ATTACHMENT_LIMIT}
+                  </span>
+                )}
+              </div>
+              {props.attachments.length ? (
+                <div className="askem-feedback-attachment-grid">
+                  {props.attachments.map((attachment) => (
+                    <div className="askem-feedback-attachment-card" key={attachment.id}>
+                      <img
+                        className="askem-feedback-attachment-image"
+                        src={attachment.previewUrl}
+                        alt=""
+                      />
+                      <button
+                        className="askem-feedback-attachment-remove"
+                        onClick={() => props.onRemoveAttachment(attachment.id)}
+                        type="button"
+                        disabled={props.feedbackSubmitting}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            {props.attachmentError ? (
+              <p className="askem-feedback-error">{props.attachmentError}</p>
+            ) : null}
             {props.feedbackKind === 'bug-report' ? (
               <div className={`askem-feedback-log-note ${props.includeLogs ? 'is-attached' : 'is-detached'}`}>
                 <div className="askem-feedback-log-copy">

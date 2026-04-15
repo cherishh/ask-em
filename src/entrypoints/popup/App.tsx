@@ -72,12 +72,16 @@ export default function App() {
     customFeatureRequestText,
     feedbackText,
     includeLogs,
+    attachments,
+    attachmentError,
     feedbackSubmitting,
     feedbackSubmitted,
     feedbackError,
     canSubmit,
     selectFeedbackKind,
     goBack,
+    addAttachmentFiles,
+    removeAttachment,
     setFeatureRequestChoice,
     setCustomFeatureRequestText,
     setFeedbackText,
@@ -227,6 +231,8 @@ export default function App() {
         customFeatureRequestText={customFeatureRequestText}
         feedbackText={feedbackText}
         includeLogs={includeLogs}
+        attachments={attachments}
+        attachmentError={attachmentError}
         feedbackSubmitting={feedbackSubmitting}
         feedbackSubmitted={feedbackSubmitted}
         feedbackError={feedbackError}
@@ -234,10 +240,12 @@ export default function App() {
         onClose={() => setFeedbackModalOpen(false)}
         onBack={goBack}
         onSelectFeedbackKind={selectFeedbackKind}
+        onAddAttachments={addAttachmentFiles}
         onFeatureRequestChoiceChange={setFeatureRequestChoice}
         onCustomFeatureRequestTextChange={setCustomFeatureRequestText}
         onFeedbackTextChange={setFeedbackText}
         onIncludeLogsChange={setIncludeLogs}
+        onRemoveAttachment={removeAttachment}
         onSubmit={() => void submitFeedback()}
       />
 

@@ -284,6 +284,113 @@
   box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.12);
 }
 
+.askem-feedback-attachments {
+  margin-top: 14px;
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(35, 25, 8, 0.07);
+}
+
+.askem-feedback-attachments-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.askem-feedback-attachments-copy {
+  min-width: 0;
+}
+
+.askem-feedback-attachments-kicker {
+  display: inline-block;
+  color: var(--askem-ink);
+  font: 600 11px/1.2 var(--askem-font-sans);
+}
+
+.askem-feedback-attachments-copy p {
+  margin: 4px 0 0;
+  color: var(--askem-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.askem-feedback-upload {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid rgba(35, 25, 8, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 7px 10px;
+  color: var(--askem-body);
+  cursor: pointer;
+  font: 600 10px/1 var(--askem-font-sans);
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.askem-feedback-upload:hover {
+  border-color: rgba(35, 25, 8, 0.18);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.askem-feedback-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.askem-feedback-upload:has(input:disabled) {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.askem-feedback-upload-cap {
+  flex-shrink: 0;
+  color: var(--askem-muted);
+  font: 600 10px/1 var(--askem-font-sans);
+}
+
+.askem-feedback-attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.askem-feedback-attachment-card {
+  display: grid;
+  gap: 6px;
+}
+
+.askem-feedback-attachment-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(35, 25, 8, 0.08);
+  background: rgba(52, 38, 12, 0.04);
+}
+
+.askem-feedback-attachment-remove {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--askem-muted);
+  cursor: pointer;
+  font: 600 10px/1 var(--askem-font-sans);
+}
+
+.askem-feedback-attachment-remove:hover {
+  color: var(--askem-ink);
+}
+
+.askem-feedback-attachment-remove:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .askem-feedback-log-note {
   margin-top: 12px;
   padding: 10px 0 0;
@@ -354,4 +461,16 @@
 
 .askem-feedback-error {
   color: #9d3c10;
+}
+
+@media (max-width: 420px) {
+  .askem-feedback-attachments-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .askem-feedback-upload,
+  .askem-feedback-upload-cap {
+    align-self: flex-start;
+  }
 }

@@ -36,8 +36,9 @@ export function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => 
           <h3>4. Optional Support Submissions</h3>
           <p>
             If you choose to send feedback or request additional providers, the information you
-            submit is sent to an ask&apos;em-operated support service. Optional debug logs are only
-            included when you explicitly choose to attach them.
+            submit is sent to an ask&apos;em-operated support service. Feedback can include the
+            message you write, screenshots you choose to attach, and optional debug logs when you
+            explicitly choose to include them.
           </p>
 
           <h3>5. User Responsibilities</h3>
@@ -76,8 +77,9 @@ export function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => 
           <h3>2. Optional Remote Submissions</h3>
           <p>
             If you choose to send feedback or request more providers, that submission is sent to an
-            ask&apos;em-operated support endpoint. Feedback can include the message you write and, if
-            you opt in, a snapshot of local debug logs.
+            ask&apos;em-operated support endpoint. Feedback can include the message you write,
+            screenshots you attach, and, for bug reports, a snapshot of local debug logs if you opt
+            in.
           </p>
 
           <h3>3. What Stays Out of Our Servers</h3>

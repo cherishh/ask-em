@@ -4,6 +4,7 @@ This project uses:
 
 - `Supabase Edge Functions` for the public HTTP endpoint
 - `Supabase Postgres` for storing feedback and provider requests
+- `Supabase Storage` for optional feedback screenshots
 
 ## Layout
 
