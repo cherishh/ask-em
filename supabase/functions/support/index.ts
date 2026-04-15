@@ -430,7 +430,7 @@ async function handleFeedback(body: unknown, attachmentFiles: File[]) {
 
     const { error: attachmentRowsError } = await supabase.from('feedback_attachments').insert(uploaded.rows);
     if (attachmentRowsError) {
-      await cleanupFeedbackSubmission(supabase, feedbackSubmission.id, uploadedPaths);
+      await cleanupFeedbackSubmission(supabase, feedbackSubmission.id, uploaded.uploadedPaths);
       return json({ ok: false, error: attachmentRowsError.message }, 500);
     }
   }
