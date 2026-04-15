@@ -284,18 +284,61 @@
   box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.12);
 }
 
-.askem-feedback-log-toggle {
+.askem-feedback-log-note {
+  margin-top: 12px;
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(35, 25, 8, 0.07);
+}
+
+.askem-feedback-log-copy {
+  min-width: 0;
+}
+
+.askem-feedback-log-kicker {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 10px;
-  opacity: 0.62;
-  color: var(--askem-muted);
-  font: 500 10px/1.2 var(--askem-font-sans);
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: rgba(94, 93, 89, 0.8);
+  cursor: pointer;
+  font: 700 9px/1 var(--askem-font-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: color 140ms ease;
 }
 
-.askem-feedback-log-toggle input {
-  transform: scale(0.88);
+.askem-feedback-log-kicker::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(94, 93, 89, 0.32);
+}
+
+.askem-feedback-log-note.is-attached .askem-feedback-log-kicker::before {
+  background: rgba(201, 100, 66, 0.38);
+}
+
+.askem-feedback-log-kicker:hover {
+  color: var(--askem-ink);
+}
+
+.askem-feedback-log-kicker:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.askem-feedback-log-copy p {
+  margin: 4px 0 0;
+  color: rgba(94, 93, 89, 0.88);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.askem-feedback-log-note.is-detached .askem-feedback-log-copy p {
+  color: rgba(94, 93, 89, 0.72);
 }
 
 .askem-feedback-note,

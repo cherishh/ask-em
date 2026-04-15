@@ -47,6 +47,7 @@ export function AdvancedView(props: {
   recordingShortcutId: ShortcutId | null;
   logActionBusy: boolean;
   autoSyncNewChatsEnabled: boolean;
+  showDiagnostics: boolean;
   onOpenRequestModal: () => void;
   onToggleDefaultProvider: (provider: Provider) => void;
   onToggleAutoSyncNewChats: () => void;
@@ -65,12 +66,12 @@ export function AdvancedView(props: {
     <>
       <section className="askem-advanced-heading">
         <div>
-          <h2>Advanced Tools</h2>
+          <h2>Settings</h2>
         </div>
       </section>
 
       <section className="askem-card askem-unified-settings">
-        <p className="askem-card-label">Settings</p>
+        <p className="askem-card-label">Preferences</p>
 
         <div className="askem-us-group">
           <div className="askem-us-row-header">
@@ -208,58 +209,60 @@ export function AdvancedView(props: {
         </div>
       </section>
 
-      <section className="askem-card askem-logs-card">
-        <div className="askem-debug-top">
-          <div className="askem-debug-copy">
-            <p className="askem-card-label">Diagnostics</p>
-            <h2>Bug Report Trace</h2>
-            <p className="askem-card-copy">Turn this on only when you need to report a bug.</p>
-          </div>
-          <div className="askem-log-actions">
-            <button
-              className={`askem-provider-chip askem-log-toggle ${props.status?.debugLoggingEnabled ? 'is-active' : ''}`}
-              onClick={props.onToggleDebugLogging}
-              disabled={props.logActionBusy}
-            >
-              <span>Trace</span>
-              <span>{props.status?.debugLoggingEnabled ? 'on' : 'off'}</span>
-            </button>
-            {props.status?.debugLoggingEnabled ? (
-              <>
-                <button
-                  className="askem-provider-clear"
-                  onClick={props.onDownloadLogs}
-                  disabled={props.logActionBusy}
-                >
-                  Download Logs
-                </button>
-                <button
-                  className="askem-provider-clear"
-                  onClick={props.onClearLogs}
-                  disabled={props.logActionBusy}
-                >
-                  Clear Logs
-                </button>
-              </>
-            ) : null}
-          </div>
-        </div>
-        {props.status?.debugLoggingEnabled ? (
-          <div className="askem-logs-panel">
-            <div className="askem-logs-list">
-              {props.status?.recentLogs.length ? (
-                props.status.recentLogs.map((log) => <LogRow key={log.id} log={log} />)
-              ) : (
-                <p className="askem-logs-empty">Trace is on, but nothing has been captured yet.</p>
-              )}
+      {props.showDiagnostics ? (
+        <section className="askem-card askem-logs-card">
+          <div className="askem-debug-top">
+            <div className="askem-debug-copy">
+              <p className="askem-card-label">Diagnostics</p>
+              <h2>Bug Report Trace</h2>
+              <p className="askem-card-copy">Turn this on only when you need to report a bug.</p>
+            </div>
+            <div className="askem-log-actions">
+              <button
+                className={`askem-provider-chip askem-log-toggle ${props.status?.debugLoggingEnabled ? 'is-active' : ''}`}
+                onClick={props.onToggleDebugLogging}
+                disabled={props.logActionBusy}
+              >
+                <span>Trace</span>
+                <span>{props.status?.debugLoggingEnabled ? 'on' : 'off'}</span>
+              </button>
+              {props.status?.debugLoggingEnabled ? (
+                <>
+                  <button
+                    className="askem-provider-clear"
+                    onClick={props.onDownloadLogs}
+                    disabled={props.logActionBusy}
+                  >
+                    Download Logs
+                  </button>
+                  <button
+                    className="askem-provider-clear"
+                    onClick={props.onClearLogs}
+                    disabled={props.logActionBusy}
+                  >
+                    Clear Logs
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
-        ) : (
-          <p className="askem-settings-note">
-            Turn it on only when something breaks, then export the JSON file.
-          </p>
-        )}
-      </section>
+          {props.status?.debugLoggingEnabled ? (
+            <div className="askem-logs-panel">
+              <div className="askem-logs-list">
+                {props.status?.recentLogs.length ? (
+                  props.status.recentLogs.map((log) => <LogRow key={log.id} log={log} />)
+                ) : (
+                  <p className="askem-logs-empty">Trace is on, but nothing has been captured yet.</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="askem-settings-note">
+              Turn it on only when something breaks, then export the JSON file.
+            </p>
+          )}
+        </section>
+      ) : null}
 
       <footer className="askem-footer">
         <div className="askem-legal-links">

@@ -88,6 +88,7 @@ export type StatusResponseMessage = {
   globalSyncEnabled: boolean;
   autoSyncNewChatsEnabled: boolean;
   debugLoggingEnabled: boolean;
+  showDiagnostics: boolean;
   closeTabsOnDeleteSet: boolean;
   workspaceLimit: number;
   defaultEnabledProviders: DefaultEnabledProviders;
@@ -146,6 +147,11 @@ export type SetWorkspaceProviderEnabledMessage = {
 
 export type SetDebugLoggingEnabledMessage = {
   type: 'SET_DEBUG_LOGGING_ENABLED';
+  enabled: boolean;
+};
+
+export type SetShowDiagnosticsMessage = {
+  type: 'SET_SHOW_DIAGNOSTICS';
   enabled: boolean;
 };
 
@@ -219,6 +225,7 @@ export type RuntimeMessage =
   | SetWorkspaceProviderEnabledMessage
   | SetAutoSyncNewChatsEnabledMessage
   | SetGlobalSyncEnabledMessage
+  | SetShowDiagnosticsMessage
   | SetCloseTabsOnDeleteSetMessage
   | SetShortcutsMessage
   | SwitchProviderTabMessage

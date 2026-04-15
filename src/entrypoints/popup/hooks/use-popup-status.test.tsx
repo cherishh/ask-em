@@ -44,6 +44,7 @@ describe('usePopupStatus', () => {
     popupRuntimeMocks.requestStatus.mockResolvedValue({
       workspaces: [],
       globalSyncEnabled: true,
+      autoSyncNewChatsEnabled: true,
       defaultEnabledProviders: {
         claude: true,
         chatgpt: true,
@@ -51,10 +52,13 @@ describe('usePopupStatus', () => {
         deepseek: true,
         manus: true,
       },
-      canStartNewSet: true,
       shortcuts: undefined,
       debugLoggingEnabled: false,
+      showDiagnostics: false,
       closeTabsOnDeleteSet: false,
+      workspaceLimit: 3,
+      recentLogs: [],
+      type: 'STATUS_RESPONSE',
     });
 
     const sendMessage = vi.fn().mockRejectedValue(new Error('fail'));
@@ -82,6 +86,7 @@ describe('usePopupStatus', () => {
       .mockResolvedValueOnce({
         workspaces: [],
         globalSyncEnabled: true,
+        autoSyncNewChatsEnabled: true,
         defaultEnabledProviders: {
           claude: true,
           chatgpt: true,
@@ -91,11 +96,16 @@ describe('usePopupStatus', () => {
         },
         shortcuts: undefined,
         debugLoggingEnabled: false,
+        showDiagnostics: false,
         closeTabsOnDeleteSet: false,
+        workspaceLimit: 3,
+        recentLogs: [],
+        type: 'STATUS_RESPONSE',
       })
       .mockResolvedValueOnce({
         workspaces: [],
         globalSyncEnabled: true,
+        autoSyncNewChatsEnabled: true,
         defaultEnabledProviders: {
           claude: true,
           chatgpt: true,
@@ -105,7 +115,11 @@ describe('usePopupStatus', () => {
         },
         shortcuts: undefined,
         debugLoggingEnabled: false,
+        showDiagnostics: false,
         closeTabsOnDeleteSet: false,
+        workspaceLimit: 3,
+        recentLogs: [],
+        type: 'STATUS_RESPONSE',
       });
 
     const sendMessage = vi.fn().mockResolvedValue({ ok: true });
@@ -165,6 +179,66 @@ describe('usePopupStatus', () => {
       await flushMicrotasks();
     });
 
+    expect(popupRuntimeMocks.requestStatus).toHaveBeenCalledTimes(2);
+    hook.unmount();
+  });
+
+  it('toggles diagnostics visibility through the runtime and refreshes status', async () => {
+    popupRuntimeMocks.requestStatus
+      .mockResolvedValueOnce({
+        type: 'STATUS_RESPONSE',
+        workspaces: [],
+        globalSyncEnabled: true,
+        autoSyncNewChatsEnabled: true,
+        defaultEnabledProviders: {
+          claude: true,
+          chatgpt: true,
+          gemini: true,
+          deepseek: true,
+          manus: true,
+        },
+        shortcuts: undefined,
+        debugLoggingEnabled: true,
+        showDiagnostics: false,
+        closeTabsOnDeleteSet: false,
+        workspaceLimit: 3,
+        recentLogs: [],
+      })
+      .mockResolvedValueOnce({
+        type: 'STATUS_RESPONSE',
+        workspaces: [],
+        globalSyncEnabled: true,
+        autoSyncNewChatsEnabled: true,
+        defaultEnabledProviders: {
+          claude: true,
+          chatgpt: true,
+          gemini: true,
+          deepseek: true,
+          manus: true,
+        },
+        shortcuts: undefined,
+        debugLoggingEnabled: true,
+        showDiagnostics: true,
+        closeTabsOnDeleteSet: false,
+        workspaceLimit: 3,
+        recentLogs: [],
+      });
+
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const hook = renderHookHarness(() => usePopupStatus());
+    await flushMicrotasks();
+
+    await act(async () => {
+      await hook.current.toggleShowDiagnostics();
+    });
+
+    expect(sendMessage).toHaveBeenCalledWith({ type: 'SET_SHOW_DIAGNOSTICS', enabled: true });
     expect(popupRuntimeMocks.requestStatus).toHaveBeenCalledTimes(2);
     hook.unmount();
   });

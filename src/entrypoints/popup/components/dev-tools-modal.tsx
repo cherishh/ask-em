@@ -1,9 +1,11 @@
 export function DevToolsModal(props: {
   open: boolean;
   busy: boolean;
+  showDiagnostics: boolean;
   onClose: () => void;
   onClearPersistentStorage: () => void;
   onResetRequestCooldown: () => void;
+  onToggleShowDiagnostics: () => void;
 }) {
   if (!props.open) {
     return null;
@@ -36,6 +38,23 @@ export function DevToolsModal(props: {
           </button>
         </div>
         <div className="askem-dev-list">
+          <div className="askem-dev-row">
+            <div className="askem-dev-copy">
+              <p className="askem-dev-title">Show Diagnostics card</p>
+              <span className="askem-dev-desc">
+                Reveal the Diagnostics section in Settings without changing trace defaults.
+              </span>
+            </div>
+            <button
+              className={`askem-provider-chip ${props.showDiagnostics ? 'is-active' : ''}`}
+              onClick={props.onToggleShowDiagnostics}
+              disabled={props.busy}
+              type="button"
+            >
+              <span>Diagnostics</span>
+              <span>{props.showDiagnostics ? 'on' : 'off'}</span>
+            </button>
+          </div>
           <div className="askem-dev-row">
             <div className="askem-dev-copy">
               <p className="askem-dev-title">Clear persistent storage</p>

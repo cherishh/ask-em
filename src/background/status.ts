@@ -56,6 +56,7 @@ export async function handleGetStatus(): Promise<StatusResponseMessage> {
     globalSyncEnabled: localState.globalSyncEnabled,
     autoSyncNewChatsEnabled: localState.autoSyncNewChatsEnabled,
     debugLoggingEnabled: localState.debugLoggingEnabled,
+    showDiagnostics: localState.showDiagnostics,
     closeTabsOnDeleteSet: localState.closeTabsOnDeleteSet ?? false,
     workspaceLimit: MAX_WORKSPACES,
     defaultEnabledProviders: localState.defaultEnabledProviders,

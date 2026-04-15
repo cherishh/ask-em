@@ -25,6 +25,7 @@ import {
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
   handleSetGlobalSyncEnabled,
+  handleSetShowDiagnostics,
   handleResetIndicatorPositions,
   handleSetShortcuts,
   handleSetWorkspaceProviderEnabled,
@@ -56,6 +57,7 @@ export {
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
   handleSetGlobalSyncEnabled,
+  handleSetShowDiagnostics,
   handleResetIndicatorPositions,
   handleSetShortcuts,
   handleSetWorkspaceProviderEnabled,
@@ -133,6 +135,9 @@ export default defineBackground(() => {
           return;
         case 'SET_DEBUG_LOGGING_ENABLED':
           sendResponse(await handleSetDebugLoggingEnabled(message));
+          return;
+        case 'SET_SHOW_DIAGNOSTICS':
+          sendResponse(await handleSetShowDiagnostics(message));
           return;
         case 'LOG_DEBUG':
           sendResponse(await handleDebugLog(message));

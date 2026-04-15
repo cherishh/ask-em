@@ -193,6 +193,17 @@ export async function handleSetDebugLoggingEnabled(
   return { ok: true };
 }
 
+export async function handleSetShowDiagnostics(
+  message: Extract<RuntimeMessage, { type: 'SET_SHOW_DIAGNOSTICS' }>,
+) {
+  const localState = await getLocalState();
+  await setLocalState({
+    ...localState,
+    showDiagnostics: message.enabled,
+  });
+  return { ok: true };
+}
+
 export async function handleSetCloseTabsOnDeleteSet(
   message: Extract<RuntimeMessage, { type: 'SET_CLOSE_TABS_ON_DELETE_SET' }>,
 ) {

@@ -39,6 +39,7 @@ export function makeLocalState(overrides: Partial<LocalState> = {}): LocalState 
     globalSyncEnabled: true,
     autoSyncNewChatsEnabled: true,
     debugLoggingEnabled: true,
+    showDiagnostics: false,
     closeTabsOnDeleteSet: false,
     defaultEnabledProviders: createDefaultEnabledProviders(),
     shortcuts: DEFAULT_SHORTCUTS,

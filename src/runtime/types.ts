@@ -64,6 +64,7 @@ export type LocalState = {
   globalSyncEnabled: boolean;
   autoSyncNewChatsEnabled: boolean;
   debugLoggingEnabled: boolean;
+  showDiagnostics: boolean;
   closeTabsOnDeleteSet: boolean;
   defaultEnabledProviders: DefaultEnabledProviders;
   shortcuts: ShortcutConfig;

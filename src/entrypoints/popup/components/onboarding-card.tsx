@@ -55,7 +55,7 @@ export function OnboardingCard({ providers }: { providers: Provider[] }) {
               </button>
             ))
           ) : (
-            <span className="askem-onboarding-empty">Enable a default model in Advanced.</span>
+            <span className="askem-onboarding-empty">Enable a default model in Settings.</span>
           )}
         </div>
       </div>

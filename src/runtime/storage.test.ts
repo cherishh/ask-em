@@ -61,6 +61,7 @@ describe('storage update queues', () => {
     await storage.setLocalState({
       ...storage.DEFAULT_LOCAL_STATE,
       debugLoggingEnabled: true,
+      showDiagnostics: false,
     });
 
     const first = storage.updateLocalState(async (state) => {
@@ -82,6 +83,7 @@ describe('storage update queues', () => {
     deferred.resolve({
       ...storage.DEFAULT_LOCAL_STATE,
       debugLoggingEnabled: true,
+      showDiagnostics: false,
       debugLogs: [
         {
           id: 'log-1',

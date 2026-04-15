@@ -270,6 +270,7 @@ describe('workspace state', () => {
       globalSyncEnabled: true,
       autoSyncNewChatsEnabled: true,
       debugLoggingEnabled: false,
+      showDiagnostics: false,
       closeTabsOnDeleteSet: false,
       defaultEnabledProviders: createDefaultEnabledProviders(),
       shortcuts: DEFAULT_SHORTCUTS,

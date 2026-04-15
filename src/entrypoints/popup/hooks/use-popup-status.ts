@@ -147,6 +147,14 @@ export function usePopupStatus() {
     }, { silentRefresh: true });
   }, [sendRuntimeMessage, status?.closeTabsOnDeleteSet]);
 
+  const toggleShowDiagnostics = useCallback(async () => {
+    const nextEnabled = !status?.showDiagnostics;
+    await sendRuntimeMessage({
+      type: 'SET_SHOW_DIAGNOSTICS',
+      enabled: nextEnabled,
+    }, { silentRefresh: true });
+  }, [sendRuntimeMessage, status?.showDiagnostics]);
+
   const updateShortcut = useCallback(async (id: ShortcutId, binding: ShortcutBinding) => {
     const next = { ...resolvedShortcuts, [id]: binding };
     setShortcuts(next);
@@ -180,6 +188,7 @@ export function usePopupStatus() {
     toggleAutoSyncNewChats,
     toggleGlobalSync,
     toggleCloseTabsOnDeleteSet,
+    toggleShowDiagnostics,
     updateShortcut,
     resetShortcuts,
     resetIndicatorPositions,

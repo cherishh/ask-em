@@ -39,6 +39,7 @@ export default function App() {
     toggleAutoSyncNewChats,
     toggleGlobalSync,
     toggleCloseTabsOnDeleteSet,
+    toggleShowDiagnostics,
     updateShortcut,
     resetShortcuts,
     resetIndicatorPositions,
@@ -149,7 +150,7 @@ export default function App() {
             onClick={() => setActiveView('settings')}
             type="button"
           >
-            Advanced
+            Settings
           </button>
         </nav>
 
@@ -181,6 +182,7 @@ export default function App() {
             recordingShortcutId={recordingShortcutId}
             logActionBusy={logActionBusy}
             autoSyncNewChatsEnabled={autoSyncNewChatsEnabled}
+            showDiagnostics={status?.showDiagnostics ?? false}
             onOpenRequestModal={openRequestModal}
             onToggleDefaultProvider={(provider) => void toggleDefaultProvider(provider)}
             onToggleAutoSyncNewChats={() => void toggleAutoSyncNewChats()}
@@ -242,9 +244,11 @@ export default function App() {
       <DevToolsModal
         open={devModalOpen}
         busy={devActionBusy}
+        showDiagnostics={status?.showDiagnostics ?? false}
         onClose={() => setDevModalOpen(false)}
         onClearPersistentStorage={() => void handleClearPersistentStorage()}
         onResetRequestCooldown={resetRequestCooldownForDev}
+        onToggleShowDiagnostics={() => void toggleShowDiagnostics()}
       />
     </main>
   );
