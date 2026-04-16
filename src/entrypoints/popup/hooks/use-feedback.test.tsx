@@ -229,6 +229,28 @@ describe('useFeedback', () => {
     });
     expect(attachments).toHaveLength(0);
 
+    await act(async () => {
+      hook.current.resetFeedback();
+      hook.current.selectFeedbackKind('feature-request');
+      hook.current.setFeatureRequestChoice('image-paste');
+    });
+
+    await act(async () => {
+      await hook.current.submitFeedback();
+    });
+
+    [, init] = vi.mocked(globalThis.fetch).mock.calls[2];
+    ({ payload, attachments } = readPayloadFromFormData(init?.body));
+
+    expect(payload).toMatchObject({
+      kind: 'feature-request',
+      message: 'Image paste',
+      includeLogs: false,
+      featureRequestChoice: 'image-paste',
+      featureRequestDetail: null,
+    });
+    expect(attachments).toHaveLength(0);
+
     hook.unmount();
   });
 

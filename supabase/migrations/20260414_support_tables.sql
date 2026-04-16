@@ -13,6 +13,7 @@ create table if not exists public.feedback_submissions (
       'incognito-chat',
       'more-providers',
       'switch-models',
+      'image-paste',
       'custom'
     )
   ),

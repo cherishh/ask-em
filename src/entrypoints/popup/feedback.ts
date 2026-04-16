@@ -11,6 +11,7 @@ export type FeatureRequestChoice =
   | 'incognito-chat'
   | 'more-providers'
   | 'switch-models'
+  | 'image-paste'
   | 'custom';
 
 export const FEEDBACK_KIND_OPTIONS: Array<{
@@ -59,6 +60,11 @@ export const FEATURE_REQUEST_OPTIONS: Array<{
     choice: 'switch-models',
     label: 'Switch models',
     description: 'Choose different models or plan tiers inside one provider.',
+  },
+  {
+    choice: 'image-paste',
+    label: 'Image pasting',
+    description: 'Sync images you paste into a chat',
   },
   {
     choice: 'custom',

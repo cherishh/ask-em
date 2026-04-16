@@ -22,6 +22,7 @@ const FEATURE_REQUEST_CHOICES = new Set([
   'incognito-chat',
   'more-providers',
   'switch-models',
+  'image-paste',
   'custom',
 ]);
 
