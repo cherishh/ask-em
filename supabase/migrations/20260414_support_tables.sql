@@ -29,6 +29,9 @@ create table if not exists public.feedback_logs (
   created_at timestamptz not null default now()
 );
 
+alter table if exists public.feedback_submissions enable row level security;
+alter table if exists public.feedback_logs enable row level security;
+
 create index if not exists idx_feedback_submissions_created_at
   on public.feedback_submissions(created_at desc);
 
@@ -46,6 +49,8 @@ create table if not exists public.feedback_attachments (
   created_at timestamptz not null default now()
 );
 
+alter table if exists public.feedback_attachments enable row level security;
+
 create index if not exists idx_feedback_attachments_feedback_id_sort_order
   on public.feedback_attachments(feedback_id, sort_order);
 
@@ -56,6 +61,8 @@ create table if not exists public.provider_requests (
   extension_version text null,
   created_at timestamptz not null default now()
 );
+
+alter table if exists public.provider_requests enable row level security;
 
 create index if not exists idx_provider_requests_submission_id
   on public.provider_requests(submission_id);
