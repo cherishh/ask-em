@@ -16,7 +16,7 @@ describe('provider attachment capability gate', () => {
     ).toEqual({ ok: true });
   });
 
-  it('uses extension fallback only for generic MIME types', () => {
+  it('uses document extension fallback even when MIME is generic or vendor-specific', () => {
     expect(
       checkProviderAttachmentCapability('chatgpt', [
         { id: 'a1', name: 'sample.pdf', mime: 'application/octet-stream', size: 100 },
@@ -27,13 +27,28 @@ describe('provider attachment capability gate', () => {
       checkProviderAttachmentCapability('chatgpt', [
         { id: 'a1', name: 'sample.pdf', mime: 'application/x-custom', size: 100 },
       ]),
-    ).toEqual({
-      ok: false,
-      reason: 'chatgpt attachment type not supported',
-    });
+    ).toEqual({ ok: true });
   });
 
-  it('rejects empty MIME and missing extension', () => {
+  it('allows source-confirmed plain text even for code and config files', () => {
+    expect(
+      checkProviderAttachmentCapability('claude', [
+        { id: 'a1', name: '.env', mime: 'application/octet-stream', size: 100, isPlainText: true },
+        { id: 'a2', name: 'component.tsx', mime: 'application/x-custom', size: 100, isPlainText: true },
+      ]),
+    ).toEqual({ ok: true });
+  });
+
+  it('allows text MIME and extension fallbacks when source sniffing is unavailable', () => {
+    expect(
+      checkProviderAttachmentCapability('claude', [
+        { id: 'a1', name: 'settings.conf', mime: 'application/octet-stream', size: 100 },
+        { id: 'a2', name: 'payload', mime: 'application/json', size: 100 },
+      ]),
+    ).toEqual({ ok: true });
+  });
+
+  it('rejects empty MIME and missing extension unless source confirmed plain text', () => {
     expect(
       checkProviderAttachmentCapability('gemini', [
         { id: 'a1', name: 'clipboard-file', mime: '', size: 100 },
@@ -44,11 +59,20 @@ describe('provider attachment capability gate', () => {
     });
   });
 
-  it('rejects mixed batches all-or-nothing', () => {
+  it('rejects blacklisted media and binary batches all-or-nothing', () => {
     expect(
       checkProviderAttachmentCapability('deepseek', [
         { id: 'a1', name: 'ok.png', mime: 'image/png', size: 100 },
         { id: 'a2', name: 'bad.zip', mime: 'application/zip', size: 100 },
+      ]),
+    ).toEqual({
+      ok: false,
+      reason: 'deepseek attachment type not supported',
+    });
+
+    expect(
+      checkProviderAttachmentCapability('deepseek', [
+        { id: 'a1', name: 'movie.mp4', mime: 'video/mp4', size: 100, isPlainText: true },
       ]),
     ).toEqual({
       ok: false,

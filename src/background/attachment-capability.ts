@@ -1,7 +1,10 @@
 import {
   ATTACHMENT_MAX_COUNT,
+  IMAGE_ATTACHMENT_MIME_PREFIX,
   getAttachmentExtension,
   isGenericAttachmentMime,
+  isTextAttachmentExtension,
+  isTextAttachmentMime,
   PROVIDER_UPLOAD_CAPABILITIES,
   type AttachmentRef,
   type Provider,
@@ -17,22 +20,54 @@ function isAttachmentAllowedByCapability(
   capability: Exclude<UploadCapability, null>,
 ): boolean {
   const mime = attachment.mime.trim().toLowerCase();
-  const allowedMimes = new Set(capability.mimes.map((value) => value.toLowerCase()));
+  const extension = getAttachmentExtension(attachment.name);
+  const blockedMimes = new Set((capability.blockedMimes ?? []).map((value) => value.toLowerCase()));
+  const blockedExtensions = new Set((capability.blockedExtensions ?? []).map((value) => value.toLowerCase()));
 
-  if (mime && !isGenericAttachmentMime(mime) && allowedMimes.has(mime)) {
+  if (extension && blockedExtensions.has(extension)) {
+    return false;
+  }
+
+  if (
+    mime &&
+    !isGenericAttachmentMime(mime) &&
+    (blockedMimes.has(mime) ||
+      (capability.blockedMimePrefixes ?? []).some((prefix) => mime.startsWith(prefix.toLowerCase())))
+  ) {
+    return false;
+  }
+
+  if (capability.allowImages && mime.startsWith(IMAGE_ATTACHMENT_MIME_PREFIX)) {
     return true;
   }
 
-  if (!isGenericAttachmentMime(mime)) {
+  const documentMimes = new Set((capability.documentMimes ?? []).map((value) => value.toLowerCase()));
+  if (mime && documentMimes.has(mime)) {
+    return true;
+  }
+
+  const documentExtensions = new Set((capability.documentExtensions ?? []).map((value) => value.toLowerCase()));
+  if (extension && documentExtensions.has(extension)) {
+    return true;
+  }
+
+  if (!capability.allowPlainText) {
     return false;
   }
 
-  const extension = getAttachmentExtension(attachment.name);
-  if (!extension) {
+  if (attachment.isPlainText === true) {
+    return true;
+  }
+
+  if (attachment.isPlainText === false) {
     return false;
   }
 
-  return (capability.extensions ?? []).some((value) => value.toLowerCase() === extension);
+  if (mime && isTextAttachmentMime(mime)) {
+    return true;
+  }
+
+  return isTextAttachmentExtension(extension);
 }
 
 export function checkProviderAttachmentCapability(

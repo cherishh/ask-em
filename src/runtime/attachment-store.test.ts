@@ -384,12 +384,30 @@ describe('attachment store', () => {
     expect(indexedDb.data.has('a1')).toBe(false);
   });
 
-  it('clears attachments for owner tab close and persistent storage reset', async () => {
+  it('clears only writing attachments for owner tab close and persistent storage reset', async () => {
     const store = await import('./attachment-store');
 
     await store.createAttachment({
       submitId: 'submit-1',
       ref: makeRef({ id: 'a1' }),
+      ownerTabId: 9,
+    });
+    await store.bindAttachments('submit-1', 'w1');
+    await store.createAttachment({
+      submitId: 'submit-4',
+      ref: makeRef({ id: 'a4' }),
+      ownerTabId: 9,
+    });
+    await store.appendAttachmentChunk({
+      submitId: 'submit-4',
+      attachmentId: 'a4',
+      offset: 0,
+      chunkBase64: bytesToBase64(new Uint8Array([1, 2, 3, 4])),
+    });
+    await store.finalizeAttachment({ submitId: 'submit-4', attachmentId: 'a4' });
+    await store.createAttachment({
+      submitId: 'submit-3',
+      ref: makeRef({ id: 'a3' }),
       ownerTabId: 9,
     });
     await store.createAttachment({
@@ -399,7 +417,9 @@ describe('attachment store', () => {
     });
 
     expect(await store.sweepAttachmentsByOwnerTab(9)).toBe(1);
-    expect(await store.getAttachmentMetadata('a1')).toBeNull();
+    expect(await store.getAttachmentMetadata('a1')).not.toBeNull();
+    expect(await store.getAttachmentMetadata('a4')).not.toBeNull();
+    expect(await store.getAttachmentMetadata('a3')).toBeNull();
     expect(await store.getAttachmentMetadata('a2')).not.toBeNull();
 
     await store.clearAllAttachments();

@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { claudeAdapter } from './claude';
+import { installFileInputDeliveryBridge } from '../content/file-input-delivery-main';
 
 function mockVisibleLayout() {
   return vi
@@ -23,10 +24,12 @@ function mockVisibleLayout() {
 
 describe('Claude attachment delivery adapter', () => {
   let rectSpy: ReturnType<typeof vi.spyOn>;
+  let uninstallFileInputDeliveryBridge: () => void;
 
   beforeEach(() => {
     document.body.innerHTML = '';
     rectSpy = mockVisibleLayout();
+    uninstallFileInputDeliveryBridge = installFileInputDeliveryBridge();
     vi.stubGlobal('chrome', {
       runtime: {
         sendMessage: vi.fn(async () => ({
@@ -44,6 +47,7 @@ describe('Claude attachment delivery adapter', () => {
   });
 
   afterEach(() => {
+    uninstallFileInputDeliveryBridge();
     rectSpy.mockRestore();
     vi.unstubAllGlobals();
   });
@@ -87,5 +91,106 @@ describe('Claude attachment delivery adapter', () => {
       count: 1,
       keys: ['Remove sample.pdf attachment'],
     });
+  });
+
+  it('reports attachment presence from Claude file cards that show the expected filename', async () => {
+    document.body.innerHTML = `
+      <fieldset>
+        <input data-testid="file-upload" aria-label="Upload files" type="file" />
+        <div>
+          <div data-testid="file-thumbnail">
+            <button>
+              <h3>潜规则-中国古代<br />官民互动.md</h3>
+              <p>MD</p>
+            </button>
+          </div>
+          <div>
+            <div data-testid="chat-input" contenteditable="true"></div>
+            <button type="button" aria-label="Send message"></button>
+          </div>
+        </div>
+      </fieldset>
+    `;
+
+    await expect(Promise.resolve(claudeAdapter.composer?.getComposerAttachmentPresence?.([
+      {
+        id: 'a1',
+        name: '潜规则-中国古代官民互动.md',
+        mime: 'text/markdown',
+        size: 3,
+      },
+    ]))).resolves.toMatchObject({
+      count: 1,
+    });
+  });
+
+  it('reads submit-time source attachment snapshots from Claude file cards', () => {
+    document.body.innerHTML = `
+      <fieldset>
+        <input data-testid="file-upload" aria-label="Upload files" type="file" />
+        <div data-testid="file-thumbnail">
+          <button>
+            <h3>潜规则-中国古代<br />官民互动.md</h3>
+            <p>MD</p>
+          </button>
+        </div>
+        <div data-testid="chat-input" contenteditable="true"></div>
+      </fieldset>
+    `;
+
+    expect(claudeAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: '潜规则-中国古代官民互动.md',
+        mime: 'text/markdown',
+        size: 3,
+        source: 'file-input',
+        file: new File(['abc'], '潜规则-中国古代官民互动.md', { type: 'text/markdown' }),
+      },
+    ])).toMatchObject({
+      count: 1,
+      items: [expect.stringContaining('潜规则-中国古代')],
+    });
+  });
+
+  it('returns an empty source snapshot after Claude file cards are removed', () => {
+    document.body.innerHTML = `
+      <fieldset>
+        <input data-testid="file-upload" aria-label="Upload files" type="file" />
+        <div data-testid="chat-input" contenteditable="true"></div>
+      </fieldset>
+    `;
+
+    expect(claudeAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: 'removed.md',
+        mime: 'text/markdown',
+        size: 3,
+        source: 'file-input',
+        file: new File(['abc'], 'removed.md', { type: 'text/markdown' }),
+      },
+    ])).toEqual({
+      count: 0,
+      items: [],
+    });
+  });
+
+  it('clicks Claude send buttons with current aria labels', async () => {
+    document.body.innerHTML = `
+      <form>
+        <div data-testid="chat-input" contenteditable="true"></div>
+        <button type="button" aria-label="Send"></button>
+      </form>
+    `;
+    const button = document.querySelector('button') as HTMLButtonElement;
+    let clicked = false;
+    button.addEventListener('click', () => {
+      clicked = true;
+    });
+
+    await claudeAdapter.composer?.submit({ timeoutMs: 250 });
+
+    expect(clicked).toBe(true);
   });
 });

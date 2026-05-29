@@ -2,9 +2,12 @@ import type { ProviderAdapter, UserSubmissionPayload } from '../adapters/types';
 import {
   ATTACHMENT_CHUNK_BYTES,
   ATTACHMENT_MAX_COUNT,
+  ATTACHMENT_MAX_FILE_BYTES,
   type AttachmentRef,
   type CapturedAttachment,
 } from '../runtime/protocol';
+import { formatAttachmentSummary, shortSubmitId } from '../runtime/attachment-log';
+import { isProbablyPlainTextBytes } from '../runtime/attachment-text';
 import { buildUserSubmitMessage, createSubmitId, sendRuntimeMessage } from './routing';
 import type { ContentStateController, SubmitResponse } from './state';
 
@@ -59,14 +62,21 @@ export function createSubmitController(
     }
 
     const refs: AttachmentRef[] = [];
+    let createdAttachment = false;
 
     try {
       for (const attachment of attachments) {
+        if (attachment.size > ATTACHMENT_MAX_FILE_BYTES) {
+          throw new Error('attachment too large');
+        }
+
+        const bytes = new Uint8Array(await attachment.file.arrayBuffer());
         const ref: AttachmentRef = {
           id: attachment.id,
           name: attachment.name,
           mime: attachment.mime,
           size: attachment.size,
+          isPlainText: isProbablyPlainTextBytes(bytes),
         };
 
         const createResponse = await sendRuntimeMessage<{ ok?: boolean; error?: string }>({
@@ -77,8 +87,8 @@ export function createSubmitController(
         if (!createResponse?.ok) {
           throw new Error(createResponse?.error ?? 'failed to create attachment');
         }
+        createdAttachment = true;
 
-        const bytes = new Uint8Array(await attachment.file.arrayBuffer());
         for (let offset = 0; offset < bytes.byteLength; offset += ATTACHMENT_CHUNK_BYTES) {
           const chunk = bytes.subarray(offset, Math.min(offset + ATTACHMENT_CHUNK_BYTES, bytes.byteLength));
           const appendResponse = await sendRuntimeMessage<{ ok?: boolean; error?: string }>({
@@ -107,10 +117,12 @@ export function createSubmitController(
 
       return refs;
     } catch (error) {
-      await sendRuntimeMessage({
-        type: 'ATTACHMENT_ABORT',
-        submitId,
-      });
+      if (createdAttachment) {
+        await sendRuntimeMessage({
+          type: 'ATTACHMENT_ABORT',
+          submitId,
+        });
+      }
       throw error;
     }
   };
@@ -179,7 +191,7 @@ export function createSubmitController(
     await dependencies.logDebug({
       level: 'info',
       message: 'Detected user submit',
-      detail: content.slice(0, 120),
+      detail: `${content.slice(0, 120)}; attachments=${payload.attachments.length}${payload.attachmentResolution ? `; captured=${payload.attachmentResolution.capturedCount}; current=${payload.attachmentResolution.currentCount ?? 'unknown'}` : ''}`,
     });
 
     state.setSyncing();
@@ -187,20 +199,52 @@ export function createSubmitController(
     const submitId = createSubmitId();
     let attachments: AttachmentRef[] = [];
 
+    if (
+      payload.attachmentResolution &&
+      payload.attachmentResolution.capturedCount > 0 &&
+      payload.attachmentResolution.submittedCount === 0 &&
+      payload.attachmentResolution.reason &&
+      payload.attachmentResolution.reason !== 'no-current-attachments'
+    ) {
+      state.showCurrentWarning('attachment sync skipped');
+      await dependencies.logDebug({
+        level: 'warn',
+        message: 'Skipped source attachments before staging',
+        detail: `submit=${shortSubmitId(submitId)}; captured=${payload.attachmentResolution.capturedCount}; current=${payload.attachmentResolution.currentCount ?? 'unknown'}; reason=${payload.attachmentResolution.reason}`,
+      });
+    }
+
     try {
+      if (payload.attachments.length > 0) {
+        await dependencies.logDebug({
+          level: 'info',
+          message: 'Staging submit attachments',
+          detail: `submit=${shortSubmitId(submitId)}; ${formatAttachmentSummary(payload.attachments)}`,
+        });
+      }
+
       attachments = await writeAttachmentsToStore(submitId, payload.attachments);
+
+      if (attachments.length > 0) {
+        await dependencies.logDebug({
+          level: 'info',
+          message: 'Submit attachments ready',
+          detail: `submit=${shortSubmitId(submitId)}; ${formatAttachmentSummary(attachments)}`,
+        });
+      }
     } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
       state.showCurrentWarning(
-        error instanceof Error && error.message === 'too many files'
+        error instanceof Error && reason === 'too many files'
           ? 'too many files'
-          : error instanceof Error && error.message.includes('large')
+          : error instanceof Error && reason.includes('large')
             ? 'attachment too large'
             : 'attachment sync skipped',
       );
       await dependencies.logDebug({
         level: 'warn',
         message: 'Skipped attachment fan-out',
-        detail: `${payload.attachments.length} attachment(s)`,
+        detail: `submit=${shortSubmitId(submitId)}; ${formatAttachmentSummary(payload.attachments)}; reason=${reason}`,
       });
       attachments = [];
     } finally {

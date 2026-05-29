@@ -1,5 +1,9 @@
 import type { CapturedAttachment } from '../runtime/protocol';
 import { getAttachmentExtension } from '../runtime/protocol';
+import type {
+  AttachmentSubmitResolution,
+  ComposerAttachmentSnapshot,
+} from './types';
 
 type AttachmentSource = CapturedAttachment['source'];
 
@@ -102,18 +106,43 @@ export function getFilesFromDataTransfer(dataTransfer: DataTransfer | null | und
     .filter((file): file is File => file instanceof File);
 }
 
+function compactAttachmentText(value: string): string {
+  return value.replace(/\s+/g, '').toLowerCase();
+}
+
+function findCapturedAttachmentForSnapshotItem(
+  attachments: CapturedAttachment[],
+  usedIndexes: Set<number>,
+  item: string,
+): { index: number; attachment: CapturedAttachment } | null {
+  const compactItem = compactAttachmentText(item);
+  if (!compactItem) {
+    return null;
+  }
+
+  for (let index = 0; index < attachments.length; index += 1) {
+    if (usedIndexes.has(index)) {
+      continue;
+    }
+
+    const compactName = compactAttachmentText(attachments[index].name);
+    if (compactName && compactItem.includes(compactName)) {
+      return {
+        index,
+        attachment: attachments[index],
+      };
+    }
+  }
+
+  return null;
+}
+
 export class ComposerAttachmentCaptureBuffer {
   private attachments: CapturedAttachment[] = [];
-  private invalidatedForCurrentMessage = false;
 
   addFiles(files: File[], source: AttachmentSource): CapturedAttachment[] {
     if (files.length === 0) {
       return [];
-    }
-
-    if (this.invalidatedForCurrentMessage) {
-      this.attachments = [];
-      this.invalidatedForCurrentMessage = false;
     }
 
     const captured = normalizeCapturedFiles(files, source);
@@ -122,16 +151,96 @@ export class ComposerAttachmentCaptureBuffer {
   }
 
   getAttachmentsForSubmit(): CapturedAttachment[] {
-    return this.invalidatedForCurrentMessage ? [] : [...this.attachments];
+    return [...this.attachments];
+  }
+
+  resolveAttachmentsForSubmit(
+    snapshot: ComposerAttachmentSnapshot | null,
+  ): AttachmentSubmitResolution {
+    const captured = this.getAttachmentsForSubmit();
+    if (captured.length === 0) {
+      return {
+        attachments: [],
+        capturedCount: 0,
+        currentCount: 0,
+        submittedCount: 0,
+        reason: 'no-captured-attachments',
+      };
+    }
+
+    if (!snapshot) {
+      return {
+        attachments: [],
+        capturedCount: captured.length,
+        currentCount: null,
+        submittedCount: 0,
+        reason: 'missing-source-snapshot',
+      };
+    }
+
+    const snapshotItems = (snapshot.items ?? []).map((item) => item.trim()).filter(Boolean);
+    const currentCount = Math.max(0, snapshot.count, snapshotItems.length);
+    if (currentCount === 0) {
+      return {
+        attachments: [],
+        capturedCount: captured.length,
+        currentCount,
+        submittedCount: 0,
+        reason: 'no-current-attachments',
+      };
+    }
+
+    if (snapshotItems.length > 0) {
+      const usedIndexes = new Set<number>();
+      const matchedAttachments: CapturedAttachment[] = [];
+
+      for (const item of snapshotItems) {
+        const match = findCapturedAttachmentForSnapshotItem(captured, usedIndexes, item);
+        if (!match) {
+          continue;
+        }
+
+        usedIndexes.add(match.index);
+        matchedAttachments.push(match.attachment);
+      }
+
+      if (matchedAttachments.length === currentCount) {
+        return {
+          attachments: matchedAttachments,
+          capturedCount: captured.length,
+          currentCount,
+          submittedCount: matchedAttachments.length,
+        };
+      }
+
+      return {
+        attachments: [],
+        capturedCount: captured.length,
+        currentCount,
+        submittedCount: 0,
+        reason: 'unmatched-current-attachments',
+      };
+    }
+
+    if (currentCount === captured.length) {
+      return {
+        attachments: captured,
+        capturedCount: captured.length,
+        currentCount,
+        submittedCount: captured.length,
+      };
+    }
+
+    return {
+      attachments: [],
+      capturedCount: captured.length,
+      currentCount,
+      submittedCount: 0,
+      reason: 'ambiguous-current-attachments',
+    };
   }
 
   clear() {
     this.attachments = [];
-    this.invalidatedForCurrentMessage = false;
-  }
-
-  invalidateCurrentMessage() {
-    this.attachments = [];
-    this.invalidatedForCurrentMessage = true;
   }
 }

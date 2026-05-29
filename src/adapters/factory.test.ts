@@ -74,18 +74,19 @@ describe('dom provider adapter submit detection', () => {
     const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
     document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    expect(onSubmit).toHaveBeenCalledWith({
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       text: 'hello',
       attachments: [],
       onConsumed: expect.any(Function),
-    });
+    }));
     unsubscribe?.();
   });
 
-  it('captures stable file input changes for the next submit', () => {
+  it('captures stable file input changes when a submit-time source preview is present', () => {
     document.body.innerHTML = `
       <form>
         <div id="composer" contenteditable="true">hello</div>
+        <div data-testid="attachment-card">sample.pdf</div>
         <input id="file" type="file" />
         <button id="send" type="button">Send</button>
       </form>
@@ -111,7 +112,7 @@ describe('dom provider adapter submit detection', () => {
     input.dispatchEvent(new Event('change', { bubbles: true }));
     document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    expect(onSubmit).toHaveBeenCalledWith({
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       text: 'hello',
       attachments: [
         expect.objectContaining({
@@ -123,13 +124,55 @@ describe('dom provider adapter submit detection', () => {
         }),
       ],
       onConsumed: expect.any(Function),
+    }));
+    unsubscribe?.();
+  });
+
+  it('does not trust stale file input files without a submit-time source preview', () => {
+    document.body.innerHTML = `
+      <form>
+        <div id="composer" contenteditable="true">hello</div>
+        <input id="file" type="file" />
+        <button id="send" type="button">Send</button>
+      </form>
+    `;
+
+    const input = document.getElementById('file') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [new File(['abc'], 'stale.pdf', { type: 'application/pdf' })],
     });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 1,
+        currentCount: 0,
+        submittedCount: 0,
+        reason: 'no-current-attachments',
+      }),
+    }));
     unsubscribe?.();
   });
 
   it('captures pasted files for the next submit', () => {
     document.body.innerHTML = `
       <div id="composer" contenteditable="true">hello</div>
+      <div data-testid="attachment-card">pasted.png</div>
       <button id="send">Send</button>
     `;
 
@@ -156,7 +199,7 @@ describe('dom provider adapter submit detection', () => {
     composer.dispatchEvent(pasteEvent);
     document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    expect(onSubmit).toHaveBeenCalledWith({
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       text: 'hello',
       attachments: [
         expect.objectContaining({
@@ -167,13 +210,108 @@ describe('dom provider adapter submit detection', () => {
         }),
       ],
       onConsumed: expect.any(Function),
+    }));
+    unsubscribe?.();
+  });
+
+  it('does not submit stale captured files when the source composer no longer shows them', () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">hello</div>
+      <button id="send">Send</button>
+    `;
+
+    const file = new File(['abc'], 'removed.png', { type: 'image/png' });
+    const composer = document.getElementById('composer') as HTMLElement;
+    const pasteEvent = new Event('paste', { bubbles: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: {
+        files: [file],
+        items: [],
+      },
     });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    composer.dispatchEvent(pasteEvent);
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 1,
+        currentCount: null,
+        submittedCount: 0,
+        reason: 'missing-source-snapshot',
+      }),
+    }));
+    unsubscribe?.();
+  });
+
+  it('uses the submit-time source snapshot to filter removed files', () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">hello</div>
+      <div data-testid="attachment-card">kept.png</div>
+      <button id="send">Send</button>
+    `;
+
+    const composer = document.getElementById('composer') as HTMLElement;
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    for (const file of [
+      new File(['abc'], 'removed.png', { type: 'image/png' }),
+      new File(['abc'], 'kept.png', { type: 'image/png' }),
+    ]) {
+      const pasteEvent = new Event('paste', { bubbles: true });
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: {
+          files: [file],
+          items: [],
+        },
+      });
+      composer.dispatchEvent(pasteEvent);
+    }
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [
+        expect.objectContaining({
+          file: expect.any(File),
+          name: 'kept.png',
+          mime: 'image/png',
+          source: 'paste',
+        }),
+      ],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 2,
+        currentCount: 1,
+        submittedCount: 1,
+      }),
+    }));
     unsubscribe?.();
   });
 
   it('captures bridged transient input files for the next submit', () => {
     document.body.innerHTML = `
       <div id="composer" contenteditable="true">hello</div>
+      <div data-testid="attachment-card">transient.pdf</div>
       <button id="send">Send</button>
     `;
 
@@ -200,7 +338,7 @@ describe('dom provider adapter submit detection', () => {
     );
     document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    expect(onSubmit).toHaveBeenCalledWith({
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       text: 'hello',
       attachments: [
         expect.objectContaining({
@@ -211,11 +349,11 @@ describe('dom provider adapter submit detection', () => {
         }),
       ],
       onConsumed: expect.any(Function),
-    });
+    }));
     unsubscribe?.();
   });
 
-  it('invalidates captured files when a scoped file input resets', () => {
+  it('filters captured files when a scoped file input resets before submit', () => {
     document.body.innerHTML = `
       <form>
         <div id="composer" contenteditable="true">hello</div>
@@ -248,11 +386,11 @@ describe('dom provider adapter submit detection', () => {
     input.dispatchEvent(new Event('change', { bubbles: true }));
     document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    expect(onSubmit).toHaveBeenCalledWith({
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       text: 'hello',
       attachments: [],
       onConsumed: expect.any(Function),
-    });
+    }));
     unsubscribe?.();
   });
 });

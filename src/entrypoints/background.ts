@@ -71,14 +71,37 @@ export {
 };
 
 export default defineBackground(() => {
-  void startupSweepAttachments().catch((error) => {
-    console.warn('ask-em: failed to sweep attachment store on startup', error);
-  });
+  void startupSweepAttachments()
+    .then(({ expired, orphaned }) => {
+      if (expired + orphaned === 0) {
+        return;
+      }
+
+      void logDebug({
+        level: 'info',
+        scope: 'background',
+        message: 'Swept attachment store on startup',
+        detail: `expired=${expired}; orphaned=${orphaned}`,
+      }).catch((error) => {
+        console.warn('ask-em: failed to append attachment startup sweep log', error);
+      });
+    })
+    .catch((error) => {
+      console.warn('ask-em: failed to sweep attachment store on startup', error);
+    });
 
   chrome.tabs.onRemoved.addListener((tabId) => {
     void (async () => {
       try {
-        await sweepAttachmentsByOwnerTab(tabId);
+        const sweptAttachments = await sweepAttachmentsByOwnerTab(tabId);
+        if (sweptAttachments > 0) {
+          await logDebug({
+            level: 'info',
+            scope: 'background',
+            message: 'Swept attachments for closed tab',
+            detail: `tab=${tabId}; removed=${sweptAttachments}`,
+          });
+        }
       } catch (error) {
         console.warn('ask-em: failed to sweep attachment store for closed tab', error);
       }

@@ -1,11 +1,13 @@
 import type { ProviderAdapter } from '../adapters/types';
 import type { ComposerAttachmentPresence } from '../adapters/types';
 import type {
+  AttachmentRef,
   DeliverPromptMessage,
   PingMessage,
   PingResponseMessage,
   RuntimeMessage,
 } from '../runtime/protocol';
+import { formatAttachmentSummary } from '../runtime/attachment-log';
 import { buildHeartbeatMessage, sendRuntimeMessage } from './routing';
 import type { ContentStateController } from './state';
 import type { ContentSubmitController } from './submit-controller';
@@ -17,24 +19,29 @@ function countAttachmentPresenceDelta(
   baseline: ComposerAttachmentPresence,
   current: ComposerAttachmentPresence,
 ): number {
+  const countDelta = current.count - baseline.count;
+
   if (baseline.keys && current.keys) {
     const baselineKeys = new Set(baseline.keys);
-    return current.keys.filter((key) => !baselineKeys.has(key)).length;
+    const keyDelta = current.keys.filter((key) => !baselineKeys.has(key)).length;
+    return Math.max(countDelta, keyDelta);
   }
 
-  return current.count - baseline.count;
+  return countDelta;
 }
 
 async function waitForAttachmentPresence(
   composer: NonNullable<ProviderAdapter['composer']>,
-  expectedCount: number,
+  expectedAttachments: AttachmentRef[],
   baseline: ComposerAttachmentPresence,
-) {
+): Promise<ComposerAttachmentPresence> {
   if (!composer.getComposerAttachmentPresence) {
     throw new Error('upload failed');
   }
 
+  const expectedCount = expectedAttachments.length;
   const deadline = Date.now() + ATTACHMENT_DELIVERY_TIMEOUT_MS;
+  let lastPresence = baseline;
 
   while (Date.now() <= deadline) {
     const uploadError = await composer.detectAttachmentUploadError?.();
@@ -42,15 +49,18 @@ async function waitForAttachmentPresence(
       throw new Error('upload failed');
     }
 
-    const current = await composer.getComposerAttachmentPresence();
+    const current = await composer.getComposerAttachmentPresence(expectedAttachments);
+    lastPresence = current;
     if (countAttachmentPresenceDelta(baseline, current) >= expectedCount) {
-      return;
+      return current;
     }
 
     await new Promise((resolve) => window.setTimeout(resolve, ATTACHMENT_DELIVERY_POLL_MS));
   }
 
-  throw new Error('upload failed');
+  throw new Error(
+    `upload failed: attachment presence timeout expected=${expectedCount}; baseline=${baseline.count}; current=${lastPresence.count}`,
+  );
 }
 
 export function createDeliveryController(
@@ -146,14 +156,20 @@ export function createDeliveryController(
         await dependencies.logDebug({
           level: 'info',
           message: 'Starting prompt delivery in content',
-          detail: message.content.slice(0, 120),
+          detail: `${message.content.slice(0, 120)}; attachments=${message.attachments.length}`,
           workspaceId: message.workspaceId,
         });
 
         const baselineUrl = adapter.session.getCurrentUrl();
         let attachmentBaseline: ComposerAttachmentPresence | null = null;
         if (message.attachments.length > 0) {
-          attachmentBaseline = await adapter.composer.getComposerAttachmentPresence?.() ?? null;
+          await dependencies.logDebug({
+            level: 'info',
+            message: 'Attachment delivery started',
+            detail: formatAttachmentSummary(message.attachments),
+            workspaceId: message.workspaceId,
+          });
+          attachmentBaseline = await adapter.composer.getComposerAttachmentPresence?.(message.attachments) ?? null;
           if (!attachmentBaseline) {
             throw new Error('upload failed');
           }
@@ -174,16 +190,35 @@ export function createDeliveryController(
             throw new Error('upload failed');
           }
 
-          await waitForAttachmentPresence(
+          const currentPresence = await waitForAttachmentPresence(
             adapter.composer,
-            message.attachments.length,
+            message.attachments,
             baseline,
           );
+
+          await dependencies.logDebug({
+            level: 'info',
+            message: 'Attachment delivery confirmed',
+            detail: `expected=${message.attachments.length}; baseline=${baseline.count}; current=${currentPresence.count}; keys=${(currentPresence.keys ?? []).slice(0, 5).join(' | ')}`,
+            workspaceId: message.workspaceId,
+          });
         }
 
+        await dependencies.logDebug({
+          level: 'info',
+          message: 'Submitting prompt in content',
+          detail: `attachments=${message.attachments.length}`,
+          workspaceId: message.workspaceId,
+        });
         submitController.rememberProgrammaticSubmit(message.content);
         await adapter.composer.submit({
           timeoutMs: message.attachments.length > 0 ? ATTACHMENT_DELIVERY_TIMEOUT_MS : undefined,
+        });
+        await dependencies.logDebug({
+          level: 'info',
+          message: 'Prompt submit action dispatched',
+          detail: `attachments=${message.attachments.length}`,
+          workspaceId: message.workspaceId,
         });
 
         const shouldAwaitSessionRef =
@@ -232,7 +267,7 @@ export function createDeliveryController(
         await dependencies.logDebug({
           level: 'error',
           message: 'Content delivery failed',
-          detail: error instanceof Error ? error.message : String(error),
+          detail: `${error instanceof Error ? error.message : String(error)}; attachments=${message.attachments.length}`,
           workspaceId: message.workspaceId,
         });
         state.showCurrentWarning('Delivery failed');

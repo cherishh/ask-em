@@ -39,6 +39,7 @@ export interface ProviderSessionAdapter {
 export type UserSubmissionPayload = {
   text: string;
   attachments: CapturedAttachment[];
+  attachmentResolution?: AttachmentSubmitResolution;
   onConsumed?: () => void;
 };
 
@@ -52,12 +53,37 @@ export type ComposerAttachmentPresence = {
   keys?: string[];
 };
 
+export type ComposerAttachmentSnapshot = {
+  count: number;
+  items?: string[];
+};
+
+export type AttachmentSubmitResolutionReason =
+  | 'no-captured-attachments'
+  | 'no-current-attachments'
+  | 'missing-source-snapshot'
+  | 'ambiguous-current-attachments'
+  | 'unmatched-current-attachments';
+
+export type AttachmentSubmitResolution = {
+  attachments: CapturedAttachment[];
+  capturedCount: number;
+  currentCount: number | null;
+  submittedCount: number;
+  reason?: AttachmentSubmitResolutionReason;
+};
+
 export interface ProviderComposerAdapter {
   subscribeToUserSubmissions?(onSubmit: (payload: UserSubmissionPayload) => void): () => void;
   setComposerPayload?(payload: ComposerPayload): Promise<void> | void;
   setComposerText(content: string): Promise<void> | void;
   detectAttachmentUploadError?(): string | null | Promise<string | null>;
-  getComposerAttachmentPresence?(): ComposerAttachmentPresence | Promise<ComposerAttachmentPresence>;
+  getComposerAttachmentSnapshot?(
+    capturedAttachments?: CapturedAttachment[],
+  ): ComposerAttachmentSnapshot | null;
+  getComposerAttachmentPresence?(
+    expectedAttachments?: AttachmentRef[],
+  ): ComposerAttachmentPresence | Promise<ComposerAttachmentPresence>;
   suppressAttachmentCaptureFor?(durationMs: number): void;
   submit(options?: { timeoutMs?: number }): Promise<void> | void;
 }

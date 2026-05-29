@@ -21,6 +21,7 @@ export type AttachmentRef = {
   name: string;
   mime: string;
   size: number;
+  isPlainText?: boolean;
 };
 
 export type CapturedAttachment = AttachmentRef & {
@@ -29,9 +30,14 @@ export type CapturedAttachment = AttachmentRef & {
 };
 
 export type UploadCapability = {
-  mimes: string[];
-  extensions?: string[];
   maxFiles: number;
+  allowImages?: boolean;
+  allowPlainText?: boolean;
+  documentMimes?: string[];
+  documentExtensions?: string[];
+  blockedMimes?: string[];
+  blockedMimePrefixes?: string[];
+  blockedExtensions?: string[];
 } | null;
 
 export type ConversationRef = {

@@ -6,6 +6,7 @@ import type {
   Workspace,
 } from '../runtime/protocol';
 import { upsertClaimedTab } from '../runtime/storage';
+import { formatAttachmentSummary } from '../runtime/attachment-log';
 import { logDebug } from './debug';
 import { checkProviderAttachmentCapability } from './attachment-capability';
 import { resolveDeliveryTarget, resolveReadyProviderTabForWorkspace } from './delivery-targets';
@@ -85,7 +86,7 @@ export async function attemptProviderDelivery({
       provider,
       workspaceId,
       message: 'Skipped delivery for unsupported attachment',
-      detail: attachmentCapability.reason,
+      detail: `${attachmentCapability.reason}; ${formatAttachmentSummary(message.attachments)}`,
     });
 
     return {
@@ -157,7 +158,7 @@ export async function attemptProviderDelivery({
       provider,
       workspaceId,
       message: 'Delivering prompt',
-      detail: `${message.provider} -> ${provider} @ ${target.expectedSessionId ?? 'new-chat'}`,
+      detail: `${message.provider} -> ${provider} @ ${target.expectedSessionId ?? 'new-chat'}; ${formatAttachmentSummary(message.attachments)}`,
     });
 
     const response = (await chrome.tabs.sendMessage(target.tabId, {
@@ -178,7 +179,7 @@ export async function attemptProviderDelivery({
         provider,
         workspaceId,
         message: 'Prompt delivery accepted',
-        detail: `${message.provider} -> ${provider}`,
+        detail: `${message.provider} -> ${provider}; attachments=${message.attachments.length}`,
       });
     }
 
@@ -192,7 +193,7 @@ export async function attemptProviderDelivery({
       provider,
       workspaceId,
       message: 'Prompt delivery confirmed',
-      detail: `${message.provider} -> ${provider}`,
+      detail: `${message.provider} -> ${provider}; attachments=${message.attachments.length}`,
     });
 
     return {

@@ -24,11 +24,17 @@ const attachmentStoreMocks = vi.hoisted(() => ({
   }),
 }));
 
+const debugMocks = vi.hoisted(() => ({
+  logDebug: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../runtime/attachment-store', () => attachmentStoreMocks);
+vi.mock('./debug', () => debugMocks);
 
 describe('attachment message handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    debugMocks.logDebug.mockResolvedValue(undefined);
   });
 
   it('derives attachment owner tab from the sender instead of message payload', async () => {

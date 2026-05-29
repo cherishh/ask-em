@@ -12,7 +12,7 @@
 ## 不做
 
 - v1 不硬编码为 image-only。source/store/protocol 支持通用 `File` 附件，实际 fan-out 类型由每个 provider 的 `uploadCapability` 决定。
-- v1 初始放开已验证可通过 paste 或页面上传功能上传的常见类型（图片 + PDF、DOCX 等常见文档）；未验证或 provider 不支持的类型走 `unsupported-attachment`。
+- v1 不走窄 allowlist：允许图片、常见文档，以及 source 侧 byte sniff 判定为实际纯文本的代码/配置/日志等；明确 blacklist 音视频、压缩包、可执行、字体等二进制/媒体类型。
 - 不处理纯文本里的远程文件/图片 URL。
 - 不复用某 provider 已上传成功的服务端文件句柄；每个 target provider 各自上传一次。
 - 不劫持 provider 自己的 XHR 上传。
@@ -26,7 +26,7 @@
 - Source capture 覆盖 4 类入口：`paste`、`drop`、稳定 DOM `input[type=file]`、Manus 这类 transient detached file input。
 - File input capture 不能只看 composer subtree；用 document-level capture，再用 provider-specific scoping 判断是否属于当前 composer。
 - MAIN-world transient input hook 必须 narrow、idempotent、可 teardown，只观察 `input[type=file]`，并通过受控 bridge 把文件交回 isolated content script。
-- ask'em v1 不阻止源 provider 原生发送。capture 失败、超预算/超限、用户删除附件时，只跳过附件 fan-out 并提示 indicator。
+- ask'em v1 不阻止源 provider 原生发送。capture 失败、超预算/超限、submit-time source snapshot 无法确认当前附件时，只跳过附件 fan-out 并提示 indicator。
 - Target fan-out 不依赖 synthetic drop。drop 只用于 source capture。
 - Adapter 必须能控制 payload 顺序；默认 text-first，但 Manus 可能需要 attach-first。
 - **预算与上限（本轮调整）**：
@@ -69,9 +69,14 @@
 
 ```ts
 type UploadCapability = {
-  mimes: string[];
-  extensions?: string[]; // 仅在 File.type 为空或 generic（如 application/octet-stream）时兜底匹配 [P2-a]
   maxFiles: number;
+  allowImages?: boolean;
+  allowPlainText?: boolean;
+  documentMimes?: string[];
+  documentExtensions?: string[];
+  blockedMimes?: string[];
+  blockedMimePrefixes?: string[];
+  blockedExtensions?: string[];
 } | null;
 ```
 
@@ -125,8 +130,8 @@ type UploadCapability = {
 - [ ] **submit 时：先过 dedupe gate，再写 store [A3]**。store 写入插在 `submit-controller.ts` 的 `rememberSubmitFingerprint`（去重之后）与构建 `USER_SUBMIT`（发送之前）之间。
 - [ ] **`USER_SUBMIT` 必须等所有 ref `finalize`（status=ready）后再发 [A2]**。
 - [ ] `submit-fingerprint` 加入 attachment ids（capture-time 稳定 id），避免"同文本不同附件"被 dedupe。
-- [ ] **删除附件 invalidation（UX 调轻）**：观察到删除/preview 移除/input reset 时，只**清空当前 message 的 buffer + 本次 submit 跳过附件**，提示一次；**下一次干净的 paste/drop/change 重新启用**，不再"必须刷新页面"。
-- [ ] 删除提示：`Attachment removed. Files won't sync for this message.`
+- [ ] **submit-time source snapshot 是附件真相源**：capture buffer 只缓存 `File` bytes 来源；发送前一刻读取当前 composer DOM 的 attachment card/preview 来过滤 captured files。无法确认当前附件或无法唯一匹配 → 本次跳过附件 fan-out，不同步旧 buffer。
+- [ ] source snapshot 提示：`Attachment sync skipped. Current files could not be confirmed.`
 - [ ] 超过 20 个文件 / 单文件 >25MB / 总预算 >50MB 时，跳过附件 fan-out，indicator 提示（`too many files` / `attachment too large`），不阻止源 provider 原生发送。
 
 ## Target Delivery
@@ -152,8 +157,8 @@ type UploadCapability = {
 
 ## Capability Gate
 
-- [ ] gate 逻辑：`mime ∈ capability.mimes || (File.type 空/generic 时) ext ∈ capability.extensions`。
-- [ ] mime 与 extension **都无法判定**（空 type + 无扩展名）→ 判 `unsupported-attachment`。
+- [ ] gate 逻辑：source 侧 `isPlainText` byte sniff + background blacklist；先拒绝音视频/压缩包/可执行/字体等，再允许图片、常见文档、实际文本或明确文本 MIME/extension。
+- [ ] 不能证明是图片/常见文档/实际文本，或 blacklist 命中 → 判 `unsupported-attachment`。
 - [ ] count 超 `min(ATTACHMENT_MAX_COUNT, capability.maxFiles)` → `unsupported-attachment`。
 - [ ] capability 为 `null` 的 provider → `unsupported-attachment`，跳过该 provider，不重试，不影响其他 provider。
 
@@ -170,7 +175,7 @@ type UploadCapability = {
 
 ### Phase 0：协议和类型脚手架
 
-- [x] 添加 `AttachmentRef`（无 sha256）、`CapturedAttachment`、`UploadCapability`（含 `extensions?`）。
+- [x] 添加 `AttachmentRef`（无 sha256，含 `isPlainText?`）、`CapturedAttachment`、`UploadCapability`（blacklist + image/text/document policy）。
 - [x] 定义附件传输消息类型（`ATTACHMENT_CREATE/APPEND_CHUNK/FINALIZE/READ_CHUNK/ABORT`）。
 - [x] 消息协议增加 `attachments: []` 默认值。
 - [x] `WorkspaceIssue` 增加 `unsupported-attachment`。
@@ -212,15 +217,15 @@ type UploadCapability = {
 
 ### Phase 2：Capability Gate + Presentation
 
-- [x] 为 Claude / ChatGPT / Gemini / DeepSeek / Manus 声明 MIME / extension / count capability，含已验证的图片 + 常见文档。
-- [x] background delivery 增加 capability gate（mime∪extension，空-空→unsupported，count gate）。
+- [x] 为 Claude / ChatGPT / Gemini / DeepSeek / Manus 声明 blacklist + image/text/document/count capability。
+- [x] background delivery 增加 capability gate（blacklist、图片、常见文档、actual plain text、count gate）。
 - [x] mixed 附件 all-or-nothing → `unsupported-attachment` [P2-a]。
 - [x] 不支持时返回 `unsupported-attachment`，不影响其他 provider。
 - [x] **presentation helper 支持 `unsupported-attachment`（同批）**。
 
 验收：
 - [x] text-only 行为不变。
-- [x] synthetic attachment payload 的 capability gate 测试通过（含 mixed all-or-nothing、extension 兜底、空-空→unsupported）。
+- [x] synthetic attachment payload 的 capability gate 测试通过（含 mixed all-or-nothing、actual plain text、blacklist、extension 兜底、空-空→unsupported）。
 - [x] presentation helper 测试覆盖 `unsupported-attachment`。
 
 ### Phase 2.5：Source-capture Spike（执行前 spike）
@@ -236,7 +241,7 @@ type UploadCapability = {
 - [x] **dedupe gate 先于 store 写入 [A3]**；fingerprint 含 attachment ids。
 - [x] buffer → store 的 chunked base64 write；`USER_SUBMIT` 等 finalize 再发 [A2]。
 - [x] **过 dedupe 后铸 `submitId`，贯穿 staging create + USER_SUBMIT [R2-P1-2]**；失败/取消时发 `ATTACHMENT_ABORT(submitId)` [R2-P2-5]。
-- [x] 删除附件 invalidation（当前 message 级，下次干净 capture 重置）。
+- [x] submit-time source snapshot 过滤 captured files；删除/移除后以发送前一刻 DOM 为准，不再维护删除 shadow state。
 - [x] 超数量/超单文件/超预算跳过 fan-out + 提示，不阻断原生发送。
 - [x] submit-runtime suppression 覆盖 synthetic paste / file-input change。
 
@@ -244,7 +249,7 @@ type UploadCapability = {
 - [x] Claude 上传一个已支持附件后 submit，`USER_SUBMIT` 有一个 `AttachmentRef`，store 恰好一条。
 - [x] text-only 不写 attachment store。
 - [x] duplicate-submit dedupe 仍工作（keydown+click 双触发不产生双写）。
-- [x] 删除附件后本次跳过、下次干净 capture 恢复。
+- [x] 删除附件后 submit-time snapshot 不再包含该文件，本次不再同步已删除附件。
 
 ### Phase 3.5：Manus 类 transient input（MAIN-world hook）
 
@@ -298,7 +303,7 @@ type UploadCapability = {
 
 - [ ] 测试 background restart mid-delivery，TTL 能清理 orphan。
 - [ ] 权限审计：确认不需要新增 `host_permissions`，且**确认未引入 `alarms`**。
-- [ ] （可选 [R2-P2-7]）扩展现有 `chrome.tabs.onRemoved` handler：source tab 关闭时清该 `ownerTabId` 下 writing/未 bind 的 staging 条目，提前腾预算。注意：当前 codebase 已有 claimed-tab close 处理（`src/entrypoints/background.ts`），这里只是新增 attachment staging cleanup 分支；ABORT + create-time sweep + TTL 已覆盖大部分，故列为可选。
+- [x] 扩展现有 `chrome.tabs.onRemoved` handler：source tab 关闭时只清该 `ownerTabId` 下 `status=writing` 且未 bind 的 staging 条目，提前腾预算；不清 ready 条目，避免 USER_SUBMIT→bind 窗口内误删 fan-out 附件。
 - [ ] 补充 lifecycle/pitfall 文档（含「never log payload」「never assume source upload finished before capture」「base64 仅限传输消息」）。
 
 验收：

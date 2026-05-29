@@ -473,16 +473,17 @@ export async function sweepOrphanAttachmentBlobs(): Promise<number> {
   });
 }
 
-export async function startupSweepAttachments(now = Date.now()): Promise<void> {
-  await sweepExpiredAttachments(now);
-  await sweepOrphanAttachmentBlobs();
+export async function startupSweepAttachments(now = Date.now()): Promise<{ expired: number; orphaned: number }> {
+  const expired = await sweepExpiredAttachments(now);
+  const orphaned = await sweepOrphanAttachmentBlobs();
+  return { expired, orphaned };
 }
 
 export async function sweepAttachmentsByOwnerTab(tabId: number): Promise<number> {
   return attachmentQueue.run(async () => {
     const state = await readMetadataState();
     const attachmentIds = Object.entries(state)
-      .filter(([, metadata]) => metadata.ownerTabId === tabId)
+      .filter(([, metadata]) => metadata.ownerTabId === tabId && metadata.status === 'writing' && !metadata.ownerWorkspaceId)
       .map(([attachmentId]) => attachmentId);
     const nextState = await deleteMetadataEntries(state, attachmentIds);
     await writeMetadataState(nextState);

@@ -1,5 +1,17 @@
-import type { DeliverPromptMessage, Provider, ProviderStatus, UploadCapability } from '../runtime/protocol';
-import type { ComposerAttachmentPresence, ComposerPayload } from './types';
+import type {
+  AttachmentRef,
+  CapturedAttachment,
+  DeliverPromptMessage,
+  Provider,
+  ProviderStatus,
+  UploadCapability,
+} from '../runtime/protocol';
+import type {
+  AttachmentSubmitResolution,
+  ComposerAttachmentPresence,
+  ComposerAttachmentSnapshot,
+  ComposerPayload,
+} from './types';
 import { isAskEmTransientFilesMessage } from '../runtime/protocol';
 import {
   ComposerAttachmentCaptureBuffer,
@@ -12,6 +24,7 @@ import {
   dispatchEnterKey,
   getEditableText,
   isElementWithin,
+  isVisible,
   normalizeWhitespace,
   queryVisible,
   setEditableText,
@@ -56,7 +69,16 @@ type DomProviderAdapterConfig = {
       findComposer: () => HTMLElement | null;
       findSendButton: () => HTMLElement | null;
     },
+    expectedAttachments?: AttachmentRef[],
   ) => ComposerAttachmentPresence | Promise<ComposerAttachmentPresence>;
+  getComposerAttachmentSnapshot?: (
+    context: {
+      findComposer: () => HTMLElement | null;
+      findSendButton: () => HTMLElement | null;
+      isFileInputForComposer: (input: HTMLInputElement) => boolean;
+    },
+    capturedAttachments: CapturedAttachment[],
+  ) => ComposerAttachmentSnapshot | null;
   detectAttachmentUploadError?: (
     context: {
       findComposer: () => HTMLElement | null;
@@ -71,6 +93,78 @@ type DomProviderAdapterConfig = {
     },
   ) => boolean;
 };
+
+const ATTACHMENT_LABEL_SELECTORS = [
+  '[data-testid*="attachment" i]',
+  '[data-testid*="file" i]',
+  '[aria-label*="attachment" i]',
+  '[aria-label*="file" i]',
+  '[class*="attachment" i]',
+  '[class*="file" i]',
+];
+
+function getElementAccessibleText(element: HTMLElement): string {
+  return normalizeWhitespace(
+    [
+      element.getAttribute('aria-label'),
+      element.getAttribute('aria-describedby'),
+      element.getAttribute('title'),
+      element.innerText || element.textContent,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+}
+
+function compactAttachmentText(value: string): string {
+  return normalizeWhitespace(value).replace(/\s+/g, '').toLowerCase();
+}
+
+function containsCapturedAttachmentName(text: string, capturedAttachments: AttachmentRef[]): boolean {
+  const compactText = compactAttachmentText(text);
+  return capturedAttachments.some((attachment) => {
+    const compactName = compactAttachmentText(attachment.name);
+    return compactName.length > 0 && compactText.includes(compactName);
+  });
+}
+
+function findGenericAttachmentSnapshotLabels(
+  container: ParentNode,
+  capturedAttachments: AttachmentRef[],
+): string[] {
+  if (!(container instanceof Element || container instanceof Document)) {
+    return [];
+  }
+
+  const candidates = ATTACHMENT_LABEL_SELECTORS.flatMap((selector) =>
+    Array.from(container.querySelectorAll<HTMLElement>(selector)),
+  )
+    .filter((element, index, elements) => elements.indexOf(element) === index)
+    .filter(isVisible)
+    .filter((element) => containsCapturedAttachmentName(getElementAccessibleText(element), capturedAttachments));
+
+  return candidates
+    .filter((candidate) => !candidates.some((other) => other !== candidate && candidate.contains(other)))
+    .map(getElementAccessibleText)
+    .filter(Boolean);
+}
+
+function getAttachmentSnapshotContainer(
+  composer: HTMLElement | null,
+  sendButton: HTMLElement | null,
+): ParentNode {
+  const form = composer?.closest('form') ?? sendButton?.closest('form') ?? null;
+  if (form) {
+    return form;
+  }
+
+  return (
+    composer?.parentElement?.parentElement?.parentElement ??
+    composer?.parentElement?.parentElement ??
+    sendButton?.parentElement?.parentElement ??
+    document
+  );
+}
 
 export function createDomProviderAdapter(config: DomProviderAdapterConfig): ProviderAdapter {
   const site = getSiteInfoByProvider(config.provider);
@@ -114,28 +208,50 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     const buttonContainer = sendButton?.parentElement?.parentElement ?? sendButton?.parentElement ?? null;
     return Boolean(buttonContainer && isElementWithin(input, buttonContainer));
   };
-  const isLikelyAttachmentRemovalClick = (event: MouseEvent) => {
-    const target = event.target instanceof Element ? event.target : null;
-    const control = target?.closest<HTMLElement>('button, [role="button"], [aria-label]');
-    if (!control) {
-      return false;
+  const getDefaultComposerAttachmentSnapshot = (
+    capturedAttachments: CapturedAttachment[],
+  ): ComposerAttachmentSnapshot | null => {
+    if (capturedAttachments.length === 0) {
+      return {
+        count: 0,
+        items: [],
+      };
     }
 
     const composer = findComposer();
-    const container = composer?.closest('form') ?? composer?.parentElement?.parentElement ?? composer?.parentElement;
-    if (container && !isElementWithin(control, container)) {
-      return false;
+    const sendButton = findSendButton();
+    const labels = findGenericAttachmentSnapshotLabels(
+      getAttachmentSnapshotContainer(composer, sendButton),
+      capturedAttachments,
+    );
+
+    if (labels.length > 0) {
+      return {
+        count: labels.length,
+        items: labels,
+      };
     }
 
-    const label = normalizeWhitespace(
-      control.getAttribute('aria-label') ?? control.getAttribute('title') ?? control.textContent ?? '',
-    ).toLowerCase();
+    const scopedFileInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
+      .filter(isFileInputForComposer);
+    if (scopedFileInputs.length > 0 && capturedAttachments.every((attachment) => attachment.source === 'file-input')) {
+      return {
+        count: 0,
+        items: [],
+      };
+    }
 
-    return (
-      (label.includes('remove') || label.includes('delete') || label.includes('close')) &&
-      (label.includes('attachment') || label.includes('file') || label.includes('image'))
-    );
+    return null;
   };
+  const getComposerAttachmentSnapshot = (
+    capturedAttachments: CapturedAttachment[],
+  ): ComposerAttachmentSnapshot | null => (
+    config.getComposerAttachmentSnapshot?.({
+      findComposer,
+      findSendButton,
+      isFileInputForComposer,
+    }, capturedAttachments) ?? getDefaultComposerAttachmentSnapshot(capturedAttachments)
+  );
 
   const getStatus = (): ProviderStatus => {
     prepareDom();
@@ -199,6 +315,22 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     composer: {
       subscribeToUserSubmissions(onSubmit) {
         const attachmentBuffer = new ComposerAttachmentCaptureBuffer();
+        const buildUserSubmissionPayload = (text: string) => {
+          const capturedAttachments = attachmentBuffer.getAttachmentsForSubmit();
+          const attachmentResolution: AttachmentSubmitResolution = attachmentBuffer.resolveAttachmentsForSubmit(
+            capturedAttachments.length > 0 ? getComposerAttachmentSnapshot(capturedAttachments) : {
+              count: 0,
+              items: [],
+            },
+          );
+
+          return {
+            text,
+            attachments: attachmentResolution.attachments,
+            attachmentResolution,
+            onConsumed: () => attachmentBuffer.clear(),
+          };
+        };
 
         const handlePaste = (event: ClipboardEvent) => {
           if (isAttachmentCaptureSuppressed()) {
@@ -238,7 +370,6 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
 
           const files = getFilesFromFileList(input.files);
           if (files.length === 0) {
-            attachmentBuffer.invalidateCurrentMessage();
             return;
           }
 
@@ -265,27 +396,14 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
             !event.isComposing &&
             isElementWithin(event.target, composer)
           ) {
-            onSubmit({
-              text: getEditableText(composer),
-              attachments: attachmentBuffer.getAttachmentsForSubmit(),
-              onConsumed: () => attachmentBuffer.clear(),
-            });
+            onSubmit(buildUserSubmissionPayload(getEditableText(composer)));
           }
         };
 
         const handleClick = (event: MouseEvent) => {
-          if (isLikelyAttachmentRemovalClick(event)) {
-            attachmentBuffer.invalidateCurrentMessage();
-            return;
-          }
-
           const sendButton = findSendButton();
           if (sendButton && isSendButtonEnabled(sendButton) && isElementWithin(event.target, sendButton)) {
-            onSubmit({
-              text: getEditableText(findComposer()),
-              attachments: attachmentBuffer.getAttachmentsForSubmit(),
-              onConsumed: () => attachmentBuffer.clear(),
-            });
+            onSubmit(buildUserSubmissionPayload(getEditableText(findComposer())));
           }
         };
 
@@ -324,11 +442,14 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
 
         await setComposerText(payload.text);
       },
-      getComposerAttachmentPresence() {
+      getComposerAttachmentPresence(expectedAttachments) {
         return config.getComposerAttachmentPresence?.({
           findComposer,
           findSendButton,
-        }) ?? { count: 0 };
+        }, expectedAttachments) ?? { count: 0 };
+      },
+      getComposerAttachmentSnapshot(capturedAttachments) {
+        return getComposerAttachmentSnapshot(capturedAttachments ?? []);
       },
       detectAttachmentUploadError() {
         return config.detectAttachmentUploadError?.({

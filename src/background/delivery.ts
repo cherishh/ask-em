@@ -10,6 +10,7 @@ import {
   updateLocalState,
 } from '../runtime/storage';
 import { bindAttachments, releaseSubmitAttachments } from '../runtime/attachment-store';
+import { formatAttachmentSummary, shortSubmitId } from '../runtime/attachment-log';
 import { type WorkspaceLookupResult } from '../runtime/workspace';
 import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
 import {
@@ -27,6 +28,14 @@ import { buildUserSubmitResult, logFanOutCompletion, type UserSubmitResult } fro
 import { cancelScheduledGroupGc } from './gc';
 import { logDebug } from './debug';
 import { buildWorkspaceSummary, canStartNewSet } from './status';
+
+async function logAttachmentLifecycle(entry: Parameters<typeof logDebug>[0]) {
+  try {
+    await logDebug(entry);
+  } catch (error) {
+    console.warn('ask-em: failed to append attachment lifecycle debug log', error);
+  }
+}
 
 export async function deliverPromptToWorkspaceTargets(
   workspaceId: string,
@@ -77,6 +86,8 @@ export async function handleUserSubmit(
   message: UserSubmitMessage,
   sender: chrome.runtime.MessageSender,
 ): Promise<UserSubmitResult> {
+  let attachmentWorkspaceId: string | null = null;
+
   try {
     const tabId = sender.tab?.id;
     let {
@@ -112,6 +123,15 @@ export async function handleUserSubmit(
 
     if (message.attachments.length > 0) {
       await bindAttachments(message.submitId, workspaceLookup.workspaceId);
+      attachmentWorkspaceId = workspaceLookup.workspaceId;
+      await logAttachmentLifecycle({
+        level: 'info',
+        scope: 'background',
+        provider: message.provider,
+        workspaceId: workspaceLookup.workspaceId,
+        message: 'Bound submit attachments',
+        detail: `submit=${shortSubmitId(message.submitId)}; ${formatAttachmentSummary(message.attachments)}`,
+      });
     }
 
     if (!isProviderEnabled(workspaceLookup.workspace.enabledProviders, message.provider)) {
@@ -195,8 +215,16 @@ export async function handleUserSubmit(
     if (message.attachments.length > 0) {
       try {
         await releaseSubmitAttachments(message.submitId);
+        await logAttachmentLifecycle({
+          level: 'info',
+          scope: 'background',
+          provider: message.provider,
+          workspaceId: attachmentWorkspaceId ?? undefined,
+          message: 'Released submit attachments',
+          detail: `submit=${shortSubmitId(message.submitId)}; ${formatAttachmentSummary(message.attachments)}`,
+        });
       } catch (error) {
-        await logDebug({
+        await logAttachmentLifecycle({
           level: 'error',
           scope: 'background',
           provider: message.provider,

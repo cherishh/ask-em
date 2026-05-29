@@ -95,6 +95,43 @@ describe('content delivery controller attachment flow', () => {
     });
   });
 
+  it('uses count delta as a fallback when attachment keys are not unique', async () => {
+    const adapter = createAdapter({
+      getComposerAttachmentPresence: vi.fn()
+        .mockResolvedValueOnce({ count: 0, keys: [] })
+        .mockResolvedValueOnce({ count: 2, keys: ['README.md'] }),
+    });
+    const sendResponse = vi.fn();
+    const controller = createDeliveryController(adapter, createState() as any, {
+      suppressObservedSubmissionsFor: vi.fn(),
+      rememberProgrammaticSubmit: vi.fn(),
+    }, {
+      reportPresence: vi.fn(),
+      resetIndicatorPosition: vi.fn(),
+      logDebug: vi.fn(),
+    });
+
+    controller.handleRuntimeMessage({
+      type: 'DELIVER_PROMPT',
+      workspaceId: 'w1',
+      provider: 'claude',
+      content: 'hello',
+      attachments: [
+        { id: 'a1', name: 'README.md', mime: 'text/markdown', size: 1 },
+        { id: 'a2', name: 'README.md', mime: 'text/markdown', size: 1 },
+      ],
+      expectedSessionId: 'c-1',
+      expectedUrl: 'https://claude.ai/chat/c-1',
+      timestamp: 1,
+    }, sendResponse);
+    await flushMicrotasks();
+
+    await waitForAssertion(() => {
+      expect(adapter.composer?.submit).toHaveBeenCalledWith({ timeoutMs: 30_000 });
+      expect(sendResponse).toHaveBeenCalledWith({ ok: true, accepted: true, confirmed: true });
+    });
+  });
+
   it('does not submit when upload error is detected', async () => {
     const adapter = createAdapter({
       getComposerAttachmentPresence: vi.fn().mockResolvedValue({ count: 0 }),

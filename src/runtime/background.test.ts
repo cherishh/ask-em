@@ -27,7 +27,7 @@ const attachmentStoreMocks = vi.hoisted(() => ({
   bindAttachments: vi.fn().mockResolvedValue(undefined),
   clearAllAttachments: vi.fn().mockResolvedValue(undefined),
   releaseSubmitAttachments: vi.fn().mockResolvedValue(undefined),
-  startupSweepAttachments: vi.fn().mockResolvedValue(undefined),
+  startupSweepAttachments: vi.fn().mockResolvedValue({ expired: 0, orphaned: 0 }),
   sweepAttachmentsByOwnerTab: vi.fn().mockResolvedValue(0),
 }));
 
