@@ -97,7 +97,7 @@ type UploadCapability = {
   - `ATTACHMENT_CHUNK_BYTES`（raw，建议 ~256KB）
 - [ ] **每次 `ATTACHMENT_CREATE` 的 reserve/check 之前先 sweep expired [R2-P1-1]**：预算入口是 create（不是 USER_SUBMIT）。若只在 USER_SUBMIT 前 sweep，过期附件会先把 create 的 50MB 预算卡死、source 根本发不出 USER_SUBMIT。USER_SUBMIT 前 sweep 可保留但只是次要入口，不是预算闸门。
 - [ ] background service worker startup sweep。
-- [ ] **不使用 `chrome.alarms` [B3/P1-c]**：manifest 当前只有 `storage`/`tabs`，alarm 是新权限；before-submit sweep + startup sweep 已覆盖，去掉 alarm 省权限 + 省代码路径。
+- [ ] **不使用 `chrome.alarms` [B3/P1-c]**：manifest 当前只有 `storage`/`tabs`，alarm 是新权限；create-time sweep + startup sweep 已覆盖，去掉 alarm 省权限 + 省代码路径。
 - [ ] service worker restart 后不恢复 in-flight delivery，只靠 TTL/startup sweep 清理。
 - [ ] `handleClearPersistentStorage` 同时清空 attachment metadata 和 IndexedDB object store。
 
@@ -148,7 +148,7 @@ type UploadCapability = {
 - [ ] DeepSeek override：隐藏 file input fallback。
 - [ ] Manus override：点击工具按钮，选择 `Add from local files`，捕获 transient input，注入文件。
 - [ ] explicit upload error 和 timeout 都返回 `delivery-failed`，文案统一 `upload failed`。
-- [ ] **delivery 释放在 fan-out 的 finally 里按 submitId 删除 [B2]**，不在单个 delivery 的 finally。
+- [ ] **delivery 释放在 `handleUserSubmit` 的 outer finally 里按 submitId 删除 [B2 + R2-P1-3]**，不在单个 delivery、也不在 fan-out 内层 finally。
 
 ## Capability Gate
 
@@ -171,7 +171,7 @@ type UploadCapability = {
 ### Phase 0：协议和类型脚手架
 
 - [ ] 添加 `AttachmentRef`（无 sha256）、`CapturedAttachment`、`UploadCapability`（含 `extensions?`）。
-- [ ] 定义附件传输消息类型（`ATTACHMENT_CREATE/APPEND_CHUNK/FINALIZE/READ_CHUNK`）。
+- [ ] 定义附件传输消息类型（`ATTACHMENT_CREATE/APPEND_CHUNK/FINALIZE/READ_CHUNK/ABORT`）。
 - [ ] 消息协议增加 `attachments: []` 默认值。
 - [ ] `WorkspaceIssue` 增加 `unsupported-attachment`。
 - [ ] 所有现有 call site 传空数组。
@@ -258,9 +258,9 @@ type UploadCapability = {
 
 - [ ] 实现 `setComposerPayload` + 从 base64 chunk reconstruct `File`。
 - [ ] Claude 稳定 file input fallback。
-- [ ] **submit 前 `confirmAttachmentPresent` 正向确认 [A1]**。
+- [ ] **submit 前通过 `getComposerAttachmentPresence()` 做 baseline+delta 正向确认 [A1]**。
 - [ ] 附件 delivery 等待窗口延长 + 轮询 `detectAttachmentUploadError()`（先 TODO stub）。
-- [ ] fan-out finally 按 submitId release [B2]。
+- [ ] `handleUserSubmit` outer finally 按 submitId release [B2 + R2-P1-3]。
 
 验收：
 - [ ] 一个已支持附件能 fan-out 到 Claude target 并发送。
@@ -274,7 +274,7 @@ type UploadCapability = {
 - [ ] Gemini synthetic paste。
 - [ ] DeepSeek hidden file input fallback。
 - [ ] Manus menu-triggered transient input fallback（依赖 Phase 3.5）。
-- [ ] 每个 adapter 启动正确 suppression + `confirmAttachmentPresent`。
+- [ ] 每个 adapter 启动正确 suppression + `getComposerAttachmentPresence()`。
 - [ ] 每个 adapter 留 `detectAttachmentUploadError()` TODO，smoke test 后补 selector。
 - [ ] 按 smoke test 修正 capability。
 
@@ -298,7 +298,7 @@ type UploadCapability = {
 
 - [ ] 测试 background restart mid-delivery，TTL 能清理 orphan。
 - [ ] 权限审计：确认不需要新增 `host_permissions`，且**确认未引入 `alarms`**。
-- [ ] （可选 [R2-P2-7]）新增 `chrome.tabs.onRemoved` handler：source tab 关闭时清该 `ownerTabId` 下 writing/未 bind 的 staging 条目，提前腾预算。注意：当前 codebase **没有** onRemoved（claimed-tab 走 reconciliation），这是新基础设施；ABORT + create-time sweep + TTL 已覆盖大部分，故列为可选。
+- [ ] （可选 [R2-P2-7]）扩展现有 `chrome.tabs.onRemoved` handler：source tab 关闭时清该 `ownerTabId` 下 writing/未 bind 的 staging 条目，提前腾预算。注意：当前 codebase 已有 claimed-tab close 处理（`src/entrypoints/background.ts`），这里只是新增 attachment staging cleanup 分支；ABORT + create-time sweep + TTL 已覆盖大部分，故列为可选。
 - [ ] 补充 lifecycle/pitfall 文档（含「never log payload」「never assume source upload finished before capture」「base64 仅限传输消息」）。
 
 验收：
@@ -312,6 +312,6 @@ type UploadCapability = {
 - [ ] 不在主 runtime message 内塞 inline 二进制。
 - [ ] 不写入没有 TTL 的附件。
 - [ ] 不写入没有 release 路径的附件（release = `handleUserSubmit` outer finally 按 submitId 删除，覆盖**所有**早退/成功/失败路径 [R2-P1-3] + ABORT 即时释放 + TTL 兜底）。
-- [ ] 不静默把附件 submit 成纯文本：target submit 前必须 `confirmAttachmentPresent` [A1]。
+- [ ] 不静默把附件 submit 成纯文本：target submit 前必须通过 `getComposerAttachmentPresence()` 做 baseline+delta 确认 [A1]。
 - [ ] 不阻止源 provider 原生发送。
 - [ ] 不引入 `chrome.alarms` 或其他新权限。

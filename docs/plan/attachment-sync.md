@@ -61,7 +61,7 @@ v1 用**作用域绑定生命周期**替代引用计数：
 - TTL sweep（**create-time** + startup）兜 SW 崩溃 / 残留。
 - delete 必须 idempotent，容忍并发已删。
 
-这不削弱任何硬约束：字节"多活"的窗口被 50MB 预算 + before-submit sweep + 10min TTL 三重兜住。
+这不削弱任何硬约束：字节"多活"的窗口被 50MB 预算 + create-time sweep + 10min TTL 三重兜住。
 
 ### 4. staging owner-binding
 
@@ -184,7 +184,7 @@ background-owned，`chrome.storage.session` metadata + IndexedDB raw bytes。函
 6. delivery 抛错/超时 **或 `handleUserSubmit` 早退**（无 workspace / provider disabled / sync paused）→ outer finally 仍按 submitId 删除，store 不漏。写入失败/取消/页面卸载 → `ATTACHMENT_ABORT` 即时释放。
 7. 文本紧随图片 submit → 上一批附件在 fan-out 完成时已删（release 绑 deliver 完成，不绑下次 submit）。
 8. 程序注入反射成用户输入 → target 的 suppression 必须在**任何**注入前开启（synthetic paste / stable input change / transient input change）。
-9. **注入静默失败** → `confirmAttachmentPresent` 数量不足 → 不发送、`delivery-failed`，杜绝"附件丢成纯文本却报成功"。
+9. **注入静默失败** → `getComposerAttachmentPresence()` 的 baseline+delta 确认不足 → 不发送、`delivery-failed`，杜绝"附件丢成纯文本却报成功"。
 10. 指纹碰撞 → attachmentIds 进指纹。
 11. **用户删附件（UX 调轻）**：观察到删除/preview 移除/input reset → 清空当前 message buffer + 本次跳过附件 + 提示一次；**下一次干净 capture 重新启用**（不再"必须刷新页面"）。仅影响 ask'em fan-out，不挡原生发送。
 12. 源上传未完成用户已回车 → capture 在 paste/drop/change 时拿到 raw File，不依赖源 provider 上传完成。
@@ -209,7 +209,7 @@ background-owned，`chrome.storage.session` metadata + IndexedDB raw bytes。函
 - base64 只出现在 `ATTACHMENT_APPEND_CHUNK` / `ATTACHMENT_READ_CHUNK`。
 - 不在主协议塞 inline 二进制——ref 间接层是重点。
 - 不写没有 TTL / 没有 release 路径的附件。
-- target submit 前必须 `confirmAttachmentPresent`，不静默降级为纯文本。
+- target submit 前必须通过 `getComposerAttachmentPresence()` 做 baseline+delta 确认，不静默降级为纯文本。
 - 不引入 `chrome.alarms` 或其他新权限（manifest 现有 `storage`/`tabs`）。
 - 不阻止源 provider 原生发送。
 
