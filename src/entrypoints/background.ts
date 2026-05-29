@@ -1,8 +1,10 @@
 import type { RuntimeMessage } from '../runtime/protocol';
 import { getSessionState, setSessionState } from '../runtime/storage';
+import { startupSweepAttachments, sweepAttachmentsByOwnerTab } from '../runtime/attachment-store';
 import { removeClaimedTabsForTabId } from '../background/claimed-tabs';
 import { scheduleGroupGcIfEmpty } from '../background/gc';
 import { logDebug } from '../background/debug';
+import { handleAttachmentMessage } from '../background/attachment-messages';
 import { handlePresenceMessage } from '../background/presence';
 import {
   deliverPromptToWorkspaceTargets,
@@ -69,8 +71,18 @@ export {
 };
 
 export default defineBackground(() => {
+  void startupSweepAttachments().catch((error) => {
+    console.warn('ask-em: failed to sweep attachment store on startup', error);
+  });
+
   chrome.tabs.onRemoved.addListener((tabId) => {
     void (async () => {
+      try {
+        await sweepAttachmentsByOwnerTab(tabId);
+      } catch (error) {
+        console.warn('ask-em: failed to sweep attachment store for closed tab', error);
+      }
+
       const sessionState = await getSessionState();
       const { sessionState: nextSessionState, removedClaimedTabs } = removeClaimedTabsForTabId(sessionState, tabId);
 
@@ -102,6 +114,13 @@ export default defineBackground(() => {
           return;
         case 'USER_SUBMIT':
           sendResponse(await handleUserSubmit(message, sender));
+          return;
+        case 'ATTACHMENT_CREATE':
+        case 'ATTACHMENT_APPEND_CHUNK':
+        case 'ATTACHMENT_FINALIZE':
+        case 'ATTACHMENT_READ_CHUNK':
+        case 'ATTACHMENT_ABORT':
+          sendResponse(await handleAttachmentMessage(message, sender));
           return;
         case 'SWITCH_PROVIDER_TAB':
           sendResponse(await handleSwitchProviderTab(message, sender));

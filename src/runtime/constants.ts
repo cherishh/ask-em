@@ -10,7 +10,18 @@ export const STORAGE_KEYS = {
   local: 'ask-em-local-state',
   session: 'ask-em-session-state',
   indicatorPositions: 'ask-em-indicator-positions',
+  attachments: 'ask-em-attachment-metadata',
 } as const;
+
+export const ATTACHMENT_MAX_AGE_MS = 10 * 60 * 1000;
+
+export const ATTACHMENT_SESSION_BUDGET_BYTES = 50 * 1024 * 1024;
+
+export const ATTACHMENT_MAX_FILE_BYTES = 25 * 1024 * 1024;
+
+export const ATTACHMENT_MAX_COUNT = 20;
+
+export const ATTACHMENT_CHUNK_BYTES = 256 * 1024;
 
 export const ALL_PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek', 'manus'];
 

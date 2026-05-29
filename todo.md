@@ -189,26 +189,26 @@ type UploadCapability = {
 
 ### Phase 1：Attachment Store 和 GC
 
-- [ ] metadata（`chrome.storage.session`）+ raw bytes（IndexedDB `Blob`）。
-- [ ] **base64 chunk write/read [P1-a]** + `ATTACHMENT_ABORT` [R2-P2-5]，base64 仅限传输消息。
-- [ ] **staging create + bind owner [P1-b]**；ownerTabId 由 `sender.tab?.id` 写 [R2-P2-6]。
-- [ ] **status writing/ready + finalize gate [A2]**。
-- [ ] **budget reserve-on-create + 单文件/数量 check [A4]**；**reserve 前先 sweep expired [R2-P1-1]**。
-- [ ] **submitId 作用域 release，挂 `handleUserSubmit` outer finally 覆盖早退路径 [B2 + R2-P1-3]**（无引用计数）。
-- [ ] create-time sweep + startup sweep（**无 alarm [B3]**）。
-- [ ] orphan blob sweep；delete idempotent。
-- [ ] persistent storage clear 联动清理附件。
+- [x] metadata（`chrome.storage.session`）+ raw bytes（IndexedDB `Blob`）。
+- [x] **base64 chunk write/read [P1-a]** + `ATTACHMENT_ABORT` [R2-P2-5]，base64 仅限传输消息。
+- [x] **staging create + bind owner [P1-b]**；ownerTabId 由 `sender.tab?.id` 写 [R2-P2-6]。
+- [x] **status writing/ready + finalize gate [A2]**。
+- [x] **budget reserve-on-create + 单文件/数量 check [A4]**；**reserve 前先 sweep expired [R2-P1-1]**。
+- [x] **submitId 作用域 release，挂 `handleUserSubmit` outer finally 覆盖早退路径 [B2 + R2-P1-3]**（无引用计数）。
+- [x] create-time sweep + startup sweep（**无 alarm [B3]**）。
+- [x] orphan blob sweep；delete idempotent。
+- [x] persistent storage clear 联动清理附件。
 
 验收：
-- [ ] base64 chunk write/read 能重建 bytes（roundtrip 测试）。
-- [ ] bind 后 metadata 含 workspaceId/submitId；未 bind 条目受 TTL 清理。
-- [ ] 同 submitId 的附件在 fan-out 完成后被删（metadata + blob）。
-- [ ] **早退路径（无 workspace / disabled / sync paused）也按 submitId 删光 [R2-P1-3]**，有测试。
-- [ ] **`ATTACHMENT_ABORT` 立即释放 metadata + partial blob [R2-P2-5]**，有测试。
-- [ ] **过期附件占满预算时，create 前 sweep 能腾出空间让 create 成功 [R2-P1-1]**，有测试。
-- [ ] expired entry 被 sweep；orphan blob 被 startup sweep。
-- [ ] reserve-on-create 超预算/超单文件/超数量时 create 抛错，有测试。
-- [ ] 非 ready 条目的 read 明确失败，有测试。
+- [x] base64 chunk write/read 能重建 bytes（roundtrip 测试）。
+- [x] bind 后 metadata 含 workspaceId/submitId；未 bind 条目受 TTL 清理。
+- [x] 同 submitId 的附件在 fan-out 完成后被删（metadata + blob）。
+- [x] **早退路径（无 workspace / disabled / sync paused）也按 submitId 删光 [R2-P1-3]**，有测试。
+- [x] **`ATTACHMENT_ABORT` 立即释放 metadata + partial blob [R2-P2-5]**，有测试。
+- [x] **过期附件占满预算时，create 前 sweep 能腾出空间让 create 成功 [R2-P1-1]**，有测试。
+- [x] expired entry 被 sweep；orphan blob 被 startup sweep。
+- [x] reserve-on-create 超预算/超单文件/超数量时 create 抛错，有测试。
+- [x] 非 ready 条目的 read 明确失败，有测试。
 
 ### Phase 2：Capability Gate + Presentation
 

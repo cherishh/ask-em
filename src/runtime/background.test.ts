@@ -23,6 +23,16 @@ const storageMocks = vi.hoisted(() => ({
 
 vi.mock('./storage', () => storageMocks);
 
+const attachmentStoreMocks = vi.hoisted(() => ({
+  bindAttachments: vi.fn().mockResolvedValue(undefined),
+  clearAllAttachments: vi.fn().mockResolvedValue(undefined),
+  releaseSubmitAttachments: vi.fn().mockResolvedValue(undefined),
+  startupSweepAttachments: vi.fn().mockResolvedValue(undefined),
+  sweepAttachmentsByOwnerTab: vi.fn().mockResolvedValue(0),
+}));
+
+vi.mock('./attachment-store', () => attachmentStoreMocks);
+
 describe('background new-chat detachment', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -726,6 +736,209 @@ describe('background submit routing', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('releases submit-scoped attachments when submit has no workspace', async () => {
+    storageMocks.getLocalState.mockResolvedValue(makeLocalState());
+    storageMocks.getSessionState.mockResolvedValue(makeSessionState());
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    const result = await handleUserSubmit(
+      makeSubmitMessage({
+        currentUrl: 'https://claude.ai/chat/missing',
+        sessionId: 'missing',
+        attachments: [{ id: 'a1', name: 'a.png', mime: 'image/png', size: 1 }],
+        submitId: 'submit-a',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(result.synced).toBe(false);
+    expect(attachmentStoreMocks.bindAttachments).not.toHaveBeenCalled();
+    expect(attachmentStoreMocks.releaseSubmitAttachments).toHaveBeenCalledWith('submit-a');
+  });
+
+  it('binds and releases submit-scoped attachments when the source provider is disabled', async () => {
+    const localState: LocalState = {
+      ...makeLocalState(),
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          members: {
+            claude: makeConversationRef('claude', 'c-1', 'https://claude.ai/chat/c-1'),
+          },
+          enabledProviders: ['chatgpt'],
+        }),
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+      },
+    };
+    const sessionState = makeSessionState({
+      'w1:claude': makeClaimedTab({
+        provider: 'claude',
+        workspaceId: 'w1',
+        tabId: 9,
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+      }),
+    });
+
+    storageMocks.getLocalState.mockResolvedValue(localState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    const result = await handleUserSubmit(
+      makeSubmitMessage({
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+        attachments: [{ id: 'a1', name: 'a.png', mime: 'image/png', size: 1 }],
+        submitId: 'submit-disabled',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(result.providerEnabled).toBe(false);
+    expect(attachmentStoreMocks.bindAttachments).toHaveBeenCalledWith('submit-disabled', 'w1');
+    expect(attachmentStoreMocks.releaseSubmitAttachments).toHaveBeenCalledWith('submit-disabled');
+  });
+
+  it('releases submit-scoped attachments when global sync is paused', async () => {
+    const localState: LocalState = {
+      ...makeLocalState({
+        globalSyncEnabled: false,
+      }),
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          members: {
+            claude: makeConversationRef('claude', 'c-1', 'https://claude.ai/chat/c-1'),
+          },
+          enabledProviders: ['claude', 'chatgpt'],
+        }),
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+      },
+    };
+    const sessionState = makeSessionState({
+      'w1:claude': makeClaimedTab({
+        provider: 'claude',
+        workspaceId: 'w1',
+        tabId: 9,
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+      }),
+    });
+
+    storageMocks.getLocalState.mockResolvedValue(localState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    const result = await handleUserSubmit(
+      makeSubmitMessage({
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+        attachments: [{ id: 'a1', name: 'a.png', mime: 'image/png', size: 1 }],
+        submitId: 'submit-paused',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(result.globalSyncEnabled).toBe(false);
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
+    expect(attachmentStoreMocks.bindAttachments).toHaveBeenCalledWith('submit-paused', 'w1');
+    expect(attachmentStoreMocks.releaseSubmitAttachments).toHaveBeenCalledWith('submit-paused');
+  });
+
+  it('releases submit-scoped attachments after successful fan-out', async () => {
+    const attachment = { id: 'a1', name: 'a.png', mime: 'image/png', size: 1 };
+    const localState: LocalState = {
+      ...makeLocalState(),
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          members: {
+            claude: makeConversationRef('claude', 'c-1', 'https://claude.ai/chat/c-1'),
+            chatgpt: makeConversationRef('chatgpt', 'g-1', 'https://chatgpt.com/c/g-1'),
+          },
+          enabledProviders: ['claude', 'chatgpt'],
+        }),
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+        'chatgpt:g-1': 'w1',
+      },
+    };
+    const sessionState = makeSessionState({
+      'w1:claude': makeClaimedTab({
+        provider: 'claude',
+        workspaceId: 'w1',
+        tabId: 9,
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+      }),
+      'w1:chatgpt': makeClaimedTab({
+        provider: 'chatgpt',
+        workspaceId: 'w1',
+        tabId: 10,
+        currentUrl: 'https://chatgpt.com/c/g-1',
+        sessionId: 'g-1',
+      }),
+    });
+
+    storageMocks.getLocalState.mockResolvedValue(localState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const sendMessage = vi.fn().mockImplementation((tabId: number, message: { type: string }) => {
+      if (tabId === 10 && message.type === 'PING') {
+        return Promise.resolve({
+          type: 'PING_RESPONSE',
+          provider: 'chatgpt',
+          currentUrl: 'https://chatgpt.com/c/g-1',
+          sessionId: 'g-1',
+          pageState: 'ready',
+          pageKind: 'existing-session',
+        });
+      }
+
+      return Promise.resolve({ ok: true, confirmed: true });
+    });
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 9 }),
+        sendMessage,
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    const result = await handleUserSubmit(
+      makeSubmitMessage({
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+        attachments: [attachment],
+        submitId: 'submit-success',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(result.synced).toBe(true);
+    expect(sendMessage).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({
+        type: 'DELIVER_PROMPT',
+        attachments: [attachment],
+      }),
+    );
+    expect(attachmentStoreMocks.bindAttachments).toHaveBeenCalledWith('submit-success', 'w1');
+    expect(attachmentStoreMocks.releaseSubmitAttachments).toHaveBeenCalledWith('submit-success');
   });
 
   it('does not fan out when submit comes from a claimed tab on an unrelated existing session', async () => {

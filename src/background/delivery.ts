@@ -9,6 +9,7 @@ import {
   getSessionState,
   updateLocalState,
 } from '../runtime/storage';
+import { bindAttachments, releaseSubmitAttachments } from '../runtime/attachment-store';
 import { type WorkspaceLookupResult } from '../runtime/workspace';
 import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
 import {
@@ -76,113 +77,133 @@ export async function handleUserSubmit(
   message: UserSubmitMessage,
   sender: chrome.runtime.MessageSender,
 ): Promise<UserSubmitResult> {
-  const tabId = sender.tab?.id;
-  let {
-    localState,
-    workspaceLookup,
-  }: {
-    localState: LocalState;
-    workspaceLookup: WorkspaceLookupResult;
-  } = await prepareSubmitWorkspaceContext({
-    tabId,
-    message,
-    canCreateWorkspace: canCreateWorkspaceFromSubmit,
-  });
-
-  if (!workspaceLookup?.workspace) {
-    await logDebug({
-      level: 'info',
-      scope: 'background',
-      provider: message.provider,
-      message: 'Ignored submit without workspace',
-      detail: `${message.pageKind}: ${message.sessionId ?? 'no-session'} @ ${message.currentUrl}`,
+  try {
+    const tabId = sender.tab?.id;
+    let {
+      localState,
+      workspaceLookup,
+    }: {
+      localState: LocalState;
+      workspaceLookup: WorkspaceLookupResult;
+    } = await prepareSubmitWorkspaceContext({
+      tabId,
+      message,
+      canCreateWorkspace: canCreateWorkspaceFromSubmit,
     });
+
+    if (!workspaceLookup?.workspace) {
+      await logDebug({
+        level: 'info',
+        scope: 'background',
+        provider: message.provider,
+        message: 'Ignored submit without workspace',
+        detail: `${message.pageKind}: ${message.sessionId ?? 'no-session'} @ ${message.currentUrl}`,
+      });
+      return buildUserSubmitResult({
+        synced: false,
+        workspaceId: null,
+        globalSyncEnabled: localState.globalSyncEnabled,
+        canStartNewSet: canStartNewSet(localState),
+        workspaceSummary: null,
+      });
+    }
+
+    cancelScheduledGroupGc(workspaceLookup.workspaceId);
+
+    if (message.attachments.length > 0) {
+      await bindAttachments(message.submitId, workspaceLookup.workspaceId);
+    }
+
+    if (!isProviderEnabled(workspaceLookup.workspace.enabledProviders, message.provider)) {
+      await logDebug({
+        level: 'info',
+        scope: 'background',
+        provider: message.provider,
+        workspaceId: workspaceLookup.workspaceId,
+        message: 'Ignored submit from disabled provider',
+      });
+      return buildUserSubmitResult({
+        synced: false,
+        workspaceId: workspaceLookup.workspaceId,
+        providerEnabled: false,
+        globalSyncEnabled: localState.globalSyncEnabled,
+        canStartNewSet: canStartNewSet(localState),
+        workspaceSummary: buildWorkspaceSummary(
+          localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
+          await getSessionState(),
+        ),
+      });
+    }
+
+    localState = await persistSourceSubmitContext({
+      localState,
+      workspaceLookup,
+      tabId,
+      message,
+    });
+
+    if (!localState.globalSyncEnabled) {
+      await logDebug({
+        level: 'info',
+        scope: 'background',
+        provider: message.provider,
+        workspaceId: workspaceLookup.workspaceId,
+        message: 'Skipped sync fan-out because global sync is paused',
+      });
+      return buildUserSubmitResult({
+        synced: false,
+        workspaceId: workspaceLookup.workspaceId,
+        providerEnabled: true,
+        globalSyncEnabled: false,
+        canStartNewSet: canStartNewSet(localState),
+        workspaceSummary: buildWorkspaceSummary(
+          localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
+          await getSessionState(),
+        ),
+      });
+    }
+
+    const deliveryResults = await deliverPromptToWorkspaceTargets(
+      workspaceLookup.workspaceId,
+      message,
+      tabId,
+    );
+    await logFanOutCompletion(
+      message.provider,
+      workspaceLookup.workspaceId,
+      workspaceLookup.workspace.enabledProviders,
+      deliveryResults,
+    );
+
+    const finalLocalState = await getLocalState();
+    const finalWorkspace =
+      finalLocalState.workspaces[workspaceLookup.workspaceId] ?? localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace;
+
     return buildUserSubmitResult({
-      synced: false,
-      workspaceId: null,
-      globalSyncEnabled: localState.globalSyncEnabled,
-      canStartNewSet: canStartNewSet(localState),
-      workspaceSummary: null,
-    });
-  }
-
-  cancelScheduledGroupGc(workspaceLookup.workspaceId);
-
-  if (!isProviderEnabled(workspaceLookup.workspace.enabledProviders, message.provider)) {
-    await logDebug({
-      level: 'info',
-      scope: 'background',
-      provider: message.provider,
-      workspaceId: workspaceLookup.workspaceId,
-      message: 'Ignored submit from disabled provider',
-    });
-    return buildUserSubmitResult({
-      synced: false,
-      workspaceId: workspaceLookup.workspaceId,
-      providerEnabled: false,
-      globalSyncEnabled: localState.globalSyncEnabled,
-      canStartNewSet: canStartNewSet(localState),
-      workspaceSummary: buildWorkspaceSummary(
-        localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
-        await getSessionState(),
-      ),
-    });
-  }
-
-  localState = await persistSourceSubmitContext({
-    localState,
-    workspaceLookup,
-    tabId,
-    message,
-  });
-
-  if (!localState.globalSyncEnabled) {
-    await logDebug({
-      level: 'info',
-      scope: 'background',
-      provider: message.provider,
-      workspaceId: workspaceLookup.workspaceId,
-      message: 'Skipped sync fan-out because global sync is paused',
-    });
-    return buildUserSubmitResult({
-      synced: false,
+      synced: true,
       workspaceId: workspaceLookup.workspaceId,
       providerEnabled: true,
-      globalSyncEnabled: false,
-      canStartNewSet: canStartNewSet(localState),
+      globalSyncEnabled: true,
+      canStartNewSet: canStartNewSet(finalLocalState),
+      deliveryResults,
       workspaceSummary: buildWorkspaceSummary(
-        localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace,
+        finalWorkspace,
         await getSessionState(),
       ),
     });
+  } finally {
+    if (message.attachments.length > 0) {
+      try {
+        await releaseSubmitAttachments(message.submitId);
+      } catch (error) {
+        await logDebug({
+          level: 'error',
+          scope: 'background',
+          provider: message.provider,
+          message: 'Failed to release submit attachments',
+          detail: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
   }
-
-  const deliveryResults = await deliverPromptToWorkspaceTargets(
-    workspaceLookup.workspaceId,
-    message,
-    tabId,
-  );
-  await logFanOutCompletion(
-    message.provider,
-    workspaceLookup.workspaceId,
-    workspaceLookup.workspace.enabledProviders,
-    deliveryResults,
-  );
-
-  const finalLocalState = await getLocalState();
-  const finalWorkspace =
-    finalLocalState.workspaces[workspaceLookup.workspaceId] ?? localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace;
-
-  return buildUserSubmitResult({
-    synced: true,
-    workspaceId: workspaceLookup.workspaceId,
-    providerEnabled: true,
-    globalSyncEnabled: true,
-    canStartNewSet: canStartNewSet(finalLocalState),
-    deliveryResults,
-    workspaceSummary: buildWorkspaceSummary(
-      finalWorkspace,
-      await getSessionState(),
-    ),
-  });
 }

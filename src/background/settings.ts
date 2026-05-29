@@ -1,5 +1,6 @@
 import { createDefaultEnabledProviders, STORAGE_KEYS, type RuntimeMessage } from '../runtime/protocol';
 import { clearDebugLogs, getLocalState, getSessionState, setLocalState, setSessionState } from '../runtime/storage';
+import { clearAllAttachments } from '../runtime/attachment-store';
 import { clearWorkspace, clearWorkspaceProvider, setWorkspaceProviderEnabled } from '../runtime/workspace';
 import { removeClaimedTabsForWorkspace } from './claimed-tabs';
 import { logDebug } from './debug';
@@ -234,8 +235,9 @@ export async function handleResetIndicatorPositions() {
 }
 
 export async function handleClearPersistentStorage() {
-  await chrome.storage.local.clear();
   await Promise.all([
+    chrome.storage.local.clear(),
+    clearAllAttachments(),
     notifyAllTabsToRefreshContext(),
     notifyAllTabsToResetIndicatorPosition(),
   ]);
