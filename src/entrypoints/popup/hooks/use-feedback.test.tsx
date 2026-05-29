@@ -244,7 +244,7 @@ describe('useFeedback', () => {
 
     expect(payload).toMatchObject({
       kind: 'feature-request',
-      message: 'Image paste',
+      message: 'Image pasting',
       includeLogs: false,
       featureRequestChoice: 'image-paste',
       featureRequestDetail: null,

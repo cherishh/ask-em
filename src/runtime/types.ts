@@ -16,6 +16,24 @@ export type ProviderStatus = {
   authSignalSummary?: string;
 };
 
+export type AttachmentRef = {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+};
+
+export type CapturedAttachment = AttachmentRef & {
+  file: File;
+  source: 'paste' | 'drop' | 'file-input' | 'transient-file-input';
+};
+
+export type UploadCapability = {
+  mimes: string[];
+  extensions?: string[];
+  maxFiles: number;
+} | null;
+
 export type ConversationRef = {
   provider: Provider;
   sessionId: string | null;
@@ -33,7 +51,12 @@ export type Workspace = {
   pendingSource?: Provider;
 };
 
-export type WorkspaceIssue = 'needs-login' | 'loading' | 'delivery-failed' | 'error-page';
+export type WorkspaceIssue =
+  | 'needs-login'
+  | 'loading'
+  | 'delivery-failed'
+  | 'error-page'
+  | 'unsupported-attachment';
 
 export type DefaultEnabledProviders = Record<Provider, boolean>;
 

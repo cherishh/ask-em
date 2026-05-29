@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SHORTCUTS, type ProviderStatus, type WorkspaceSummary } from '../runtime/protocol';
+import type { UserSubmissionPayload } from '../adapters/types';
 
 const routingMocks = vi.hoisted(() => ({
   buildHeartbeatMessage: vi.fn(() => ({ type: 'HEARTBEAT' })),
@@ -71,7 +72,7 @@ describe('content bootstrap wiring', () => {
   let runtimeListener:
     | ((message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => unknown)
     | null;
-  let submitHandler: ((content: string) => void) | null;
+  let submitHandler: ((payload: UserSubmissionPayload) => void) | null;
   let beforeUnloadHandler: (() => void) | null;
   let status: ProviderStatus;
   let ui: {
@@ -262,7 +263,7 @@ describe('content bootstrap wiring', () => {
 
     await bootstrap();
 
-    submitHandler?.('hello world');
+    submitHandler?.({ text: 'hello world', attachments: [] });
     await flushMicrotasks();
 
     expect(ui.setState).toHaveBeenCalledWith('syncing', 'current model is in sync');
@@ -284,7 +285,7 @@ describe('content bootstrap wiring', () => {
     await bootstrap();
     routingMocks.sendRuntimeMessage.mockClear();
 
-    submitHandler?.('hello world');
+    submitHandler?.({ text: 'hello world', attachments: [] });
     await flushMicrotasks();
 
     expect(
@@ -304,7 +305,7 @@ describe('content bootstrap wiring', () => {
     routingMocks.observeUrlChanges.mockReturnValue(stopObservingUrl);
 
     const composer = {
-      subscribeToUserSubmissions(onSubmit: (content: string) => void) {
+      subscribeToUserSubmissions(onSubmit: (payload: UserSubmissionPayload) => void) {
         submitHandler = onSubmit;
         return unsubscribe;
       },

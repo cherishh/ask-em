@@ -146,6 +146,7 @@ export async function attemptProviderDelivery({
       workspaceId,
       provider,
       content: message.content,
+      attachments: message.attachments,
       expectedSessionId: target.expectedSessionId,
       expectedUrl: target.expectedUrl,
       timestamp: Date.now(),

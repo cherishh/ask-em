@@ -83,6 +83,8 @@ export function makeSubmitMessage(overrides: Partial<UserSubmitMessage> = {}): U
     pageKind: 'existing-session',
     allowNewSetCreation: true,
     content: 'hello',
+    attachments: [],
+    submitId: 'submit-test',
     timestamp: 100,
     ...overrides,
   };

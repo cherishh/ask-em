@@ -74,7 +74,10 @@ describe('dom provider adapter submit detection', () => {
     const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
     document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    expect(onSubmit).toHaveBeenCalledWith('hello');
+    expect(onSubmit).toHaveBeenCalledWith({
+      text: 'hello',
+      attachments: [],
+    });
     unsubscribe?.();
   });
 });

@@ -117,14 +117,20 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
             !event.isComposing &&
             isElementWithin(event.target, composer)
           ) {
-            onSubmit(getEditableText(composer));
+            onSubmit({
+              text: getEditableText(composer),
+              attachments: [],
+            });
           }
         };
 
         const handleClick = (event: MouseEvent) => {
           const sendButton = findSendButton();
           if (sendButton && isSendButtonEnabled(sendButton) && isElementWithin(event.target, sendButton)) {
-            onSubmit(getEditableText(findComposer()));
+            onSubmit({
+              text: getEditableText(findComposer()),
+              attachments: [],
+            });
           }
         };
 

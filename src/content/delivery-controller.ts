@@ -106,7 +106,14 @@ export function createDeliveryController(
         });
 
         const baselineUrl = adapter.session.getCurrentUrl();
-        await adapter.composer.setComposerText(message.content);
+        if (adapter.composer.setComposerPayload) {
+          await adapter.composer.setComposerPayload({
+            text: message.content,
+            attachments: message.attachments,
+          });
+        } else {
+          await adapter.composer.setComposerText(message.content);
+        }
         submitController.rememberProgrammaticSubmit(message.content);
         await adapter.composer.submit();
 

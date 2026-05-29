@@ -1,5 +1,6 @@
 import type { ShortcutConfig } from './shortcuts';
 import type {
+  AttachmentRef,
   DebugLogEntry,
   DefaultEnabledProviders,
   PageKind,
@@ -35,6 +36,8 @@ export type UserSubmitMessage = {
   pageKind: PageKind;
   allowNewSetCreation: boolean;
   content: string;
+  attachments: AttachmentRef[];
+  submitId: string;
   timestamp: number;
 };
 
@@ -43,9 +46,60 @@ export type DeliverPromptMessage = {
   workspaceId: string;
   provider: Provider;
   content: string;
+  attachments: AttachmentRef[];
   expectedSessionId: string | null;
   expectedUrl: string | null;
   timestamp: number;
+};
+
+export type AttachmentCreateMessage = {
+  type: 'ATTACHMENT_CREATE';
+  submitId: string;
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+};
+
+export type AttachmentAppendChunkMessage = {
+  type: 'ATTACHMENT_APPEND_CHUNK';
+  submitId: string;
+  attachmentId: string;
+  offset: number;
+  chunkBase64: string;
+};
+
+export type AttachmentFinalizeMessage = {
+  type: 'ATTACHMENT_FINALIZE';
+  submitId: string;
+  attachmentId: string;
+};
+
+export type AttachmentReadChunkMessage = {
+  type: 'ATTACHMENT_READ_CHUNK';
+  attachmentId: string;
+  offset: number;
+  maxBytes: number;
+};
+
+export type AttachmentAbortMessage =
+  | {
+      type: 'ATTACHMENT_ABORT';
+      submitId: string;
+      ids?: never;
+    }
+  | {
+      type: 'ATTACHMENT_ABORT';
+      submitId?: never;
+      ids: string[];
+    };
+
+export type AttachmentReadChunkResponse = {
+  attachmentId: string;
+  offset: number;
+  nextOffset: number;
+  chunkBase64: string;
+  done: boolean;
 };
 
 export type ProviderDeliveryResult = {
@@ -212,6 +266,11 @@ export type RuntimeMessage =
   | HeartbeatMessage
   | UserSubmitMessage
   | DeliverPromptMessage
+  | AttachmentCreateMessage
+  | AttachmentAppendChunkMessage
+  | AttachmentFinalizeMessage
+  | AttachmentReadChunkMessage
+  | AttachmentAbortMessage
   | SyncProgressMessage
   | PingMessage
   | PingResponseMessage

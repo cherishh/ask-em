@@ -1,9 +1,12 @@
 import type {
+  AttachmentRef,
+  CapturedAttachment,
   DeliverPromptMessage,
   PageKind,
   PageState,
   Provider,
   ProviderStatus,
+  UploadCapability,
 } from '../runtime/protocol';
 
 export type { Provider };
@@ -33,14 +36,33 @@ export interface ProviderSessionAdapter {
   ): boolean;
 }
 
+export type UserSubmissionPayload = {
+  text: string;
+  attachments: CapturedAttachment[];
+};
+
+export type ComposerPayload = {
+  text: string;
+  attachments: AttachmentRef[];
+};
+
+export type ComposerAttachmentPresence = {
+  count: number;
+  keys?: string[];
+};
+
 export interface ProviderComposerAdapter {
-  subscribeToUserSubmissions?(onSubmit: (content: string) => void): () => void;
+  subscribeToUserSubmissions?(onSubmit: (payload: UserSubmissionPayload) => void): () => void;
+  setComposerPayload?(payload: ComposerPayload): Promise<void> | void;
   setComposerText(content: string): Promise<void> | void;
+  detectAttachmentUploadError?(): string | null | Promise<string | null>;
+  getComposerAttachmentPresence?(): ComposerAttachmentPresence | Promise<ComposerAttachmentPresence>;
   submit(): Promise<void> | void;
 }
 
 export interface ProviderAdapter {
   name: Provider;
+  uploadCapability?: UploadCapability;
   getUiSpec(): ProviderUiSpec;
   session: ProviderSessionAdapter;
   composer?: ProviderComposerAdapter;

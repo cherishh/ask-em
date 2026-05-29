@@ -170,17 +170,17 @@ type UploadCapability = {
 
 ### Phase 0：协议和类型脚手架
 
-- [ ] 添加 `AttachmentRef`（无 sha256）、`CapturedAttachment`、`UploadCapability`（含 `extensions?`）。
-- [ ] 定义附件传输消息类型（`ATTACHMENT_CREATE/APPEND_CHUNK/FINALIZE/READ_CHUNK/ABORT`）。
-- [ ] 消息协议增加 `attachments: []` 默认值。
-- [ ] `WorkspaceIssue` 增加 `unsupported-attachment`。
-- [ ] 所有现有 call site 传空数组。
-- [ ] 不改行为。
+- [x] 添加 `AttachmentRef`（无 sha256）、`CapturedAttachment`、`UploadCapability`（含 `extensions?`）。
+- [x] 定义附件传输消息类型（`ATTACHMENT_CREATE/APPEND_CHUNK/FINALIZE/READ_CHUNK/ABORT`）。
+- [x] 消息协议增加 `attachments: []` 默认值。
+- [x] `WorkspaceIssue` 增加 `unsupported-attachment`。
+- [x] 所有现有 call site 传空数组。
+- [x] 不改行为。
 
 验收：
-- [ ] `pnpm compile` 通过。
-- [ ] `pnpm test` 通过。
-- [ ] 现有 text-only 同步行为不变。
+- [x] `pnpm compile` 通过。
+- [x] `pnpm test` 通过。
+- [x] 现有 text-only 同步行为不变。
 
 ### Phase 0.5（fixtures，非执行 phase）
 
