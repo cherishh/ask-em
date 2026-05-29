@@ -225,9 +225,9 @@ type UploadCapability = {
 
 ### Phase 2.5：Source-capture Spike（执行前 spike）
 
-- [ ] 验证 `File` 跨 MAIN→ISOLATED world 回传机制（候选：`window.postMessage` structured-clone `File[]`）。
-- [ ] 验证 Manus 类 transient detached input 的捕获可行性。
-- [ ] 产出：钉死的 bridge 机制说明 + fixture，供 Phase 3/3.5 直接用。
+- [x] 验证 `File` 跨 MAIN→ISOLATED world 回传机制（候选：`window.postMessage` structured-clone `File[]`）。
+- [x] 验证 Manus 类 transient detached input 的捕获可行性。
+- [x] 产出：钉死的 bridge 机制说明 + fixture，供 Phase 3/3.5 直接用。
 
 ### Phase 3：Source Capture（paste / drop / 稳定 input）
 

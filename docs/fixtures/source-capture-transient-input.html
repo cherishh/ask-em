@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>ask'em transient input bridge fixture</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 32px;
+      }
+
+      button {
+        font: inherit;
+        padding: 8px 12px;
+      }
+
+      pre {
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Transient input bridge fixture</h1>
+    <button id="open">Open detached file input</button>
+    <pre id="log">No files captured.</pre>
+
+    <script>
+      const log = document.querySelector('#log');
+
+      window.addEventListener('message', (event) => {
+        if (event.source !== window) {
+          return;
+        }
+
+        const data = event.data;
+        if (!data || data.source !== 'ask-em' || data.type !== 'ASK_EM_TRANSIENT_FILES') {
+          return;
+        }
+
+        const files = Array.from(data.files || []);
+        log.textContent = files
+          .map((file) => `${file.name || '(unnamed)'} | ${file.type || '(empty type)'} | ${file.size} bytes`)
+          .join('\n') || 'Message received, but no files were present.';
+      });
+
+      document.querySelector('#open').addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.multiple = true;
+        input.addEventListener('change', () => {
+          window.postMessage({
+            source: 'ask-em',
+            type: 'ASK_EM_TRANSIENT_FILES',
+            files: Array.from(input.files || []),
+          }, window.location.origin);
+        }, { once: true });
+        input.click();
+      });
+    </script>
+  </body>
+</html>
