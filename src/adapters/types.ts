@@ -59,7 +59,7 @@ export interface ProviderComposerAdapter {
   detectAttachmentUploadError?(): string | null | Promise<string | null>;
   getComposerAttachmentPresence?(): ComposerAttachmentPresence | Promise<ComposerAttachmentPresence>;
   suppressAttachmentCaptureFor?(durationMs: number): void;
-  submit(): Promise<void> | void;
+  submit(options?: { timeoutMs?: number }): Promise<void> | void;
 }
 
 export interface ProviderAdapter {

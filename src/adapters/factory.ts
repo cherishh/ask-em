@@ -1,4 +1,5 @@
 import type { DeliverPromptMessage, Provider, ProviderStatus, UploadCapability } from '../runtime/protocol';
+import type { ComposerAttachmentPresence, ComposerPayload } from './types';
 import { isAskEmTransientFilesMessage } from '../runtime/protocol';
 import {
   ComposerAttachmentCaptureBuffer,
@@ -42,6 +43,26 @@ type DomProviderAdapterConfig = {
   submitWaitMs?: number;
   submitTimeoutMs?: number;
   isSendButtonEnabled?: (button: HTMLElement) => boolean;
+  setComposerPayload?: (
+    payload: ComposerPayload,
+    context: {
+      findComposer: () => HTMLElement | null;
+      findSendButton: () => HTMLElement | null;
+      setComposerText: (content: string) => Promise<void>;
+    },
+  ) => Promise<void> | void;
+  getComposerAttachmentPresence?: (
+    context: {
+      findComposer: () => HTMLElement | null;
+      findSendButton: () => HTMLElement | null;
+    },
+  ) => ComposerAttachmentPresence | Promise<ComposerAttachmentPresence>;
+  detectAttachmentUploadError?: (
+    context: {
+      findComposer: () => HTMLElement | null;
+      findSendButton: () => HTMLElement | null;
+    },
+  ) => string | null | Promise<string | null>;
   isFileInputForComposer?: (
     input: HTMLInputElement,
     context: {
@@ -150,6 +171,10 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     }
 
     return snapshot.pageKind === 'new-chat';
+  };
+  const setComposerText = async (content: string) => {
+    prepareDom();
+    setEditableText(findComposer(), content);
   };
 
   return {
@@ -281,19 +306,46 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
         };
       },
       async setComposerText(content) {
-        prepareDom();
-        setEditableText(findComposer(), content);
+        await setComposerText(content);
+      },
+      async setComposerPayload(payload) {
+        if (config.setComposerPayload) {
+          await config.setComposerPayload(payload, {
+            findComposer,
+            findSendButton,
+            setComposerText,
+          });
+          return;
+        }
+
+        if (payload.attachments.length > 0) {
+          throw new Error('Provider does not support attachment delivery');
+        }
+
+        await setComposerText(payload.text);
+      },
+      getComposerAttachmentPresence() {
+        return config.getComposerAttachmentPresence?.({
+          findComposer,
+          findSendButton,
+        }) ?? { count: 0 };
+      },
+      detectAttachmentUploadError() {
+        return config.detectAttachmentUploadError?.({
+          findComposer,
+          findSendButton,
+        }) ?? null;
       },
       suppressAttachmentCaptureFor(durationMs) {
         suppressAttachmentCaptureUntil = Math.max(suppressAttachmentCaptureUntil, Date.now() + durationMs);
       },
-      async submit() {
+      async submit(options) {
         prepareDom();
         await sleep(config.submitWaitMs ?? 150);
         const sendButton = await waitFor(() => {
           const button = findSendButton();
           return button && isSendButtonEnabled(button) ? button : null;
-        }, config.submitTimeoutMs ?? 2_000);
+        }, options?.timeoutMs ?? config.submitTimeoutMs ?? 2_000);
 
         if (sendButton && isSendButtonEnabled(sendButton)) {
           triggerPointerClick(sendButton);

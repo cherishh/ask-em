@@ -256,17 +256,17 @@ type UploadCapability = {
 
 ### Phase 4：Claude Target Delivery
 
-- [ ] 实现 `setComposerPayload` + 从 base64 chunk reconstruct `File`。
-- [ ] Claude 稳定 file input fallback。
-- [ ] **submit 前通过 `getComposerAttachmentPresence()` 做 baseline+delta 正向确认 [A1]**。
-- [ ] 附件 delivery 等待窗口延长 + 轮询 `detectAttachmentUploadError()`（先 TODO stub）。
-- [ ] `handleUserSubmit` outer finally 按 submitId release [B2 + R2-P1-3]。
+- [x] 实现 `setComposerPayload` + 从 base64 chunk reconstruct `File`。
+- [x] Claude 稳定 file input fallback。
+- [x] **submit 前通过 `getComposerAttachmentPresence()` 做 baseline+delta 正向确认 [A1]**。
+- [x] 附件 delivery 等待窗口延长 + 轮询 `detectAttachmentUploadError()`（先 TODO stub）。
+- [x] `handleUserSubmit` outer finally 按 submitId release [B2 + R2-P1-3]。
 
 验收：
-- [ ] 一个已支持附件能 fan-out 到 Claude target 并发送。
-- [ ] **注入失败（mock 不接附件的 DOM）时 target 不发纯文本、上报 `delivery-failed` [A1]**。
-- [ ] `USER_SUBMIT` 发出时对应 ref 已是 `ready` [A2]。
-- [ ] fan-out 后 store 无残留；人为制造 delivery failure 后 store 仍 drain。
+- [x] 一个已支持附件能 fan-out 到 Claude target 并发送。
+- [x] **注入失败（mock 不接附件的 DOM）时 target 不发纯文本、上报 `delivery-failed` [A1]**。
+- [x] `USER_SUBMIT` 发出时对应 ref 已是 `ready` [A2]。
+- [x] fan-out 后 store 无残留；人为制造 delivery failure 后 store 仍 drain。
 
 ### Phase 5：扩展到其他 Provider
 
