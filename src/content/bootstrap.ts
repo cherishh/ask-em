@@ -96,7 +96,7 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
   });
 
   const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.((payload) => {
-    void submitController.reportUserSubmit(payload.text);
+    void submitController.reportUserSubmit(payload);
   });
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>

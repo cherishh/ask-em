@@ -6,6 +6,7 @@ const routingMocks = vi.hoisted(() => ({
   buildHeartbeatMessage: vi.fn(() => ({ type: 'HEARTBEAT' })),
   buildHelloMessage: vi.fn(() => ({ type: 'HELLO' })),
   buildUserSubmitMessage: vi.fn(() => ({ type: 'USER_SUBMIT' })),
+  createSubmitId: vi.fn(() => 'submit-test'),
   observeUrlChanges: vi.fn(() => vi.fn()),
   sendRuntimeMessage: vi.fn(),
 }));
@@ -64,6 +65,8 @@ function createHelloResponse(overrides: Record<string, unknown> = {}) {
 }
 
 async function flushMicrotasks() {
+  await Promise.resolve();
+  await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
 }

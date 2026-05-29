@@ -98,6 +98,7 @@ export function createDeliveryController(
 
       try {
         submitController.suppressObservedSubmissionsFor(2_500);
+        adapter.composer.suppressAttachmentCaptureFor?.(2_500);
         await dependencies.logDebug({
           level: 'info',
           message: 'Starting prompt delivery in content',

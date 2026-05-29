@@ -39,6 +39,7 @@ export interface ProviderSessionAdapter {
 export type UserSubmissionPayload = {
   text: string;
   attachments: CapturedAttachment[];
+  onConsumed?: () => void;
 };
 
 export type ComposerPayload = {
@@ -57,6 +58,7 @@ export interface ProviderComposerAdapter {
   setComposerText(content: string): Promise<void> | void;
   detectAttachmentUploadError?(): string | null | Promise<string | null>;
   getComposerAttachmentPresence?(): ComposerAttachmentPresence | Promise<ComposerAttachmentPresence>;
+  suppressAttachmentCaptureFor?(durationMs: number): void;
   submit(): Promise<void> | void;
 }
 

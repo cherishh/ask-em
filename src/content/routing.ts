@@ -8,7 +8,7 @@ import type {
 } from '../runtime/protocol';
 import type { ProviderAdapter } from '../adapters/types';
 
-function createSubmitId(): string {
+export function createSubmitId(): string {
   return (
     globalThis.crypto?.randomUUID?.() ??
     `submit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`

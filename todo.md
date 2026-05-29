@@ -231,20 +231,20 @@ type UploadCapability = {
 
 ### Phase 3：Source Capture（paste / drop / 稳定 input）
 
-- [ ] paste/drop/稳定 file input 捕获 + provider-specific scoping。
-- [ ] capture-time 稳定 id 的 per-tab buffer。
-- [ ] **dedupe gate 先于 store 写入 [A3]**；fingerprint 含 attachment ids。
-- [ ] buffer → store 的 chunked base64 write；`USER_SUBMIT` 等 finalize 再发 [A2]。
-- [ ] **过 dedupe 后铸 `submitId`，贯穿 staging create + USER_SUBMIT [R2-P1-2]**；失败/取消时发 `ATTACHMENT_ABORT(submitId)` [R2-P2-5]。
-- [ ] 删除附件 invalidation（当前 message 级，下次干净 capture 重置）。
-- [ ] 超数量/超单文件/超预算跳过 fan-out + 提示，不阻断原生发送。
-- [ ] submit-runtime suppression 覆盖 synthetic paste / file-input change。
+- [x] paste/drop/稳定 file input 捕获 + provider-specific scoping。
+- [x] capture-time 稳定 id 的 per-tab buffer。
+- [x] **dedupe gate 先于 store 写入 [A3]**；fingerprint 含 attachment ids。
+- [x] buffer → store 的 chunked base64 write；`USER_SUBMIT` 等 finalize 再发 [A2]。
+- [x] **过 dedupe 后铸 `submitId`，贯穿 staging create + USER_SUBMIT [R2-P1-2]**；失败/取消时发 `ATTACHMENT_ABORT(submitId)` [R2-P2-5]。
+- [x] 删除附件 invalidation（当前 message 级，下次干净 capture 重置）。
+- [x] 超数量/超单文件/超预算跳过 fan-out + 提示，不阻断原生发送。
+- [x] submit-runtime suppression 覆盖 synthetic paste / file-input change。
 
 验收：
-- [ ] Claude 上传一个已支持附件后 submit，`USER_SUBMIT` 有一个 `AttachmentRef`，store 恰好一条。
-- [ ] text-only 不写 attachment store。
-- [ ] duplicate-submit dedupe 仍工作（keydown+click 双触发不产生双写）。
-- [ ] 删除附件后本次跳过、下次干净 capture 恢复。
+- [x] Claude 上传一个已支持附件后 submit，`USER_SUBMIT` 有一个 `AttachmentRef`，store 恰好一条。
+- [x] text-only 不写 attachment store。
+- [x] duplicate-submit dedupe 仍工作（keydown+click 双触发不产生双写）。
+- [x] 删除附件后本次跳过、下次干净 capture 恢复。
 
 ### Phase 3.5：Manus 类 transient input（MAIN-world hook）
 
