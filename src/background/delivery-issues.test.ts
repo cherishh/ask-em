@@ -39,4 +39,14 @@ describe('classifyDeliveryIssue', () => {
       }),
     ).toBe('loading');
   });
+
+  it('maps attachment capability failures to unsupported-attachment', () => {
+    expect(
+      classifyDeliveryIssue({
+        provider: 'chatgpt',
+        ok: false,
+        reason: 'chatgpt attachment type not supported',
+      }),
+    ).toBe('unsupported-attachment');
+  });
 });

@@ -1,5 +1,6 @@
 import { getVisibleButtonTexts } from './dom';
 import { createDomProviderAdapter } from './factory';
+import { PROVIDER_UPLOAD_CAPABILITIES } from '../runtime/protocol';
 
 export function isGeminiLoginRequiredPage(input: {
   pathname: string;
@@ -13,6 +14,7 @@ export function isGeminiLoginRequiredPage(input: {
 
 export const geminiAdapter = createDomProviderAdapter({
   provider: 'gemini',
+  uploadCapability: PROVIDER_UPLOAD_CAPABILITIES.gemini,
   mountId: 'ask-em-gemini-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-gemini',
   classifyAuth() {

@@ -1,5 +1,6 @@
 import { getVisibleButtonTexts, getVisibleInputDescriptors, isElementWithin } from './dom';
 import { createDomProviderAdapter } from './factory';
+import { PROVIDER_UPLOAD_CAPABILITIES } from '../runtime/protocol';
 
 export function isDeepseekLoginRequiredPage(input: {
   pathname: string;
@@ -40,6 +41,7 @@ export function isDeepseekLoginRequiredPage(input: {
 
 export const deepseekAdapter = createDomProviderAdapter({
   provider: 'deepseek',
+  uploadCapability: PROVIDER_UPLOAD_CAPABILITIES.deepseek,
   mountId: 'ask-em-deepseek-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-deepseek',
   classifyAuth() {

@@ -1,4 +1,4 @@
-import type { DeliverPromptMessage, Provider, ProviderStatus } from '../runtime/protocol';
+import type { DeliverPromptMessage, Provider, ProviderStatus, UploadCapability } from '../runtime/protocol';
 import {
   detectObviousErrorPage,
   detectLoginRequired,
@@ -17,6 +17,7 @@ import type { AdapterSnapshot, ProviderAdapter } from './types';
 
 type DomProviderAdapterConfig = {
   provider: Provider;
+  uploadCapability?: UploadCapability;
   mountId: string;
   className: string;
   prepareDom?: () => void;
@@ -91,6 +92,7 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
 
   return {
     name: config.provider,
+    uploadCapability: config.uploadCapability,
     getUiSpec() {
       return {
         mountId: config.mountId,

@@ -1,5 +1,6 @@
 import { getVisibleButtonTexts, getVisibleHeadingTexts } from './dom';
 import { createDomProviderAdapter } from './factory';
+import { PROVIDER_UPLOAD_CAPABILITIES } from '../runtime/protocol';
 
 export function isChatgptLoginRequiredPage(input: {
   pathname: string;
@@ -26,6 +27,7 @@ export function isChatgptLoginRequiredPage(input: {
 
 export const chatgptAdapter = createDomProviderAdapter({
   provider: 'chatgpt',
+  uploadCapability: PROVIDER_UPLOAD_CAPABILITIES.chatgpt,
   mountId: 'ask-em-chatgpt-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-chatgpt',
   classifyAuth() {

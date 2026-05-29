@@ -7,6 +7,7 @@ import type {
 } from '../runtime/protocol';
 import { upsertClaimedTab } from '../runtime/storage';
 import { logDebug } from './debug';
+import { checkProviderAttachmentCapability } from './attachment-capability';
 import { resolveDeliveryTarget, resolveReadyProviderTabForWorkspace } from './delivery-targets';
 
 type DeliverPromptResponse = {
@@ -75,6 +76,24 @@ export async function attemptProviderDelivery({
 }: AttemptProviderDeliveryInput): Promise<ProviderDeliveryResult> {
   const existingIssue = workspace.memberIssues?.[provider] ?? null;
   let deliveryTargetOverride: Awaited<ReturnType<typeof resolveReadyProviderTabForWorkspace>> = null;
+  const attachmentCapability = checkProviderAttachmentCapability(provider, message.attachments);
+
+  if (!attachmentCapability.ok) {
+    await logDebug({
+      level: 'warn',
+      scope: 'background',
+      provider,
+      workspaceId,
+      message: 'Skipped delivery for unsupported attachment',
+      detail: attachmentCapability.reason,
+    });
+
+    return {
+      provider,
+      ok: false,
+      reason: attachmentCapability.reason,
+    } satisfies ProviderDeliveryResult;
+  }
 
   if (existingIssue === 'needs-login') {
     deliveryTargetOverride = await resolveReadyProviderTabForWorkspace(

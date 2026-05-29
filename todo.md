@@ -212,16 +212,16 @@ type UploadCapability = {
 
 ### Phase 2：Capability Gate + Presentation
 
-- [ ] 为 Claude / ChatGPT / Gemini / DeepSeek / Manus 声明 MIME / extension / count capability，含已验证的图片 + 常见文档。
-- [ ] background delivery 增加 capability gate（mime∪extension，空-空→unsupported，count gate）。
-- [ ] mixed 附件 all-or-nothing → `unsupported-attachment` [P2-a]。
-- [ ] 不支持时返回 `unsupported-attachment`，不影响其他 provider。
-- [ ] **presentation helper 支持 `unsupported-attachment`（同批）**。
+- [x] 为 Claude / ChatGPT / Gemini / DeepSeek / Manus 声明 MIME / extension / count capability，含已验证的图片 + 常见文档。
+- [x] background delivery 增加 capability gate（mime∪extension，空-空→unsupported，count gate）。
+- [x] mixed 附件 all-or-nothing → `unsupported-attachment` [P2-a]。
+- [x] 不支持时返回 `unsupported-attachment`，不影响其他 provider。
+- [x] **presentation helper 支持 `unsupported-attachment`（同批）**。
 
 验收：
-- [ ] text-only 行为不变。
-- [ ] synthetic attachment payload 的 capability gate 测试通过（含 mixed all-or-nothing、extension 兜底、空-空→unsupported）。
-- [ ] presentation helper 测试覆盖 `unsupported-attachment`。
+- [x] text-only 行为不变。
+- [x] synthetic attachment payload 的 capability gate 测试通过（含 mixed all-or-nothing、extension 兜底、空-空→unsupported）。
+- [x] presentation helper 测试覆盖 `unsupported-attachment`。
 
 ### Phase 2.5：Source-capture Spike（执行前 spike）
 

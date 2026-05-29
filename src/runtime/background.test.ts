@@ -941,6 +941,138 @@ describe('background submit routing', () => {
     expect(attachmentStoreMocks.releaseSubmitAttachments).toHaveBeenCalledWith('submit-success');
   });
 
+  it('applies attachment capability gates per target without blocking supported targets', async () => {
+    const attachments = Array.from({ length: 11 }, (_, index) => ({
+      id: `a${index}`,
+      name: `${index}.png`,
+      mime: 'image/png',
+      size: 1,
+    }));
+    const localState: LocalState = {
+      ...makeLocalState(),
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          members: {
+            claude: makeConversationRef('claude', 'c-1', 'https://claude.ai/chat/c-1'),
+            chatgpt: makeConversationRef('chatgpt', 'g-1', 'https://chatgpt.com/c/g-1'),
+            gemini: makeConversationRef('gemini', 'm-1', 'https://gemini.google.com/app/m-1'),
+          },
+          enabledProviders: ['claude', 'chatgpt', 'gemini'],
+        }),
+      },
+      workspaceIndex: {
+        'claude:c-1': 'w1',
+        'chatgpt:g-1': 'w1',
+        'gemini:m-1': 'w1',
+      },
+    };
+    const sessionState = makeSessionState({
+      'w1:claude': makeClaimedTab({
+        provider: 'claude',
+        workspaceId: 'w1',
+        tabId: 9,
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+      }),
+      'w1:chatgpt': makeClaimedTab({
+        provider: 'chatgpt',
+        workspaceId: 'w1',
+        tabId: 10,
+        currentUrl: 'https://chatgpt.com/c/g-1',
+        sessionId: 'g-1',
+      }),
+      'w1:gemini': makeClaimedTab({
+        provider: 'gemini',
+        workspaceId: 'w1',
+        tabId: 11,
+        currentUrl: 'https://gemini.google.com/app/m-1',
+        sessionId: 'm-1',
+      }),
+    });
+    const finalLocalState: LocalState = {
+      ...localState,
+      workspaces: {
+        w1: {
+          ...localState.workspaces.w1,
+          memberIssues: {
+            gemini: 'unsupported-attachment',
+          },
+        },
+      },
+    };
+
+    storageMocks.getLocalState
+      .mockResolvedValueOnce(localState)
+      .mockResolvedValueOnce(localState)
+      .mockResolvedValueOnce(finalLocalState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+
+    const sendMessage = vi.fn().mockImplementation((tabId: number, message: { type: string }) => {
+      if (message.type === 'PING') {
+        return Promise.resolve({
+          type: 'PING_RESPONSE',
+          provider: tabId === 10 ? 'chatgpt' : 'gemini',
+          currentUrl: tabId === 10 ? 'https://chatgpt.com/c/g-1' : 'https://gemini.google.com/app/m-1',
+          sessionId: tabId === 10 ? 'g-1' : 'm-1',
+          pageState: 'ready',
+          pageKind: 'existing-session',
+        });
+      }
+
+      return Promise.resolve({ ok: true, confirmed: true });
+    });
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 9 }),
+        sendMessage,
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    const result = await handleUserSubmit(
+      makeSubmitMessage({
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+        attachments,
+        submitId: 'submit-capability',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(sendMessage).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({
+        type: 'DELIVER_PROMPT',
+        attachments,
+      }),
+    );
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      11,
+      expect.objectContaining({
+        type: 'DELIVER_PROMPT',
+      }),
+    );
+    expect(result.deliveryResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provider: 'chatgpt', ok: true }),
+        expect.objectContaining({
+          provider: 'gemini',
+          ok: false,
+          reason: 'gemini attachment count not supported',
+        }),
+      ]),
+    );
+    expect(result.workspaceSummary?.memberIssues.gemini).toBe('unsupported-attachment');
+  });
+
   it('does not fan out when submit comes from a claimed tab on an unrelated existing session', async () => {
     const localState: LocalState = {
       ...makeLocalState(),

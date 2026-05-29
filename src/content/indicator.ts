@@ -47,7 +47,13 @@ function isWarningMemberState(state: GroupMemberState | undefined) {
 }
 
 function isWarningIssue(issue: WorkspaceIssue | null | undefined) {
-  return issue === 'needs-login' || issue === 'loading' || issue === 'delivery-failed' || issue === 'error-page';
+  return (
+    issue === 'needs-login' ||
+    issue === 'loading' ||
+    issue === 'delivery-failed' ||
+    issue === 'error-page' ||
+    issue === 'unsupported-attachment'
+  );
 }
 
 export function countWorkspaceIssues(summary: WorkspaceSummary | null): number {

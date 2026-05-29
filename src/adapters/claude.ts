@@ -1,5 +1,6 @@
 import { getVisibleButtonTexts } from './dom';
 import { createDomProviderAdapter } from './factory';
+import { PROVIDER_UPLOAD_CAPABILITIES } from '../runtime/protocol';
 
 export function isClaudeLoginRequiredPage(input: {
   pathname: string;
@@ -22,6 +23,7 @@ export function isClaudeLoginRequiredPage(input: {
 
 export const claudeAdapter = createDomProviderAdapter({
   provider: 'claude',
+  uploadCapability: PROVIDER_UPLOAD_CAPABILITIES.claude,
   mountId: 'ask-em-claude-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-claude',
   classifyAuth() {

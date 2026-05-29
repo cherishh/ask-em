@@ -85,6 +85,22 @@ describe('workspace provider display', () => {
     });
   });
 
+  it('surfaces unsupported attachments as needs attention', () => {
+    expect(
+      getWorkspaceProviderDisplay({
+        memberState: 'ready',
+        memberIssue: 'unsupported-attachment',
+        enabled: true,
+        globalSyncEnabled: true,
+        hasMember: true,
+      }),
+    ).toEqual({
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Attachment not supported',
+    });
+  });
+
   it('returns a single presentation object with popup tone', () => {
     expect(
       getWorkspaceProviderPresentation({

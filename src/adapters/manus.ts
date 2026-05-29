@@ -1,5 +1,6 @@
 import { findClickableByText, getVisibleButtonTexts, isVisible, triggerPointerClick } from './dom';
 import { createDomProviderAdapter } from './factory';
+import { PROVIDER_UPLOAD_CAPABILITIES } from '../runtime/protocol';
 
 function dismissManusOverlay(): void {
   const gotIt = findClickableByText('I got it') ?? findClickableByText('Got it');
@@ -49,6 +50,7 @@ export function isManusLoginRequiredPage(input: {
 
 export const manusAdapter = createDomProviderAdapter({
   provider: 'manus',
+  uploadCapability: PROVIDER_UPLOAD_CAPABILITIES.manus,
   mountId: 'ask-em-manus-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-manus',
   prepareDom: dismissManusOverlay,

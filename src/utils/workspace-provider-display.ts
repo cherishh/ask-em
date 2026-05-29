@@ -94,6 +94,14 @@ export function getWorkspaceProviderDisplay(
     };
   }
 
+  if (input.memberIssue === 'unsupported-attachment') {
+    return {
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Attachment not supported',
+    };
+  }
+
   if (!input.hasMember || input.memberState === 'inactive') {
     return {
       kind: 'will-reopen',
@@ -140,7 +148,8 @@ export function getWorkspaceProviderDotState(
     input.memberIssue === 'needs-login' ||
     input.memberIssue === 'loading' ||
     input.memberIssue === 'delivery-failed' ||
-    input.memberIssue === 'error-page'
+    input.memberIssue === 'error-page' ||
+    input.memberIssue === 'unsupported-attachment'
   ) {
     return 'warning';
   }
