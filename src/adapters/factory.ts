@@ -1,4 +1,5 @@
 import type { DeliverPromptMessage, Provider, ProviderStatus, UploadCapability } from '../runtime/protocol';
+import { isAskEmTransientFilesMessage } from '../runtime/protocol';
 import {
   ComposerAttachmentCaptureBuffer,
   getFilesFromDataTransfer,
@@ -219,6 +220,18 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
           attachmentBuffer.addFiles(files, 'file-input');
         };
 
+        const handleTransientFilesMessage = (event: MessageEvent) => {
+          if (event.source !== window || isAttachmentCaptureSuppressed()) {
+            return;
+          }
+
+          if (!isAskEmTransientFilesMessage(event.data)) {
+            return;
+          }
+
+          attachmentBuffer.addFiles(event.data.files, 'transient-file-input');
+        };
+
         const handleKeydown = (event: KeyboardEvent) => {
           const composer = findComposer();
           if (
@@ -254,6 +267,7 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
         document.addEventListener('paste', handlePaste, true);
         document.addEventListener('drop', handleDrop, true);
         document.addEventListener('change', handleFileInputChange, true);
+        window.addEventListener('message', handleTransientFilesMessage);
         document.addEventListener('keydown', handleKeydown, true);
         document.addEventListener('click', handleClick, true);
 
@@ -261,6 +275,7 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
           document.removeEventListener('paste', handlePaste, true);
           document.removeEventListener('drop', handleDrop, true);
           document.removeEventListener('change', handleFileInputChange, true);
+          window.removeEventListener('message', handleTransientFilesMessage);
           document.removeEventListener('keydown', handleKeydown, true);
           document.removeEventListener('click', handleClick, true);
         };

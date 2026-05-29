@@ -171,6 +171,50 @@ describe('dom provider adapter submit detection', () => {
     unsubscribe?.();
   });
 
+  it('captures bridged transient input files for the next submit', () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">hello</div>
+      <button id="send">Send</button>
+    `;
+
+    const file = new File(['abc'], 'transient.pdf', { type: 'application/pdf' });
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'manus',
+      mountId: 'ask-em-manus-ui',
+      className: 'ask-em-manus-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        source: window,
+        data: {
+          source: 'ask-em',
+          type: 'ASK_EM_TRANSIENT_FILES',
+          files: [file],
+        },
+      }),
+    );
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      text: 'hello',
+      attachments: [
+        expect.objectContaining({
+          file,
+          name: 'transient.pdf',
+          mime: 'application/pdf',
+          source: 'transient-file-input',
+        }),
+      ],
+      onConsumed: expect.any(Function),
+    });
+    unsubscribe?.();
+  });
+
   it('invalidates captured files when a scoped file input resets', () => {
     document.body.innerHTML = `
       <form>

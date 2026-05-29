@@ -248,11 +248,11 @@ type UploadCapability = {
 
 ### Phase 3.5：Manus 类 transient input（MAIN-world hook）
 
-- [ ] 实现 narrow / idempotent / 可 teardown 的 MAIN-world `input[type=file]` hook。
-- [ ] 通过 Phase 2.5 钉死的 bridge 把 File 交回 isolated content。
+- [x] 实现 narrow / idempotent / 可 teardown 的 MAIN-world `input[type=file]` hook。
+- [x] 通过 Phase 2.5 钉死的 bridge 把 File 交回 isolated content。
 
 验收：
-- [ ] Manus detached input 上传一个已支持附件后 submit，`USER_SUBMIT` 有一个 `AttachmentRef`。
+- [x] Manus detached input 上传一个已支持附件后 submit，`USER_SUBMIT` 有一个 `AttachmentRef`。
 
 ### Phase 4：Claude Target Delivery
 
