@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SHORTCUTS, type ProviderStatus, type WorkspaceSummary } from '../runtime/protocol';
+import type { UserSubmissionPayload } from '../adapters/types';
 
 const routingMocks = vi.hoisted(() => ({
   buildHeartbeatMessage: vi.fn(() => ({ type: 'HEARTBEAT' })),
   buildHelloMessage: vi.fn(() => ({ type: 'HELLO' })),
   buildUserSubmitMessage: vi.fn(() => ({ type: 'USER_SUBMIT' })),
+  createSubmitId: vi.fn(() => 'submit-test'),
   observeUrlChanges: vi.fn(() => vi.fn()),
   sendRuntimeMessage: vi.fn(),
 }));
@@ -65,13 +67,15 @@ function createHelloResponse(overrides: Record<string, unknown> = {}) {
 async function flushMicrotasks() {
   await Promise.resolve();
   await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 describe('content bootstrap wiring', () => {
   let runtimeListener:
     | ((message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => unknown)
     | null;
-  let submitHandler: ((content: string) => void) | null;
+  let submitHandler: ((payload: UserSubmissionPayload) => void) | null;
   let beforeUnloadHandler: (() => void) | null;
   let status: ProviderStatus;
   let ui: {
@@ -187,6 +191,51 @@ describe('content bootstrap wiring', () => {
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('set-warning');
   });
 
+  it('reports a final startup heartbeat when a new-chat page becomes ready', async () => {
+    const intervalCallbacks: Array<() => void> = [];
+    const setIntervalMock = window.setInterval as unknown as ReturnType<typeof vi.fn>;
+    setIntervalMock.mockImplementation((handler: () => void) => {
+      if (typeof handler === 'function') {
+        intervalCallbacks.push(handler);
+      }
+      return intervalCallbacks.length;
+    });
+    status = {
+      provider: 'claude',
+      currentUrl: 'https://claude.ai/new',
+      sessionId: null,
+      pageKind: 'new-chat',
+      pageState: 'not-ready',
+    };
+    const standaloneResponse = {
+      workspaceId: null,
+      providerEnabled: false,
+      globalSyncEnabled: true,
+      autoSyncNewChatsEnabled: true,
+      nextFanOutTargetCount: 2,
+      canStartNewSet: true,
+      shortcuts: DEFAULT_SHORTCUTS,
+      workspaceSummary: null,
+    };
+    routingMocks.sendRuntimeMessage.mockResolvedValue(standaloneResponse);
+
+    await bootstrap();
+    await flushMicrotasks();
+    routingMocks.sendRuntimeMessage.mockClear();
+
+    status = {
+      ...status,
+      pageState: 'ready',
+    };
+    intervalCallbacks[0]?.();
+    await flushMicrotasks();
+
+    expect(routingMocks.sendRuntimeMessage).toHaveBeenCalledWith({ type: 'HEARTBEAT' });
+    expect(ui.setVisible).toHaveBeenLastCalledWith(true);
+    expect(ui.setState).toHaveBeenLastCalledWith('idle', 'ready');
+    expect(ui.setSyncStatus).toHaveBeenLastCalledWith('next prompt will fan out to 2 models', 'neutral');
+  });
+
   it('updates indicator progress when SYNC_PROGRESS arrives for the current workspace', async () => {
     await bootstrap();
 
@@ -228,6 +277,48 @@ describe('content bootstrap wiring', () => {
     expect(sendResponse).toHaveBeenCalledWith({ ok: true });
   });
 
+  it('persists standalone fan-out toggle through the auto-sync setting', async () => {
+    status = {
+      provider: 'claude',
+      currentUrl: 'https://claude.ai/new',
+      sessionId: null,
+      pageKind: 'new-chat',
+      pageState: 'ready',
+    };
+    routingMocks.sendRuntimeMessage.mockResolvedValueOnce(
+      createHelloResponse({
+        workspaceId: null,
+        providerEnabled: false,
+        autoSyncNewChatsEnabled: true,
+        nextFanOutTargetCount: 2,
+        workspaceSummary: null,
+      }),
+    );
+
+    await bootstrap();
+
+    const handlers = uiMocks.createContentUi.mock.calls[0]?.[1] as
+      | {
+          onStandaloneSetCreationToggle(nextEnabled: boolean): Promise<void>;
+        }
+      | undefined;
+    routingMocks.sendRuntimeMessage.mockClear();
+
+    await handlers?.onStandaloneSetCreationToggle(false);
+
+    expect(routingMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+      type: 'SET_AUTO_SYNC_NEW_CHATS_ENABLED',
+      enabled: false,
+    });
+    expect(ui.setContext).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        standaloneCreateSetEnabled: false,
+      }),
+    );
+    expect(ui.setState).toHaveBeenLastCalledWith('blocked', 'Local only');
+    expect(ui.setSyncStatus).toHaveBeenLastCalledWith('next prompt stays here', 'neutral');
+  });
+
   it('marks progress failures as set warnings', async () => {
     await bootstrap();
 
@@ -262,7 +353,7 @@ describe('content bootstrap wiring', () => {
 
     await bootstrap();
 
-    submitHandler?.('hello world');
+    submitHandler?.({ text: 'hello world', attachments: [] });
     await flushMicrotasks();
 
     expect(ui.setState).toHaveBeenCalledWith('syncing', 'current model is in sync');
@@ -284,7 +375,7 @@ describe('content bootstrap wiring', () => {
     await bootstrap();
     routingMocks.sendRuntimeMessage.mockClear();
 
-    submitHandler?.('hello world');
+    submitHandler?.({ text: 'hello world', attachments: [] });
     await flushMicrotasks();
 
     expect(
@@ -304,7 +395,7 @@ describe('content bootstrap wiring', () => {
     routingMocks.observeUrlChanges.mockReturnValue(stopObservingUrl);
 
     const composer = {
-      subscribeToUserSubmissions(onSubmit: (content: string) => void) {
+      subscribeToUserSubmissions(onSubmit: (payload: UserSubmissionPayload) => void) {
         submitHandler = onSubmit;
         return unsubscribe;
       },

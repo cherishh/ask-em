@@ -42,6 +42,140 @@
   line-height: 1.35;
 }
 
+.askem-ep-header {
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.askem-ep-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.askem-ep-count {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid rgba(35, 25, 8, 0.08);
+  border-radius: var(--askem-radius-pill);
+  background: rgba(255, 255, 255, 0.58);
+  color: rgba(107, 100, 89, 0.68);
+  font: 700 9px/1 var(--askem-font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.askem-ep-list {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border-top: 1px solid rgba(35, 25, 8, 0.06);
+}
+
+.askem-ep-list.is-expanded {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.askem-ep-row {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-bottom: 1px solid rgba(35, 25, 8, 0.06);
+  background: transparent;
+  padding: 9px 0;
+  color: var(--askem-ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 140ms ease, opacity 140ms ease;
+}
+
+.askem-ep-row:last-child {
+  border-bottom: 0;
+}
+
+.askem-ep-row:hover {
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.askem-ep-row:disabled {
+  cursor: default;
+}
+
+.askem-ep-row:disabled:hover {
+  background: transparent;
+}
+
+.askem-ep-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--askem-radius-pill);
+  background: rgba(35, 25, 8, 0.16);
+  box-shadow: 0 0 0 3px rgba(35, 25, 8, 0.035);
+}
+
+.askem-ep-row.is-active .askem-ep-dot {
+  background: var(--askem-ok);
+  box-shadow: 0 0 0 3px rgba(70, 160, 87, 0.1);
+}
+
+.askem-ep-copy {
+  min-width: 0;
+}
+
+.askem-ep-name {
+  display: block;
+  overflow: hidden;
+  color: var(--askem-ink);
+  font: 500 11px/1.2 var(--askem-font-sans);
+  letter-spacing: 0.12em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.askem-ep-state {
+  display: block;
+  margin-top: 3px;
+  color: rgba(107, 100, 89, 0.62);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.askem-ep-row:not(.is-active) .askem-ep-name,
+.askem-ep-row:not(.is-active) .askem-ep-state {
+  color: rgba(107, 100, 89, 0.42);
+}
+
+.askem-ep-expand {
+  align-self: flex-start;
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  color: var(--askem-muted);
+  cursor: pointer;
+  font: 700 9px/1 var(--askem-font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-decoration-color: rgba(107, 100, 89, 0.24);
+  text-underline-offset: 0.2em;
+}
+
+.askem-ep-expand:hover {
+  color: var(--askem-ink);
+}
+
 .askem-us-toggle-row {
   display: flex;
   align-items: center;

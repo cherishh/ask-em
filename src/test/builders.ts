@@ -31,6 +31,7 @@ export function makeWorkspace(overrides: Partial<Workspace> & Pick<Workspace, 'i
     updatedAt: overrides.updatedAt ?? overrides.createdAt ?? 1,
     label: overrides.label,
     pendingSource: overrides.pendingSource,
+    memberIssues: overrides.memberIssues,
   };
 }
 
@@ -38,6 +39,7 @@ export function makeLocalState(overrides: Partial<LocalState> = {}): LocalState 
   return {
     globalSyncEnabled: true,
     autoSyncNewChatsEnabled: true,
+    pauseAfterFirstFanOutEnabled: false,
     debugLoggingEnabled: true,
     showDiagnostics: false,
     closeTabsOnDeleteSet: false,
@@ -83,6 +85,8 @@ export function makeSubmitMessage(overrides: Partial<UserSubmitMessage> = {}): U
     pageKind: 'existing-session',
     allowNewSetCreation: true,
     content: 'hello',
+    attachments: [],
+    submitId: 'submit-test',
     timestamp: 100,
     ...overrides,
   };

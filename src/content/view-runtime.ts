@@ -12,7 +12,6 @@ export type ViewRuntime = {
   uiContext: UiContext;
   workspaceSummary: WorkspaceSummary | null;
   hasHydratedPresence: boolean;
-  standaloneCreateSetTouched: boolean;
 };
 
 export function createInitialViewRuntime(): ViewRuntime {
@@ -23,12 +22,12 @@ export function createInitialViewRuntime(): ViewRuntime {
       globalSyncEnabled: true,
       standaloneReady: false,
       standaloneCreateSetEnabled: true,
+      standaloneFanOutTargetCount: null,
       canStartNewSet: true,
       shortcuts: DEFAULT_SHORTCUTS,
     },
     workspaceSummary: null,
     hasHydratedPresence: false,
-    standaloneCreateSetTouched: false,
   };
 }
 
@@ -36,7 +35,6 @@ export function setViewStandaloneCreateSetEnabled(
   viewRuntime: ViewRuntime,
   nextEnabled: boolean,
 ): UiContext {
-  viewRuntime.standaloneCreateSetTouched = true;
   viewRuntime.uiContext = {
     ...viewRuntime.uiContext,
     standaloneCreateSetEnabled: nextEnabled,
@@ -73,13 +71,10 @@ export function applyPresenceResponseToView(
     currentContext: viewRuntime.uiContext,
     response,
     standaloneVisible,
-    hasHydratedPresence: viewRuntime.hasHydratedPresence,
-    standaloneCreateSetTouched: viewRuntime.standaloneCreateSetTouched,
   });
 
   viewRuntime.workspaceSummary = transition.workspaceSummary;
   viewRuntime.uiContext = transition.uiContext;
-  viewRuntime.standaloneCreateSetTouched = transition.standaloneCreateSetTouched;
   viewRuntime.hasHydratedPresence = transition.hasHydratedPresence;
 
   return {

@@ -40,6 +40,78 @@
   display: none;
 }
 
+.ask-em-toast {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: max-content;
+  max-width: min(380px, calc(100vw - 32px));
+  padding: 10px 10px 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 252, 246, 0.98);
+  color: rgba(15, 23, 42, 0.86);
+  box-shadow:
+    0 18px 36px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  font: 600 12px/1.35 "Avenir Next", "Segoe UI", sans-serif;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  transform: translateY(-8px);
+  opacity: 0;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.ask-em-toast-message {
+  min-width: 0;
+}
+
+.ask-em-toast-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  color: currentColor;
+  font: 700 12px/1 "Avenir Next", "Segoe UI", sans-serif;
+  opacity: 0.72;
+  cursor: pointer;
+}
+
+.ask-em-toast-close:hover {
+  opacity: 1;
+  background: rgba(15, 23, 42, 0.12);
+}
+
+.ask-em-toast-close:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.ask-em-toast[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.ask-em-toast[data-tone="warning"] {
+  border-color: rgba(217, 119, 6, 0.34);
+  background: rgba(255, 249, 235, 0.98);
+  color: rgba(120, 53, 15, 0.94);
+  box-shadow:
+    0 18px 36px rgba(146, 64, 14, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
 .ask-em-sync-pill[data-interactive="true"] {
   cursor: grab;
 }

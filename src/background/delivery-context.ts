@@ -2,7 +2,7 @@ import type { LocalState, SessionState, UserSubmitMessage } from '../runtime/pro
 import {
   bindWorkspaceMember,
   createPendingWorkspace,
-  getDefaultEnabledProviderList,
+  getDefaultFanOutEnabledProviderList,
   getWorkspacesOrdered,
   type WorkspaceLookupResult,
 } from '../runtime/workspace';
@@ -21,6 +21,7 @@ type PrepareSubmitWorkspaceContextResult = {
   localState: LocalState;
   sessionState: SessionState;
   workspaceLookup: WorkspaceLookupResult;
+  createdWorkspace: boolean;
 };
 
 export async function prepareSubmitWorkspaceContext({
@@ -30,6 +31,7 @@ export async function prepareSubmitWorkspaceContext({
 }: PrepareSubmitWorkspaceContextInput): Promise<PrepareSubmitWorkspaceContextResult> {
   const refreshedState = await refreshPendingState();
   let { localState } = refreshedState;
+  let createdWorkspace = false;
   const reconciled = tabId
     ? await reconcileClaimedTabContext({
         localState,
@@ -57,7 +59,16 @@ export async function prepareSubmitWorkspaceContext({
   let workspaceLookup = reconciled.workspaceLookup;
 
   if (!workspaceLookup && canCreateWorkspace(localState, message)) {
-    const enabledProviders = getDefaultEnabledProviderList(localState, message.provider);
+    const enabledProviders = getDefaultFanOutEnabledProviderList(localState, message.provider);
+    if (enabledProviders.length === 0) {
+      return {
+        localState,
+        sessionState: reconciled.sessionState,
+        workspaceLookup: null,
+        createdWorkspace: false,
+      };
+    }
+
     const label = message.content.trim().slice(0, 80) || undefined;
     localState = createPendingWorkspace(localState, {
       sourceProvider: message.provider,
@@ -68,6 +79,7 @@ export async function prepareSubmitWorkspaceContext({
 
     const workspace = getWorkspacesOrdered(localState)[0];
     workspaceLookup = workspace ? { workspaceId: workspace.id, workspace } : null;
+    createdWorkspace = Boolean(workspaceLookup);
     await setLocalState(localState);
     await logDebug({
       level: 'info',
@@ -83,6 +95,7 @@ export async function prepareSubmitWorkspaceContext({
     localState,
     sessionState: reconciled.sessionState,
     workspaceLookup,
+    createdWorkspace,
   };
 }
 

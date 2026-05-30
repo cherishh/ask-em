@@ -1,13 +1,59 @@
 import type { ProviderAdapter } from '../adapters/types';
+import type { ComposerAttachmentPresence } from '../adapters/types';
+import { countAttachmentPresenceDelta } from '../adapters/attachment-presence';
 import type {
+  AttachmentRef,
   DeliverPromptMessage,
   PingMessage,
   PingResponseMessage,
   RuntimeMessage,
 } from '../runtime/protocol';
+import { formatAttachmentSummary } from '../runtime/attachment-log';
 import { buildHeartbeatMessage, sendRuntimeMessage } from './routing';
 import type { ContentStateController } from './state';
 import type { ContentSubmitController } from './submit-controller';
+
+const ATTACHMENT_DELIVERY_TIMEOUT_MS = 30_000;
+const ATTACHMENT_DELIVERY_POLL_MS = 250;
+const PROGRAMMATIC_SUBMIT_BUFFER_MS = 10_000;
+
+function getDeliveryWarningLabel(error: unknown): string {
+  const reason = error instanceof Error ? error.message : String(error);
+  return reason.toLowerCase().includes('upload failed') ? 'upload failed' : 'Delivery failed';
+}
+
+async function waitForAttachmentPresence(
+  composer: NonNullable<ProviderAdapter['composer']>,
+  expectedAttachments: AttachmentRef[],
+  baseline: ComposerAttachmentPresence,
+): Promise<ComposerAttachmentPresence> {
+  if (!composer.getComposerAttachmentPresence) {
+    throw new Error('upload failed');
+  }
+
+  const expectedCount = expectedAttachments.length;
+  const deadline = Date.now() + ATTACHMENT_DELIVERY_TIMEOUT_MS;
+  let lastPresence = baseline;
+
+  while (Date.now() <= deadline) {
+    const uploadError = await composer.detectAttachmentUploadError?.();
+    if (uploadError) {
+      throw new Error(uploadError);
+    }
+
+    const current = await composer.getComposerAttachmentPresence(expectedAttachments);
+    lastPresence = current;
+    if (countAttachmentPresenceDelta(baseline, current) >= expectedCount) {
+      return current;
+    }
+
+    await new Promise((resolve) => globalThis.setTimeout(resolve, ATTACHMENT_DELIVERY_POLL_MS));
+  }
+
+  throw new Error(
+    `upload failed: attachment presence timeout expected=${expectedCount}; baseline=${baseline.count}; current=${lastPresence.count}`,
+  );
+}
 
 export function createDeliveryController(
   adapter: ProviderAdapter,
@@ -97,18 +143,96 @@ export function createDeliveryController(
       }
 
       try {
-        submitController.suppressObservedSubmissionsFor(2_500);
+        const submitTimeoutMs = message.attachments.length > 0 ? ATTACHMENT_DELIVERY_TIMEOUT_MS : undefined;
+        const suppressionMs = (submitTimeoutMs ?? 2_500) + PROGRAMMATIC_SUBMIT_BUFFER_MS;
+        submitController.suppressObservedSubmissionsFor(suppressionMs);
+        // Capture suppression must cover the WHOLE delivery window, not a fixed
+        // 2.5s: a target's injection (readAttachmentFiles over the message bus +
+        // file-input `change`) can land well after 2.5s within the 30s attachment
+        // window, otherwise the injected files get re-captured as the target tab's
+        // own source attachments and leak into its next user submit.
+        adapter.composer.suppressAttachmentCaptureFor?.(suppressionMs);
         await dependencies.logDebug({
           level: 'info',
           message: 'Starting prompt delivery in content',
-          detail: message.content.slice(0, 120),
+          detail: `${message.content.slice(0, 120)}; attachments=${message.attachments.length}`,
           workspaceId: message.workspaceId,
         });
 
         const baselineUrl = adapter.session.getCurrentUrl();
-        await adapter.composer.setComposerText(message.content);
+        await adapter.composer.prepareForDelivery?.({
+          text: message.content,
+          attachments: message.attachments,
+          expectedSessionId: message.expectedSessionId,
+          expectedUrl: message.expectedUrl,
+        });
+
+        let attachmentBaseline: ComposerAttachmentPresence | null = null;
+        if (message.attachments.length > 0) {
+          await dependencies.logDebug({
+            level: 'info',
+            message: 'Attachment delivery started',
+            detail: formatAttachmentSummary(message.attachments),
+            workspaceId: message.workspaceId,
+          });
+          attachmentBaseline = await adapter.composer.getComposerAttachmentPresence?.(message.attachments) ?? null;
+          if (!attachmentBaseline) {
+            throw new Error('upload failed');
+          }
+        }
+
+        if (adapter.composer.setComposerPayload) {
+          await adapter.composer.setComposerPayload({
+            text: message.content,
+            attachments: message.attachments,
+          });
+        } else {
+          await adapter.composer.setComposerText(message.content);
+        }
+
+        await dependencies.logDebug({
+          level: 'info',
+          message: 'Prompt payload injected',
+          detail: `attachments=${message.attachments.length}`,
+          workspaceId: message.workspaceId,
+        });
+
+        if (message.attachments.length > 0) {
+          const baseline = attachmentBaseline;
+          if (!baseline) {
+            throw new Error('upload failed');
+          }
+
+          const currentPresence = await waitForAttachmentPresence(
+            adapter.composer,
+            message.attachments,
+            baseline,
+          );
+
+          await dependencies.logDebug({
+            level: 'info',
+            message: 'Attachment delivery confirmed',
+            detail: `expected=${message.attachments.length}; baseline=${baseline.count}; current=${currentPresence.count}; keys=${(currentPresence.keys ?? []).slice(0, 5).join(' | ')}`,
+            workspaceId: message.workspaceId,
+          });
+        }
+
+        await dependencies.logDebug({
+          level: 'info',
+          message: 'Submitting prompt in content',
+          detail: `attachments=${message.attachments.length}`,
+          workspaceId: message.workspaceId,
+        });
+        submitController.suppressObservedSubmissionsFor(suppressionMs);
+        adapter.composer.suppressAttachmentCaptureFor?.(suppressionMs);
         submitController.rememberProgrammaticSubmit(message.content);
-        await adapter.composer.submit();
+        await adapter.composer.submit({ timeoutMs: submitTimeoutMs });
+        await dependencies.logDebug({
+          level: 'info',
+          message: 'Prompt submit action dispatched',
+          detail: `attachments=${message.attachments.length}`,
+          workspaceId: message.workspaceId,
+        });
 
         const shouldAwaitSessionRef =
           snapshot.sessionId === null ||
@@ -132,14 +256,17 @@ export function createDeliveryController(
               },
             });
           } catch (error) {
-            const reason = error instanceof Error ? error.message : String(error);
+            const uploadError = message.attachments.length > 0
+              ? await adapter.composer.detectAttachmentUploadError?.()
+              : null;
+            const reason = uploadError ?? (error instanceof Error ? error.message : String(error));
             await dependencies.logDebug({
               level: 'warn',
               message: 'Expected session ref update was not observed',
               detail: reason,
               workspaceId: message.workspaceId,
             });
-            state.showCurrentWarning('Delivery failed');
+            state.showCurrentWarning(getDeliveryWarningLabel(new Error(reason)));
             sendResponse({
               ok: false,
               accepted: true,
@@ -156,10 +283,10 @@ export function createDeliveryController(
         await dependencies.logDebug({
           level: 'error',
           message: 'Content delivery failed',
-          detail: error instanceof Error ? error.message : String(error),
+          detail: `${error instanceof Error ? error.message : String(error)}; attachments=${message.attachments.length}`,
           workspaceId: message.workspaceId,
         });
-        state.showCurrentWarning('Delivery failed');
+        state.showCurrentWarning(getDeliveryWarningLabel(error));
         sendResponse({
           ok: false,
           error: error instanceof Error ? error.message : String(error),

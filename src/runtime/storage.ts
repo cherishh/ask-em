@@ -9,15 +9,18 @@ import {
   type SessionState,
 } from './protocol';
 import { toClaimedTabKey } from './protocol';
+import { appendDebugLogForStorage, trimDebugLogsForStorage } from './debug-log-retention';
 import { rebuildWorkspaceIndex } from './workspace';
 
 export const DEFAULT_LOCAL_STATE: LocalState = {
   globalSyncEnabled: true,
   autoSyncNewChatsEnabled: true,
+  pauseAfterFirstFanOutEnabled: false,
   debugLoggingEnabled: true,
   showDiagnostics: false,
   closeTabsOnDeleteSet: false,
   defaultEnabledProviders: createDefaultEnabledProviders(),
+  defaultFanOutProviders: null,
   shortcuts: DEFAULT_SHORTCUTS,
   workspaces: {},
   workspaceIndex: {},
@@ -28,12 +31,14 @@ export const DEFAULT_SESSION_STATE: SessionState = {
   claimedTabs: {},
 };
 
-const DEBUG_LOG_LIMIT = 350;
-
 type StorageArea = Pick<
   chrome.storage.StorageArea,
   'get' | 'set' | 'remove'
 >;
+
+type LegacyLocalState = LocalState & {
+  firstFanOutProviders?: Provider[] | null;
+};
 
 function createStorageQueue() {
   let tail = Promise.resolve();
@@ -76,6 +81,36 @@ function isWorkspaceIndexEqual(left: LocalState['workspaceIndex'], right: LocalS
 
 function normalizeLocalState(state: LocalState): LocalState {
   let normalized = state;
+  const legacyState = state as LegacyLocalState;
+
+  if ('firstFanOutProviders' in legacyState || legacyState.defaultFanOutProviders === undefined) {
+    const {
+      firstFanOutProviders,
+      ...stateWithoutLegacyFirstFanOut
+    } = legacyState;
+    normalized = {
+      ...stateWithoutLegacyFirstFanOut,
+      defaultFanOutProviders:
+        stateWithoutLegacyFirstFanOut.defaultFanOutProviders === undefined
+          ? firstFanOutProviders ?? null
+          : stateWithoutLegacyFirstFanOut.defaultFanOutProviders,
+    };
+  }
+
+  if (normalized.pauseAfterFirstFanOutEnabled === undefined) {
+    normalized = {
+      ...normalized,
+      pauseAfterFirstFanOutEnabled: false,
+    };
+  }
+
+  const debugLogs = trimDebugLogsForStorage(normalized.debugLogs ?? []);
+  if (debugLogs !== normalized.debugLogs) {
+    normalized = {
+      ...normalized,
+      debugLogs,
+    };
+  }
 
   const workspaceIndex = rebuildWorkspaceIndex(normalized.workspaces);
 
@@ -170,7 +205,7 @@ export async function appendDebugLog(entry: Omit<DebugLogEntry, 'id' | 'timestam
 
     return {
       ...state,
-      debugLogs: [...state.debugLogs, debugLog].slice(-DEBUG_LOG_LIMIT),
+      debugLogs: appendDebugLogForStorage(state.debugLogs, debugLog),
     };
   });
 }

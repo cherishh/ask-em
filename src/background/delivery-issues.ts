@@ -9,6 +9,18 @@ export function classifyDeliveryIssue(result: ProviderDeliveryResult): Workspace
 
   const normalizedReason = (result.reason ?? '').toLowerCase();
 
+  if (normalizedReason.includes('attachment count not supported')) {
+    return 'attachment-limit';
+  }
+
+  if (normalizedReason.includes('attachment not supported')) {
+    return 'unsupported-attachment';
+  }
+
+  if (normalizedReason.includes('upload failed')) {
+    return 'upload-failed';
+  }
+
   if (normalizedReason.includes('login required')) {
     return 'needs-login';
   }

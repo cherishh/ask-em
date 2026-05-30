@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { trimDebugLogsForFeedback } from '../../../runtime/debug-log-retention';
 import { requestFullLogs } from '../popup-runtime';
 import {
   FEEDBACK_ATTACHMENT_ACCEPT,
@@ -222,7 +223,7 @@ export function useFeedback() {
 
     try {
       const shouldIncludeLogs = feedbackKind === 'bug-report' && includeLogs;
-      const logs = shouldIncludeLogs ? await requestFullLogs() : [];
+      const logs = shouldIncludeLogs ? trimDebugLogsForFeedback(await requestFullLogs()) : [];
       const payload = {
         kind: feedbackKind,
         message,

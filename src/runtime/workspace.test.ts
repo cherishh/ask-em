@@ -23,9 +23,13 @@ import {
   createPendingWorkspace,
   enforceWorkspaceLimit,
   getDefaultEnabledProviderList,
+  getDefaultFanOutEnabledProviderList,
+  getDefaultFanOutTargetProviderList,
+  getVisibleWorkspaceProviders,
   getWorkspacesOrdered,
   lookupWorkspaceBySession,
   rebuildWorkspaceIndex,
+  setWorkspaceEnabledProviders,
   setWorkspaceProviderEnabled,
   setWorkspaceProviderIssue,
 } from './workspace';
@@ -269,6 +273,7 @@ describe('workspace state', () => {
     const state: LocalState = {
       globalSyncEnabled: true,
       autoSyncNewChatsEnabled: true,
+      pauseAfterFirstFanOutEnabled: true,
       debugLoggingEnabled: false,
       showDiagnostics: false,
       closeTabsOnDeleteSet: false,
@@ -336,6 +341,28 @@ describe('workspace state', () => {
     expect(getDefaultEnabledProviderList(state, 'gemini')).toEqual(['gemini', 'chatgpt', 'deepseek']);
   });
 
+  it('builds default fan-out providers as a subset of default enabled providers', () => {
+    const state: LocalState = {
+      ...createEmptyState(),
+      defaultEnabledProviders: createDefaultEnabledProviders(['claude', 'chatgpt', 'deepseek']),
+      defaultFanOutProviders: ['chatgpt', 'manus'],
+    };
+
+    expect(getDefaultFanOutEnabledProviderList(state, 'gemini')).toEqual(['gemini', 'chatgpt']);
+    expect(getDefaultFanOutTargetProviderList(state, 'gemini')).toEqual(['chatgpt']);
+  });
+
+  it('does not build a source-only default fan-out provider list', () => {
+    const state: LocalState = {
+      ...createEmptyState(),
+      defaultEnabledProviders: createDefaultEnabledProviders(['claude']),
+      defaultFanOutProviders: null,
+    };
+
+    expect(getDefaultFanOutTargetProviderList(state, 'claude')).toEqual([]);
+    expect(getDefaultFanOutEnabledProviderList(state, 'claude')).toEqual([]);
+  });
+
   it('can pause a provider without removing its binding', () => {
     let state = createPendingWorkspace(createEmptyState(), {
       sourceProvider: 'gemini',
@@ -348,6 +375,32 @@ describe('workspace state', () => {
 
     expect(state.workspaces.w1.enabledProviders).toEqual(['gemini', 'claude']);
     expect(state.workspaces.w1.members.gemini).toBeDefined();
+  });
+
+  it('can pause every provider in a workspace without hiding bound members', () => {
+    const state = createPendingWorkspace(createEmptyState(), {
+      sourceProvider: 'gemini',
+      sourceUrl: 'https://gemini.google.com/app',
+      workspaceId: 'w1',
+      enabledProviders: ['gemini', 'chatgpt', 'claude'],
+    });
+
+    const nextState = setWorkspaceEnabledProviders(state, 'w1', []);
+
+    expect(nextState.workspaces.w1.enabledProviders).toEqual([]);
+    expect(nextState.workspaces.w1.members.gemini).toBeDefined();
+  });
+
+  it('keeps providers with persisted issues visible even when sync is paused', () => {
+    const workspace = makeWorkspace({
+      id: 'w1',
+      enabledProviders: [],
+      memberIssues: {
+        chatgpt: 'delivery-failed',
+      },
+    });
+
+    expect(getVisibleWorkspaceProviders(workspace)).toContain('chatgpt');
   });
 
   it('can set and clear a persisted provider issue', () => {

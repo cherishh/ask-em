@@ -1,17 +1,16 @@
 import type { Provider } from '../../../runtime/protocol';
-import { SUPPORTED_SITES } from '../../../adapters/sites';
 
-function getProviderOrigin(provider: Provider): string {
-  const site = SUPPORTED_SITES.find((s) => s.name === provider);
-  return site?.origin ?? '#';
-}
-
-export function OnboardingCard({ providers }: { providers: Provider[] }) {
-  const openProvider = (provider: Provider) => {
-    const origin = getProviderOrigin(provider);
-    void chrome.tabs.create({ url: origin });
-  };
-
+export function OnboardingCard({
+  providers,
+  enabledProviders,
+  loading,
+  onToggleProvider,
+}: {
+  providers: Provider[];
+  enabledProviders: Provider[];
+  loading: boolean;
+  onToggleProvider: (provider: Provider) => void;
+}) {
   return (
     <div className="askem-onboarding">
       <div className="askem-onboarding-header">
@@ -27,15 +26,15 @@ export function OnboardingCard({ providers }: { providers: Provider[] }) {
         <div className="askem-onboarding-steps">
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">1</span>
-            <span>Open any AI chat below</span>
+            <span>Choose who joins the default fan-out</span>
           </div>
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">2</span>
-            <span>Type your prompt and send</span>
+            <span>Open any AI chat as usual</span>
           </div>
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">3</span>
-            <span>It auto-syncs to the other models</span>
+            <span>It auto-syncs to selected models</span>
           </div>
         </div>
         <p className="askem-onboarding-hint">
@@ -43,19 +42,34 @@ export function OnboardingCard({ providers }: { providers: Provider[] }) {
         </p>
         <div className="askem-onboarding-providers">
           {providers.length > 0 ? (
-            providers.map((provider) => (
-              <button
-                key={provider}
-                className="askem-onboarding-provider-btn"
-                onClick={() => openProvider(provider)}
-                type="button"
-              >
-                {provider}
-                <span className="askem-onboarding-arrow">→</span>
-              </button>
-            ))
+            providers.map((provider) => {
+              const active = enabledProviders.includes(provider);
+              const locked = active && enabledProviders.length <= 1;
+
+              return (
+                <button
+                  key={provider}
+                  className="askem-onboarding-provider-btn"
+                  onClick={() => onToggleProvider(provider)}
+                  type="button"
+                  disabled={loading || locked}
+                  aria-pressed={active}
+                  aria-label={
+                    locked
+                      ? `Keep ${provider} for default fan-out`
+                      : `${active ? 'Disable' : 'Enable'} ${provider} for default fan-out`
+                  }
+                  data-enabled={String(active)}
+                >
+                  {provider}
+                  <span className="askem-onboarding-provider-check" aria-hidden="true">
+                    {active ? '✓' : ''}
+                  </span>
+                </button>
+              );
+            })
           ) : (
-            <span className="askem-onboarding-empty">Enable a default model in Settings.</span>
+            <span className="askem-onboarding-empty">Enable providers in Settings.</span>
           )}
         </div>
       </div>

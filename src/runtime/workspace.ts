@@ -50,6 +50,40 @@ export function getDefaultEnabledProviderList(state: LocalState, sourceProvider?
   return Array.from(new Set(selected));
 }
 
+export function getDefaultFanOutSelectedProviderList(state: LocalState): Provider[] {
+  const defaultProviders = getDefaultEnabledProviderList(state);
+  return state.defaultFanOutProviders
+    ? state.defaultFanOutProviders.filter((provider) => defaultProviders.includes(provider))
+    : defaultProviders;
+}
+
+export function getDefaultFanOutTargetProviderList(
+  state: LocalState,
+  sourceProvider: Provider,
+): Provider[] {
+  return getDefaultFanOutSelectedProviderList(state).filter(
+    (provider) => provider !== sourceProvider,
+  );
+}
+
+export function getDefaultFanOutEnabledProviderList(
+  state: LocalState,
+  sourceProvider: Provider,
+): Provider[] {
+  const targets = getDefaultFanOutTargetProviderList(state, sourceProvider);
+  if (targets.length === 0) {
+    return [];
+  }
+
+  const selected = [...targets];
+
+  if (!selected.includes(sourceProvider)) {
+    selected.unshift(sourceProvider);
+  }
+
+  return Array.from(new Set(selected));
+}
+
 export function createPendingWorkspace(
   state: LocalState,
   input: CreatePendingWorkspaceInput,
@@ -265,6 +299,34 @@ export function setWorkspaceProviderEnabled(
   };
 }
 
+export function setWorkspaceEnabledProviders(
+  state: LocalState,
+  workspaceId: string,
+  enabledProviders: Provider[],
+): LocalState {
+  const workspace = state.workspaces[workspaceId];
+
+  if (!workspace) {
+    return state;
+  }
+
+  const normalizedEnabledProviders = ALL_PROVIDERS.filter((provider) =>
+    enabledProviders.includes(provider),
+  );
+
+  return {
+    ...state,
+    workspaces: {
+      ...state.workspaces,
+      [workspaceId]: {
+        ...workspace,
+        enabledProviders: normalizedEnabledProviders,
+        updatedAt: Date.now(),
+      },
+    },
+  };
+}
+
 export function setWorkspaceProviderIssue(
   state: LocalState,
   workspaceId: string,
@@ -388,6 +450,7 @@ export function getVisibleWorkspaceProviders(workspace: Workspace): Provider[] {
   const visibleProviders = new Set<Provider>([
     ...workspace.enabledProviders,
     ...(Object.keys(workspace.members) as Provider[]),
+    ...(Object.keys(workspace.memberIssues ?? {}) as Provider[]),
     ...(workspace.pendingSource ? [workspace.pendingSource] : []),
   ]);
 

@@ -1,9 +1,12 @@
 import type {
+  AttachmentRef,
+  CapturedAttachment,
   DeliverPromptMessage,
   PageKind,
   PageState,
   Provider,
   ProviderStatus,
+  UploadCapability,
 } from '../runtime/protocol';
 
 export type { Provider };
@@ -33,14 +36,67 @@ export interface ProviderSessionAdapter {
   ): boolean;
 }
 
+export type UserSubmissionPayload = {
+  text: string;
+  attachments: CapturedAttachment[];
+  attachmentResolution?: AttachmentSubmitResolution;
+  onConsumed?: () => void;
+};
+
+export type ComposerPayload = {
+  text: string;
+  attachments: AttachmentRef[];
+};
+
+export type ComposerDeliveryPreparation = ComposerPayload & {
+  expectedSessionId: string | null;
+  expectedUrl: string | null;
+};
+
+export type ComposerAttachmentPresence = {
+  count: number;
+  keys?: string[];
+};
+
+export type ComposerAttachmentSnapshot = {
+  count: number;
+  items?: string[];
+};
+
+export type AttachmentSubmitResolutionReason =
+  | 'no-captured-attachments'
+  | 'no-current-attachments'
+  | 'missing-source-snapshot'
+  | 'ambiguous-current-attachments'
+  | 'unmatched-current-attachments';
+
+export type AttachmentSubmitResolution = {
+  attachments: CapturedAttachment[];
+  capturedCount: number;
+  currentCount: number | null;
+  submittedCount: number;
+  reason?: AttachmentSubmitResolutionReason;
+};
+
 export interface ProviderComposerAdapter {
-  subscribeToUserSubmissions?(onSubmit: (content: string) => void): () => void;
+  subscribeToUserSubmissions?(onSubmit: (payload: UserSubmissionPayload) => void): () => void;
+  prepareForDelivery?(payload: ComposerDeliveryPreparation): Promise<void> | void;
+  setComposerPayload?(payload: ComposerPayload): Promise<void> | void;
   setComposerText(content: string): Promise<void> | void;
-  submit(): Promise<void> | void;
+  detectAttachmentUploadError?(): string | null | Promise<string | null>;
+  getComposerAttachmentSnapshot?(
+    capturedAttachments?: CapturedAttachment[],
+  ): ComposerAttachmentSnapshot | null;
+  getComposerAttachmentPresence?(
+    expectedAttachments?: AttachmentRef[],
+  ): ComposerAttachmentPresence | Promise<ComposerAttachmentPresence>;
+  suppressAttachmentCaptureFor?(durationMs: number): void;
+  submit(options?: { timeoutMs?: number }): Promise<void> | void;
 }
 
 export interface ProviderAdapter {
   name: Provider;
+  uploadCapability?: UploadCapability;
   getUiSpec(): ProviderUiSpec;
   session: ProviderSessionAdapter;
   composer?: ProviderComposerAdapter;

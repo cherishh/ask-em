@@ -101,6 +101,42 @@ describe('storage update queues', () => {
     expect(finalState.debugLogs.map((log) => log.id)).toEqual(['log-1', 'log-2']);
   });
 
+  it('bounds stored debug logs by entry count and serialized size', async () => {
+    const storage = await import('./storage');
+    const {
+      DEBUG_LOG_MAX_BYTES,
+      DEBUG_LOG_MAX_ENTRIES,
+      getDebugLogsByteLength,
+    } = await import('./debug-log-retention');
+
+    await storage.setLocalState({
+      ...storage.DEFAULT_LOCAL_STATE,
+      debugLoggingEnabled: true,
+      showDiagnostics: false,
+    });
+
+    for (let index = 0; index < DEBUG_LOG_MAX_ENTRIES + 50; index += 1) {
+      await storage.appendDebugLog({
+        id: `log-${index}`,
+        timestamp: index,
+        level: 'info',
+        scope: 'background',
+        message: `message-${index}`,
+        detail: 'x'.repeat(10_000),
+      });
+    }
+
+    const finalState = await storage.getLocalState();
+    expect(finalState.debugLogs.length).toBeLessThanOrEqual(DEBUG_LOG_MAX_ENTRIES);
+    expect(getDebugLogsByteLength(finalState.debugLogs)).toBeLessThanOrEqual(DEBUG_LOG_MAX_BYTES);
+    expect(finalState.debugLogs.at(-1)?.id).toBe(`log-${DEBUG_LOG_MAX_ENTRIES + 49}`);
+    expect(finalState.debugLogs.at(-1)?.detail).toContain('...[truncated ');
+    // Stress test: 550 appends each re-measure the serialized byte budget over a
+    // ~500-entry / ~4MB array, so this is inherently a few seconds. The default 5s
+    // timeout is too tight under parallel/CI load; debug logging is a dev-only
+    // opt-in path so this cost never hits normal use.
+  }, 20_000);
+
   it('serializes session state updates so concurrent claimed-tab writes are merged', async () => {
     const storage = await import('./storage');
     const deferred = createDeferred<SessionState>();

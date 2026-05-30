@@ -1,8 +1,10 @@
 import type { RuntimeMessage } from '../runtime/protocol';
 import { getSessionState, setSessionState } from '../runtime/storage';
+import { startupSweepAttachments, sweepAttachmentsByOwnerTab } from '../runtime/attachment-store';
 import { removeClaimedTabsForTabId } from '../background/claimed-tabs';
 import { scheduleGroupGcIfEmpty } from '../background/gc';
 import { logDebug } from '../background/debug';
+import { handleAttachmentMessage } from '../background/attachment-messages';
 import { handlePresenceMessage } from '../background/presence';
 import {
   deliverPromptToWorkspaceTargets,
@@ -24,7 +26,9 @@ import {
   handleSetAutoSyncNewChatsEnabled,
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
+  handleSetDefaultFanOutProviders,
   handleSetGlobalSyncEnabled,
+  handleSetPauseAfterFirstFanOutEnabled,
   handleSetShowDiagnostics,
   handleResetIndicatorPositions,
   handleSetShortcuts,
@@ -56,7 +60,9 @@ export {
   handleSetAutoSyncNewChatsEnabled,
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
+  handleSetDefaultFanOutProviders,
   handleSetGlobalSyncEnabled,
+  handleSetPauseAfterFirstFanOutEnabled,
   handleSetShowDiagnostics,
   handleResetIndicatorPositions,
   handleSetShortcuts,
@@ -69,8 +75,41 @@ export {
 };
 
 export default defineBackground(() => {
+  void startupSweepAttachments()
+    .then(({ expired, orphaned }) => {
+      if (expired + orphaned === 0) {
+        return;
+      }
+
+      void logDebug({
+        level: 'info',
+        scope: 'background',
+        message: 'Swept attachment store on startup',
+        detail: `expired=${expired}; orphaned=${orphaned}`,
+      }).catch((error) => {
+        console.warn('ask-em: failed to append attachment startup sweep log', error);
+      });
+    })
+    .catch((error) => {
+      console.warn('ask-em: failed to sweep attachment store on startup', error);
+    });
+
   chrome.tabs.onRemoved.addListener((tabId) => {
     void (async () => {
+      try {
+        const sweptAttachments = await sweepAttachmentsByOwnerTab(tabId);
+        if (sweptAttachments > 0) {
+          await logDebug({
+            level: 'info',
+            scope: 'background',
+            message: 'Swept attachments for closed tab',
+            detail: `tab=${tabId}; removed=${sweptAttachments}`,
+          });
+        }
+      } catch (error) {
+        console.warn('ask-em: failed to sweep attachment store for closed tab', error);
+      }
+
       const sessionState = await getSessionState();
       const { sessionState: nextSessionState, removedClaimedTabs } = removeClaimedTabsForTabId(sessionState, tabId);
 
@@ -103,6 +142,13 @@ export default defineBackground(() => {
         case 'USER_SUBMIT':
           sendResponse(await handleUserSubmit(message, sender));
           return;
+        case 'ATTACHMENT_CREATE':
+        case 'ATTACHMENT_APPEND_CHUNK':
+        case 'ATTACHMENT_FINALIZE':
+        case 'ATTACHMENT_READ_CHUNK':
+        case 'ATTACHMENT_ABORT':
+          sendResponse(await handleAttachmentMessage(message, sender));
+          return;
         case 'SWITCH_PROVIDER_TAB':
           sendResponse(await handleSwitchProviderTab(message, sender));
           return;
@@ -118,6 +164,9 @@ export default defineBackground(() => {
         case 'SET_DEFAULT_ENABLED_PROVIDERS':
           sendResponse(await handleSetDefaultEnabledProviders(message));
           return;
+        case 'SET_DEFAULT_FAN_OUT_PROVIDERS':
+          sendResponse(await handleSetDefaultFanOutProviders(message));
+          return;
         case 'SET_WORKSPACE_PROVIDER_ENABLED':
           sendResponse(await handleSetWorkspaceProviderEnabled(message));
           return;
@@ -126,6 +175,9 @@ export default defineBackground(() => {
           return;
         case 'SET_AUTO_SYNC_NEW_CHATS_ENABLED':
           sendResponse(await handleSetAutoSyncNewChatsEnabled(message));
+          return;
+        case 'SET_PAUSE_AFTER_FIRST_FAN_OUT_ENABLED':
+          sendResponse(await handleSetPauseAfterFirstFanOutEnabled(message));
           return;
         case 'SET_CLOSE_TABS_ON_DELETE_SET':
           sendResponse(await handleSetCloseTabsOnDeleteSet(message));

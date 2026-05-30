@@ -1,5 +1,6 @@
 import type { ShortcutConfig } from './shortcuts';
 import type {
+  AttachmentRef,
   DebugLogEntry,
   DefaultEnabledProviders,
   PageKind,
@@ -35,6 +36,8 @@ export type UserSubmitMessage = {
   pageKind: PageKind;
   allowNewSetCreation: boolean;
   content: string;
+  attachments: AttachmentRef[];
+  submitId: string;
   timestamp: number;
 };
 
@@ -43,9 +46,60 @@ export type DeliverPromptMessage = {
   workspaceId: string;
   provider: Provider;
   content: string;
+  attachments: AttachmentRef[];
   expectedSessionId: string | null;
   expectedUrl: string | null;
   timestamp: number;
+};
+
+export type AttachmentCreateMessage = {
+  type: 'ATTACHMENT_CREATE';
+  submitId: string;
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+};
+
+export type AttachmentAppendChunkMessage = {
+  type: 'ATTACHMENT_APPEND_CHUNK';
+  submitId: string;
+  attachmentId: string;
+  offset: number;
+  chunkBase64: string;
+};
+
+export type AttachmentFinalizeMessage = {
+  type: 'ATTACHMENT_FINALIZE';
+  submitId: string;
+  attachmentId: string;
+};
+
+export type AttachmentReadChunkMessage = {
+  type: 'ATTACHMENT_READ_CHUNK';
+  attachmentId: string;
+  offset: number;
+  maxBytes: number;
+};
+
+export type AttachmentAbortMessage =
+  | {
+      type: 'ATTACHMENT_ABORT';
+      submitId: string;
+      ids?: never;
+    }
+  | {
+      type: 'ATTACHMENT_ABORT';
+      submitId?: never;
+      ids: string[];
+    };
+
+export type AttachmentReadChunkResponse = {
+  attachmentId: string;
+  offset: number;
+  nextOffset: number;
+  chunkBase64: string;
+  done: boolean;
 };
 
 export type ProviderDeliveryResult = {
@@ -87,11 +141,13 @@ export type StatusResponseMessage = {
   type: 'STATUS_RESPONSE';
   globalSyncEnabled: boolean;
   autoSyncNewChatsEnabled: boolean;
+  pauseAfterFirstFanOutEnabled: boolean;
   debugLoggingEnabled: boolean;
   showDiagnostics: boolean;
   closeTabsOnDeleteSet: boolean;
   workspaceLimit: number;
   defaultEnabledProviders: DefaultEnabledProviders;
+  defaultFanOutProviders?: Provider[] | null;
   shortcuts: ShortcutConfig;
   workspaces: WorkspaceSummary[];
   recentLogs: DebugLogEntry[];
@@ -138,6 +194,11 @@ export type SetDefaultEnabledProvidersMessage = {
   providers: Provider[];
 };
 
+export type SetDefaultFanOutProvidersMessage = {
+  type: 'SET_DEFAULT_FAN_OUT_PROVIDERS';
+  providers: Provider[] | null;
+};
+
 export type SetWorkspaceProviderEnabledMessage = {
   type: 'SET_WORKSPACE_PROVIDER_ENABLED';
   workspaceId: string;
@@ -167,6 +228,11 @@ export type SetGlobalSyncEnabledMessage = {
 
 export type SetAutoSyncNewChatsEnabledMessage = {
   type: 'SET_AUTO_SYNC_NEW_CHATS_ENABLED';
+  enabled: boolean;
+};
+
+export type SetPauseAfterFirstFanOutEnabledMessage = {
+  type: 'SET_PAUSE_AFTER_FIRST_FAN_OUT_ENABLED';
   enabled: boolean;
 };
 
@@ -212,6 +278,11 @@ export type RuntimeMessage =
   | HeartbeatMessage
   | UserSubmitMessage
   | DeliverPromptMessage
+  | AttachmentCreateMessage
+  | AttachmentAppendChunkMessage
+  | AttachmentFinalizeMessage
+  | AttachmentReadChunkMessage
+  | AttachmentAbortMessage
   | SyncProgressMessage
   | PingMessage
   | PingResponseMessage
@@ -222,8 +293,10 @@ export type RuntimeMessage =
   | ClearWorkspaceProviderMessage
   | ClearDebugLogsMessage
   | SetDefaultEnabledProvidersMessage
+  | SetDefaultFanOutProvidersMessage
   | SetWorkspaceProviderEnabledMessage
   | SetAutoSyncNewChatsEnabledMessage
+  | SetPauseAfterFirstFanOutEnabledMessage
   | SetGlobalSyncEnabledMessage
   | SetShowDiagnosticsMessage
   | SetCloseTabsOnDeleteSetMessage
@@ -238,11 +311,3 @@ export type RuntimeMessage =
   | DebugLogsResponseMessage
   | WorkspaceContextResponseMessage
   | StatusResponseMessage;
-
-export function isRuntimeMessage(value: unknown): value is RuntimeMessage {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  return 'type' in value;
-}

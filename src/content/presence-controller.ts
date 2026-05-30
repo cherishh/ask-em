@@ -44,6 +44,10 @@ export function createPresenceController(
     !state.getUiContext().workspaceId &&
     !state.shouldShowStandaloneIndicator();
 
+  const isWithinStartupPresenceWindow = () =>
+    Date.now() < startupPresenceDeadline &&
+    !state.getUiContext().workspaceId;
+
   const reportPresence = async (kind: PresenceKind) => {
     const status = adapter.session.getStatus();
     const previousPageState = lastObservedPageState;
@@ -89,7 +93,7 @@ export function createPresenceController(
 
     startupPresenceDeadline = Date.now() + STARTUP_PRESENCE_DURATION_MS;
     startupPresenceInterval = window.setInterval(() => {
-      if (!shouldContinueStartupPresencePolling()) {
+      if (!isWithinStartupPresenceWindow()) {
         stopStartupPresencePolling();
         return;
       }

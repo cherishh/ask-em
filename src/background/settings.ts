@@ -1,5 +1,13 @@
-import { createDefaultEnabledProviders, STORAGE_KEYS, type RuntimeMessage } from '../runtime/protocol';
+import {
+  ALL_PROVIDERS,
+  createDefaultEnabledProviders,
+  STORAGE_KEYS,
+  type DefaultEnabledProviders,
+  type Provider,
+  type RuntimeMessage,
+} from '../runtime/protocol';
 import { clearDebugLogs, getLocalState, getSessionState, setLocalState, setSessionState } from '../runtime/storage';
+import { clearAllAttachments } from '../runtime/attachment-store';
 import { clearWorkspace, clearWorkspaceProvider, setWorkspaceProviderEnabled } from '../runtime/workspace';
 import { removeClaimedTabsForWorkspace } from './claimed-tabs';
 import { logDebug } from './debug';
@@ -10,6 +18,28 @@ import {
   notifyAllTabsToResetIndicatorPosition,
   notifyTabsToRefreshContext,
 } from './tabs';
+
+function toEnabledProviderList(defaultEnabledProviders: DefaultEnabledProviders): Provider[] {
+  return ALL_PROVIDERS.filter((provider) => defaultEnabledProviders[provider]);
+}
+
+function normalizeDefaultFanOutProviders(
+  selectedFanOutProviders: Provider[] | null | undefined,
+  enabledProviders: Provider[],
+): Provider[] | null {
+  if (!selectedFanOutProviders) {
+    return null;
+  }
+
+  const enabledSet = new Set(enabledProviders);
+  const normalized = selectedFanOutProviders.filter((provider) => enabledSet.has(provider));
+
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  return normalized;
+}
 
 export async function handleWorkspaceClear(
   message: Extract<RuntimeMessage, { type: 'CLEAR_WORKSPACE' | 'CLEAR_WORKSPACE_PROVIDER' }>,
@@ -91,15 +121,53 @@ export async function handleSetDefaultEnabledProviders(
 ) {
   const nextProviders = createDefaultEnabledProviders(message.providers);
   const localState = await getLocalState();
+  const enabledProviders = toEnabledProviderList(nextProviders);
+
+  if (enabledProviders.length === 0) {
+    return { ok: false, reason: 'At least one enabled provider is required' };
+  }
+
   await setLocalState({
     ...localState,
     defaultEnabledProviders: nextProviders,
+    defaultFanOutProviders: normalizeDefaultFanOutProviders(
+      localState.defaultFanOutProviders,
+      enabledProviders,
+    ),
   });
   await logDebug({
     level: 'info',
     scope: 'background',
-    message: 'Updated default enabled providers',
-    detail: message.providers.join(', '),
+    message: 'Updated enabled providers',
+    detail: enabledProviders.join(', '),
+  });
+  return { ok: true };
+}
+
+export async function handleSetDefaultFanOutProviders(
+  message: Extract<RuntimeMessage, { type: 'SET_DEFAULT_FAN_OUT_PROVIDERS' }>,
+) {
+  const localState = await getLocalState();
+  const enabledProviders = toEnabledProviderList(localState.defaultEnabledProviders);
+  const providers = message.providers
+    ? message.providers.filter((provider) => enabledProviders.includes(provider))
+    : null;
+
+  if (message.providers && providers?.length === 0) {
+    return { ok: false, reason: 'At least one default fan-out provider is required' };
+  }
+
+  await setLocalState({
+    ...localState,
+    defaultFanOutProviders: providers,
+  });
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    message: providers
+      ? 'Updated default fan-out providers'
+      : 'Reset default fan-out providers to defaults',
+    detail: providers?.join(', ') ?? 'default',
   });
   return { ok: true };
 }
@@ -172,6 +240,24 @@ export async function handleSetAutoSyncNewChatsEnabled(
   return { ok: true };
 }
 
+export async function handleSetPauseAfterFirstFanOutEnabled(
+  message: Extract<RuntimeMessage, { type: 'SET_PAUSE_AFTER_FIRST_FAN_OUT_ENABLED' }>,
+) {
+  const localState = await getLocalState();
+  await setLocalState({
+    ...localState,
+    pauseAfterFirstFanOutEnabled: message.enabled,
+  });
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    message: message.enabled
+      ? 'Pause after first fan-out enabled'
+      : 'Pause after first fan-out disabled',
+  });
+  return { ok: true };
+}
+
 export async function handleSetDebugLoggingEnabled(
   message: Extract<RuntimeMessage, { type: 'SET_DEBUG_LOGGING_ENABLED' }>,
 ) {
@@ -234,8 +320,9 @@ export async function handleResetIndicatorPositions() {
 }
 
 export async function handleClearPersistentStorage() {
-  await chrome.storage.local.clear();
   await Promise.all([
+    chrome.storage.local.clear(),
+    clearAllAttachments(),
     notifyAllTabsToRefreshContext(),
     notifyAllTabsToResetIndicatorPosition(),
   ]);

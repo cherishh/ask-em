@@ -53,6 +53,7 @@ export function getStandaloneTooltipSpec(input: {
   globalSyncEnabled: boolean;
   canStartNewSet: boolean;
   standaloneCreateSetEnabled: boolean;
+  standaloneFanOutTargetCount: number | null;
   toggleShortcutKeys: string[];
 }): ContentTooltipSpec {
   if (!input.globalSyncEnabled) {
@@ -64,6 +65,13 @@ export function getStandaloneTooltipSpec(input: {
   if (!input.canStartNewSet) {
     return {
       message: 'Set limit reached. Clear a set in the popup first.',
+    };
+  }
+
+  if (input.standaloneFanOutTargetCount === 0) {
+    return {
+      message: 'Choose another model in the popup to fan out.',
+      secondaryHtml: renderTooltipShortcutHtml('Shortcut', input.toggleShortcutKeys),
     };
   }
 

@@ -107,32 +107,54 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border: 1px solid rgba(35, 25, 8, 0.1);
+  border: 1px solid var(--askem-border-soft);
   border-radius: 12px;
-  background: var(--askem-white-surface);
+  background: var(--askem-white-surface-muted);
   padding: 10px 12px;
-  color: var(--askem-ink);
+  color: rgba(107, 100, 89, 0.62);
   cursor: pointer;
   font: 700 10px/1 var(--askem-font-sans);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
 }
 
 .askem-onboarding-provider-btn:hover {
-  border-color: var(--askem-border-accent-hover);
-  background: var(--askem-accent-surface-strong);
+  border-color: rgba(35, 25, 8, 0.14);
+  background: var(--askem-white-surface-soft);
   box-shadow: 0 4px 12px rgba(201, 100, 66, 0.08);
 }
 
-.askem-onboarding-arrow {
-  color: var(--askem-accent);
-  font-size: 13px;
-  opacity: 0.6;
-  transition: opacity 140ms ease, transform 140ms ease;
+.askem-onboarding-provider-btn[data-enabled="true"] {
+  color: var(--askem-ink);
+  border-color: var(--askem-border-accent-soft);
+  background: rgba(255, 249, 244, 0.86);
 }
 
-.askem-onboarding-provider-btn:hover .askem-onboarding-arrow {
-  opacity: 1;
-  transform: translateX(2px);
+.askem-onboarding-provider-btn:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+
+.askem-onboarding-provider-btn:disabled:hover {
+  border-color: var(--askem-border-soft);
+  background: var(--askem-white-surface-muted);
+  box-shadow: none;
+}
+
+.askem-onboarding-provider-btn[data-enabled="true"]:disabled:hover {
+  border-color: var(--askem-border-accent-soft);
+  background: rgba(255, 249, 244, 0.86);
+}
+
+.askem-onboarding-provider-check {
+  color: var(--askem-accent);
+  font-size: 12px;
+  line-height: 1;
+  min-width: 14px;
+  text-align: center;
 }

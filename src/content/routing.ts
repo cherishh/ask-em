@@ -1,4 +1,5 @@
 import type {
+  AttachmentRef,
   HeartbeatMessage,
   HelloMessage,
   ProviderStatus,
@@ -6,6 +7,13 @@ import type {
   UserSubmitMessage,
 } from '../runtime/protocol';
 import type { ProviderAdapter } from '../adapters/types';
+
+export function createSubmitId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `submit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  );
+}
 
 export function buildHelloMessage(adapter: ProviderAdapter): HelloMessage {
   const status = adapter.session.getStatus();
@@ -38,6 +46,10 @@ export function buildUserSubmitMessage(
   status: ProviderStatus,
   content: string,
   allowNewSetCreation: boolean,
+  options: {
+    attachments?: AttachmentRef[];
+    submitId?: string;
+  } = {},
 ): UserSubmitMessage {
   return {
     type: 'USER_SUBMIT',
@@ -47,6 +59,8 @@ export function buildUserSubmitMessage(
     pageKind: status.pageKind,
     allowNewSetCreation,
     content,
+    attachments: options.attachments ?? [],
+    submitId: options.submitId ?? createSubmitId(),
     timestamp: Date.now(),
   };
 }

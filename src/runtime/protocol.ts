@@ -1,4 +1,6 @@
+export * from './attachment-bridge';
 export * from './constants';
 export * from './messages';
 export * from './shortcuts';
 export * from './types';
+export * from './upload-capabilities';

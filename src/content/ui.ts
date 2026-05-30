@@ -33,13 +33,14 @@ export type UiContext = {
   globalSyncEnabled: boolean;
   standaloneReady: boolean;
   standaloneCreateSetEnabled: boolean;
+  standaloneFanOutTargetCount: number | null;
   canStartNewSet: boolean;
   shortcuts: ShortcutConfig;
 };
 
 export type UiHandlers = {
   onWorkspaceProviderToggle: (provider: Provider, nextEnabled: boolean) => Promise<void>;
-  onStandaloneSetCreationToggle: (nextEnabled: boolean) => void;
+  onStandaloneSetCreationToggle: (nextEnabled: boolean) => Promise<void>;
   onProviderTabSwitch: (direction: 'next' | 'previous') => Promise<{
     ok?: boolean;
     switched?: boolean;
@@ -62,6 +63,7 @@ type DragState = {
 const DRAG_THRESHOLD_PX = 6;
 const FALLBACK_PILL_WIDTH = 260;
 const FALLBACK_PILL_HEIGHT = 44;
+const TOAST_VISIBLE_MS = 20_000;
 
 function matchesShortcut(event: KeyboardEvent, binding: ShortcutBinding): boolean {
   const apple = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
@@ -131,6 +133,37 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     shell.appendChild(panel);
   }
 
+  let toast = shell.querySelector('.ask-em-toast') as HTMLDivElement | null;
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'ask-em-toast';
+    toast.dataset.visible = 'false';
+    toast.dataset.tone = 'neutral';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    shell.appendChild(toast);
+  }
+
+  let toastMessage = toast.querySelector('.ask-em-toast-message') as HTMLSpanElement | null;
+  if (!toastMessage) {
+    const existingText = toast.textContent ?? '';
+    toast.textContent = '';
+    toastMessage = document.createElement('span');
+    toastMessage.className = 'ask-em-toast-message';
+    toastMessage.textContent = existingText;
+    toast.appendChild(toastMessage);
+  }
+
+  let toastCloseButton = toast.querySelector('.ask-em-toast-close') as HTMLButtonElement | null;
+  if (!toastCloseButton) {
+    toastCloseButton = document.createElement('button');
+    toastCloseButton.type = 'button';
+    toastCloseButton.className = 'ask-em-toast-close';
+    toastCloseButton.setAttribute('aria-label', 'Close notification');
+    toastCloseButton.textContent = 'x';
+    toast.appendChild(toastCloseButton);
+  }
+
   let mount = document.getElementById(mountId) as HTMLButtonElement | null;
   if (!mount) {
     mount = document.createElement('button');
@@ -166,6 +199,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     globalSyncEnabled: true,
     standaloneReady: false,
     standaloneCreateSetEnabled: true,
+    standaloneFanOutTargetCount: null,
     canStartNewSet: true,
     shortcuts: DEFAULT_SHORTCUTS,
   };
@@ -175,6 +209,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   let currentPlacement = getDefaultIndicatorPlacement();
   let dragState: DragState | null = null;
   let suppressClickUntil = 0;
+  let toastTimer: number | null = null;
 
   const getViewportSize = () => ({
     width: window.innerWidth,
@@ -270,6 +305,29 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     }
   };
 
+  const clearToastTimer = () => {
+    if (toastTimer !== null) {
+      window.clearTimeout(toastTimer);
+      toastTimer = null;
+    }
+  };
+
+  const hideToast = () => {
+    clearToastTimer();
+    toast.dataset.visible = 'false';
+  };
+
+  const showToast = (message: string, tone: 'neutral' | 'warning' = 'neutral') => {
+    clearToastTimer();
+
+    toastMessage.textContent = message;
+    toast.dataset.tone = tone;
+    toast.dataset.visible = 'true';
+    toastTimer = window.setTimeout(() => {
+      hideToast();
+    }, TOAST_VISIBLE_MS);
+  };
+
   const setPanelVisible = (visible: boolean) => {
     const nextVisible = visible && Boolean(context.workspaceId || context.standaloneReady);
     panel.dataset.visible = String(nextVisible);
@@ -291,6 +349,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         globalSyncEnabled: context.globalSyncEnabled,
         canStartNewSet: context.canStartNewSet,
         standaloneCreateSetEnabled: context.standaloneCreateSetEnabled,
+        standaloneFanOutTargetCount: context.standaloneFanOutTargetCount,
         toggleShortcutKeys: formatBindingKeys(context.shortcuts.togglePageParticipation),
       }),
     );
@@ -361,19 +420,23 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     }
   };
 
-  const toggleStandaloneSetCreation = () => {
+  const toggleStandaloneSetCreation = async () => {
     if (currentProviderToggleBusy || !context.globalSyncEnabled || !context.canStartNewSet) {
       return;
     }
 
     const nextEnabled = !context.standaloneCreateSetEnabled;
-    handlers.onStandaloneSetCreationToggle(nextEnabled);
-    context.standaloneCreateSetEnabled = nextEnabled;
-    mount.dataset.standaloneCreateSetEnabled = String(nextEnabled);
-    refreshLayout();
+    setCurrentProviderToggleBusy(true);
 
-    if (panel.dataset.visible === 'true' && panel.dataset.mode === 'tooltip') {
-      renderStandaloneTooltip();
+    try {
+      await handlers.onStandaloneSetCreationToggle(nextEnabled);
+      refreshLayout();
+
+      if (panel.dataset.visible === 'true' && panel.dataset.mode === 'tooltip') {
+        renderStandaloneTooltip();
+      }
+    } finally {
+      setCurrentProviderToggleBusy(false);
     }
   };
 
@@ -418,7 +481,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     event.stopPropagation();
 
     if (!context.workspaceId && context.standaloneReady) {
-      toggleStandaloneSetCreation();
+      void toggleStandaloneSetCreation();
       return;
     }
 
@@ -608,7 +671,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     if (context.standaloneReady) {
       event.preventDefault();
       event.stopPropagation();
-      toggleStandaloneSetCreation();
+      void toggleStandaloneSetCreation();
     }
   };
   document.addEventListener('keydown', handleDocumentKeyDown);
@@ -617,6 +680,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     applyPlacement();
   };
   window.addEventListener('resize', handleWindowResize);
+  toastCloseButton.addEventListener('click', hideToast);
 
   applyPlacement();
   void loadIndicatorPlacement(adapter.name).then((savedPlacement) => {
@@ -653,12 +717,14 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     setAlertLevel(level: IndicatorAlertLevel) {
       mount.dataset.alertLevel = level;
     },
+    showToast,
     setContext(nextContext: UiContext) {
       context.workspaceId = nextContext.workspaceId;
       context.providerEnabled = nextContext.providerEnabled;
       context.globalSyncEnabled = nextContext.globalSyncEnabled;
       context.standaloneReady = nextContext.standaloneReady;
       context.standaloneCreateSetEnabled = nextContext.standaloneCreateSetEnabled;
+      context.standaloneFanOutTargetCount = nextContext.standaloneFanOutTargetCount;
       context.canStartNewSet = nextContext.canStartNewSet;
       context.shortcuts = resolveShortcutConfig(nextContext.shortcuts);
       mount.dataset.providerEnabled = String(nextContext.providerEnabled);
@@ -680,6 +746,8 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       await resetPosition();
     },
     destroy() {
+      clearToastTimer();
+      toastCloseButton.removeEventListener('click', hideToast);
       mount.removeEventListener('click', handleMountClick);
       mount.removeEventListener('mousemove', handleMountMouseMove);
       mount.removeEventListener('mouseleave', handleMountMouseLeave);

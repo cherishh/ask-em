@@ -9,7 +9,8 @@ export function HomeView(props: {
   atLimit: boolean;
   workspaceCount: number;
   workspaces: WorkspaceSummary[];
-  onboardingProviders: Provider[];
+  enabledProviders: Provider[];
+  defaultFanOutProviders: Provider[];
   version: string;
   globalSyncEnabled: boolean;
   loading: boolean;
@@ -17,6 +18,7 @@ export function HomeView(props: {
   onClearWorkspace: (workspaceId: string) => Promise<void>;
   onClearProvider: (workspaceId: string, provider: Provider) => Promise<void>;
   onToggleGlobalSync: () => void;
+  onToggleDefaultFanOutProvider: (provider: Provider) => void;
 }) {
   return (
     <>
@@ -48,7 +50,12 @@ export function HomeView(props: {
             />
           ))
         ) : (
-          <OnboardingCard providers={props.onboardingProviders} />
+          <OnboardingCard
+            providers={props.enabledProviders}
+            enabledProviders={props.defaultFanOutProviders}
+            loading={props.loading}
+            onToggleProvider={props.onToggleDefaultFanOutProvider}
+          />
         )}
       </section>
 

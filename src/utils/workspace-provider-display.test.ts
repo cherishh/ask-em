@@ -69,6 +69,22 @@ describe('workspace provider display', () => {
     });
   });
 
+  it('surfaces upload failures as needs attention', () => {
+    expect(
+      getWorkspaceProviderDisplay({
+        memberState: 'ready',
+        memberIssue: 'upload-failed',
+        enabled: true,
+        globalSyncEnabled: true,
+        hasMember: true,
+      }),
+    ).toEqual({
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Upload failed',
+    });
+  });
+
   it('surfaces provider error pages as needs attention', () => {
     expect(
       getWorkspaceProviderDisplay({
@@ -82,6 +98,38 @@ describe('workspace provider display', () => {
       kind: 'needs-attention',
       label: 'Needs Attention',
       detail: 'This page is showing an error. Session may be deleted.',
+    });
+  });
+
+  it('surfaces unsupported attachments as needs attention', () => {
+    expect(
+      getWorkspaceProviderDisplay({
+        memberState: 'ready',
+        memberIssue: 'unsupported-attachment',
+        enabled: true,
+        globalSyncEnabled: true,
+        hasMember: true,
+      }),
+    ).toEqual({
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Attachment not supported',
+    });
+  });
+
+  it('surfaces attachment limit issues as needs attention', () => {
+    expect(
+      getWorkspaceProviderDisplay({
+        memberState: 'ready',
+        memberIssue: 'attachment-limit',
+        enabled: true,
+        globalSyncEnabled: true,
+        hasMember: true,
+      }),
+    ).toEqual({
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Attachment limit exceeded',
     });
   });
 

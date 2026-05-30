@@ -6,7 +6,9 @@ import type {
   Workspace,
 } from '../runtime/protocol';
 import { upsertClaimedTab } from '../runtime/storage';
+import { formatAttachmentSummary } from '../runtime/attachment-log';
 import { logDebug } from './debug';
+import { checkProviderAttachmentCapability } from './attachment-capability';
 import { resolveDeliveryTarget, resolveReadyProviderTabForWorkspace } from './delivery-targets';
 
 type DeliverPromptResponse = {
@@ -75,6 +77,24 @@ export async function attemptProviderDelivery({
 }: AttemptProviderDeliveryInput): Promise<ProviderDeliveryResult> {
   const existingIssue = workspace.memberIssues?.[provider] ?? null;
   let deliveryTargetOverride: Awaited<ReturnType<typeof resolveReadyProviderTabForWorkspace>> = null;
+  const attachmentCapability = checkProviderAttachmentCapability(provider, message.attachments);
+
+  if (!attachmentCapability.ok) {
+    await logDebug({
+      level: 'warn',
+      scope: 'background',
+      provider,
+      workspaceId,
+      message: 'Skipped delivery for unsupported attachment',
+      detail: `${attachmentCapability.reason}; ${formatAttachmentSummary(message.attachments)}`,
+    });
+
+    return {
+      provider,
+      ok: false,
+      reason: attachmentCapability.reason,
+    } satisfies ProviderDeliveryResult;
+  }
 
   if (existingIssue === 'needs-login') {
     deliveryTargetOverride = await resolveReadyProviderTabForWorkspace(
@@ -138,7 +158,7 @@ export async function attemptProviderDelivery({
       provider,
       workspaceId,
       message: 'Delivering prompt',
-      detail: `${message.provider} -> ${provider} @ ${target.expectedSessionId ?? 'new-chat'}`,
+      detail: `${message.provider} -> ${provider} @ ${target.expectedSessionId ?? 'new-chat'}; ${formatAttachmentSummary(message.attachments)}`,
     });
 
     const response = (await chrome.tabs.sendMessage(target.tabId, {
@@ -146,6 +166,7 @@ export async function attemptProviderDelivery({
       workspaceId,
       provider,
       content: message.content,
+      attachments: message.attachments,
       expectedSessionId: target.expectedSessionId,
       expectedUrl: target.expectedUrl,
       timestamp: Date.now(),
@@ -158,7 +179,7 @@ export async function attemptProviderDelivery({
         provider,
         workspaceId,
         message: 'Prompt delivery accepted',
-        detail: `${message.provider} -> ${provider}`,
+        detail: `${message.provider} -> ${provider}; attachments=${message.attachments.length}`,
       });
     }
 
@@ -172,7 +193,7 @@ export async function attemptProviderDelivery({
       provider,
       workspaceId,
       message: 'Prompt delivery confirmed',
-      detail: `${message.provider} -> ${provider}`,
+      detail: `${message.provider} -> ${provider}; attachments=${message.attachments.length}`,
     });
 
     return {

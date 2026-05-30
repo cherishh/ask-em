@@ -2,11 +2,16 @@
 
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  FEEDBACK_DEBUG_LOG_MAX_BYTES,
+  getDebugLogsByteLength,
+} from '../../../runtime/debug-log-retention';
+import type { DebugLogEntry } from '../../../runtime/protocol';
 import { renderHookHarness } from './test-utils';
 import { useFeedback } from './use-feedback';
 
 const { requestFullLogs } = vi.hoisted(() => ({
-  requestFullLogs: vi.fn(async () => [
+  requestFullLogs: vi.fn(async (): Promise<DebugLogEntry[]> => [
     {
       id: 'log-1',
       timestamp: 1,
@@ -183,6 +188,38 @@ describe('useFeedback', () => {
     hook.unmount();
   });
 
+  it('trims bug report logs to the feedback byte budget before submitting', async () => {
+    const hugeLogs: DebugLogEntry[] = Array.from({ length: 120 }, (_, index) => ({
+      id: `log-${index}`,
+      timestamp: index,
+      level: 'info',
+      scope: 'background',
+      message: `message-${index}`,
+      detail: 'x'.repeat(10_000),
+    }));
+    requestFullLogs.mockResolvedValueOnce(hugeLogs);
+    const hook = renderHookHarness(() => useFeedback());
+
+    await act(async () => {
+      hook.current.selectFeedbackKind('bug-report');
+      hook.current.setFeedbackText('A provider failed during sync.');
+    });
+
+    await act(async () => {
+      await hook.current.submitFeedback();
+    });
+
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    const { payload } = readPayloadFromFormData(init?.body);
+
+    expect(payload.includeLogs).toBe(true);
+    expect(getDebugLogsByteLength(payload.logs)).toBeLessThanOrEqual(FEEDBACK_DEBUG_LOG_MAX_BYTES);
+    expect(payload.logs.at(-1).id).toBe('log-119');
+    expect(payload.logs.at(-1).detail).toContain('...[truncated ');
+
+    hook.unmount();
+  });
+
   it('supports the new feature request presets', async () => {
     const hook = renderHookHarness(() => useFeedback());
 
@@ -244,7 +281,7 @@ describe('useFeedback', () => {
 
     expect(payload).toMatchObject({
       kind: 'feature-request',
-      message: 'Image paste',
+      message: 'Image pasting',
       includeLogs: false,
       featureRequestChoice: 'image-paste',
       featureRequestDetail: null,

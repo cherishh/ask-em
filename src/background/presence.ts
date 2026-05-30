@@ -38,7 +38,7 @@ export async function handlePresenceMessage(message: HelloMessage | HeartbeatMes
   const workspaceLookup = reconciled.workspaceLookup;
 
   if (!workspaceLookup?.workspace) {
-    return buildStandalonePresenceResponse(localState);
+    return buildStandalonePresenceResponse(localState, message.provider);
   }
 
   cancelScheduledGroupGc(workspaceLookup.workspaceId);

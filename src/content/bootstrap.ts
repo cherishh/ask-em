@@ -34,7 +34,11 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
 
       state.applyIndicatorPresentation();
     },
-    onStandaloneSetCreationToggle(nextEnabled) {
+    async onStandaloneSetCreationToggle(nextEnabled) {
+      await sendRuntimeMessage({
+        type: 'SET_AUTO_SYNC_NEW_CHATS_ENABLED',
+        enabled: nextEnabled,
+      });
       state.setStandaloneCreateSetEnabled(nextEnabled);
       state.applyIndicatorPresentation();
     },
@@ -95,8 +99,8 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
     logDebug,
   });
 
-  const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.((content) => {
-    void submitController.reportUserSubmit(content);
+  const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.((payload) => {
+    void submitController.reportUserSubmit(payload);
   });
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>

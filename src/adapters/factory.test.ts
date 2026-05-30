@@ -3,6 +3,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDomProviderAdapter } from './factory';
 
+const PASTED_TEXT_ATTACHMENT_MIN_CHARS = 5_000;
+
 function mockVisibleLayout() {
   return vi
     .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
@@ -74,7 +76,516 @@ describe('dom provider adapter submit detection', () => {
     const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
     document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    expect(onSubmit).toHaveBeenCalledWith('hello');
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [],
+      onConsumed: expect.any(Function),
+    }));
+    unsubscribe?.();
+  });
+
+  it('captures stable file input changes when a submit-time source preview is present', () => {
+    document.body.innerHTML = `
+      <form>
+        <div id="composer" contenteditable="true">hello</div>
+        <div data-testid="attachment-card">sample.pdf</div>
+        <input id="file" type="file" />
+        <button id="send" type="button">Send</button>
+      </form>
+    `;
+
+    const file = new File(['abc'], 'sample.pdf', { type: 'application/pdf' });
+    const input = document.getElementById('file') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [file],
+    });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [
+        expect.objectContaining({
+          file,
+          name: 'sample.pdf',
+          mime: 'application/pdf',
+          size: 3,
+          source: 'file-input',
+        }),
+      ],
+      onConsumed: expect.any(Function),
+    }));
+    unsubscribe?.();
+  });
+
+  it('does not trust stale file input files without a submit-time source preview', () => {
+    document.body.innerHTML = `
+      <form>
+        <div id="composer" contenteditable="true">hello</div>
+        <input id="file" type="file" />
+        <button id="send" type="button">Send</button>
+      </form>
+    `;
+
+    const input = document.getElementById('file') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [new File(['abc'], 'stale.pdf', { type: 'application/pdf' })],
+    });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 1,
+        currentCount: 0,
+        submittedCount: 0,
+        reason: 'no-current-attachments',
+      }),
+    }));
+    unsubscribe?.();
+  });
+
+  it('recovers scoped file input files at submit time when the change event was missed', () => {
+    document.body.innerHTML = `
+      <form>
+        <div id="composer" contenteditable="true">hello</div>
+        <div data-testid="attachment-card">late.pdf</div>
+        <input id="file" type="file" />
+        <button id="send" type="button">Send</button>
+      </form>
+    `;
+
+    const file = new File(['abc'], 'late.pdf', { type: 'application/pdf' });
+    const input = document.getElementById('file') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [file],
+    });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [
+        expect.objectContaining({
+          file,
+          name: 'late.pdf',
+          mime: 'application/pdf',
+          size: 3,
+          source: 'file-input',
+        }),
+      ],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 1,
+        currentCount: 1,
+        submittedCount: 1,
+      }),
+      onConsumed: expect.any(Function),
+    }));
+    unsubscribe?.();
+  });
+
+  it('does not recover late file input files without a submit-time source preview', () => {
+    document.body.innerHTML = `
+      <form>
+        <div id="composer" contenteditable="true">hello</div>
+        <input id="file" type="file" />
+        <button id="send" type="button">Send</button>
+      </form>
+    `;
+
+    const input = document.getElementById('file') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [new File(['abc'], 'stale.pdf', { type: 'application/pdf' })],
+    });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 1,
+        currentCount: 0,
+        submittedCount: 0,
+        reason: 'no-current-attachments',
+      }),
+    }));
+    unsubscribe?.();
+  });
+
+  it('captures pasted files for the next submit', () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">hello</div>
+      <div data-testid="attachment-card">pasted.png</div>
+      <button id="send">Send</button>
+    `;
+
+    const file = new File(['abc'], 'pasted.png', { type: 'image/png' });
+    const composer = document.getElementById('composer') as HTMLElement;
+    const pasteEvent = new Event('paste', { bubbles: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: {
+        files: [file],
+        items: [],
+      },
+    });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    composer.dispatchEvent(pasteEvent);
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [
+        expect.objectContaining({
+          file,
+          name: 'pasted.png',
+          mime: 'image/png',
+          source: 'paste',
+        }),
+      ],
+      onConsumed: expect.any(Function),
+    }));
+    unsubscribe?.();
+  });
+
+  it('captures long pasted text when the provider turns it into an attachment', async () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">typed after paste</div>
+      <button id="send">Send</button>
+    `;
+
+    const text = 'log line\n'.repeat(Math.ceil(PASTED_TEXT_ATTACHMENT_MIN_CHARS / 9));
+    const composer = document.getElementById('composer') as HTMLElement;
+    const pasteEvent = new Event('paste', { bubbles: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: {
+        files: [],
+        items: [],
+        getData: (type: string) => type === 'text/plain' ? text : '',
+      },
+    });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      pastedTextAttachmentMinChars: PASTED_TEXT_ATTACHMENT_MIN_CHARS,
+      getComposerAttachmentSnapshot: () => ({
+        count: 1,
+        items: ['Pasted text'],
+      }),
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    composer.dispatchEvent(pasteEvent);
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const payload = onSubmit.mock.calls[0]?.[0];
+    expect(payload).toMatchObject({
+      text: 'typed after paste',
+      attachments: [
+        expect.objectContaining({
+          name: 'pasted-text-1.txt',
+          mime: 'text/plain',
+          source: 'pasted-text',
+        }),
+      ],
+      onConsumed: expect.any(Function),
+    });
+    await expect(payload.attachments[0].file.text()).resolves.toBe(text);
+    unsubscribe?.();
+  });
+
+  it('does not submit stale captured files when the source composer no longer shows them', () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">hello</div>
+      <button id="send">Send</button>
+    `;
+
+    const file = new File(['abc'], 'removed.png', { type: 'image/png' });
+    const composer = document.getElementById('composer') as HTMLElement;
+    const pasteEvent = new Event('paste', { bubbles: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: {
+        files: [file],
+        items: [],
+      },
+    });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    composer.dispatchEvent(pasteEvent);
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 1,
+        currentCount: null,
+        submittedCount: 0,
+        reason: 'missing-source-snapshot',
+      }),
+    }));
+    unsubscribe?.();
+  });
+
+  it('does not use generic submit-time attachment labels unless explicitly opted in', () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">hello</div>
+      <div data-testid="attachment-card">sample.pdf</div>
+      <button id="send">Send</button>
+    `;
+
+    const file = new File(['abc'], 'sample.pdf', { type: 'application/pdf' });
+    const composer = document.getElementById('composer') as HTMLElement;
+    const pasteEvent = new Event('paste', { bubbles: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: {
+        files: [file],
+        items: [],
+      },
+    });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    composer.dispatchEvent(pasteEvent);
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 1,
+        currentCount: null,
+        submittedCount: 0,
+        reason: 'missing-source-snapshot',
+      }),
+    }));
+    unsubscribe?.();
+  });
+
+  it('uses the submit-time source snapshot to filter removed files', () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">hello</div>
+      <div data-testid="attachment-card">kept.png</div>
+      <button id="send">Send</button>
+    `;
+
+    const composer = document.getElementById('composer') as HTMLElement;
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    for (const file of [
+      new File(['abc'], 'removed.png', { type: 'image/png' }),
+      new File(['abc'], 'kept.png', { type: 'image/png' }),
+    ]) {
+      const pasteEvent = new Event('paste', { bubbles: true });
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: {
+          files: [file],
+          items: [],
+        },
+      });
+      composer.dispatchEvent(pasteEvent);
+    }
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [
+        expect.objectContaining({
+          file: expect.any(File),
+          name: 'kept.png',
+          mime: 'image/png',
+          source: 'paste',
+        }),
+      ],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 2,
+        currentCount: 1,
+        submittedCount: 1,
+      }),
+    }));
+    unsubscribe?.();
+  });
+
+  it('captures bridged transient input files for the next submit', () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">hello</div>
+      <div data-testid="attachment-card">transient.pdf</div>
+      <button id="send">Send</button>
+    `;
+
+    const file = new File(['abc'], 'transient.pdf', { type: 'application/pdf' });
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'manus',
+      mountId: 'ask-em-manus-ui',
+      className: 'ask-em-manus-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        source: window,
+        data: {
+          source: 'ask-em',
+          type: 'ASK_EM_TRANSIENT_FILES',
+          files: [file],
+        },
+      }),
+    );
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [
+        expect.objectContaining({
+          file,
+          name: 'transient.pdf',
+          mime: 'application/pdf',
+          source: 'transient-file-input',
+        }),
+      ],
+      onConsumed: expect.any(Function),
+    }));
+    unsubscribe?.();
+  });
+
+  it('filters captured files when a scoped file input resets before submit', () => {
+    document.body.innerHTML = `
+      <form>
+        <div id="composer" contenteditable="true">hello</div>
+        <input id="file" type="file" />
+        <button id="send" type="button">Send</button>
+      </form>
+    `;
+
+    const input = document.getElementById('file') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [new File(['abc'], 'sample.pdf', { type: 'application/pdf' })],
+    });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [],
+    });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [],
+      onConsumed: expect.any(Function),
+    }));
     unsubscribe?.();
   });
 });

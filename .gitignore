@@ -11,6 +11,8 @@ dist
 tmp-*.md
 supabase/.temp
 
+ask-em-debug-logs-*.json
+
 1.json
 2.json
 3.json

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type {
   DebugLogEntry,
   Provider,
@@ -24,6 +25,8 @@ const SHORTCUT_ROWS = [
   },
 ] as const satisfies Array<{ id: ShortcutId; label: string }>;
 
+const ENABLED_PROVIDER_COLLAPSED_LIMIT = 5;
+
 function LogRow({ log }: { log: DebugLogEntry }) {
   return (
     <div className="askem-log-row">
@@ -42,15 +45,14 @@ function LogRow({ log }: { log: DebugLogEntry }) {
 export function AdvancedView(props: {
   status: StatusResponseMessage | null;
   loading: boolean;
-  selectedProviders: Provider[];
+  enabledProviders: Provider[];
   resolvedShortcuts: ShortcutConfig;
   recordingShortcutId: ShortcutId | null;
   logActionBusy: boolean;
-  autoSyncNewChatsEnabled: boolean;
   showDiagnostics: boolean;
   onOpenRequestModal: () => void;
-  onToggleDefaultProvider: (provider: Provider) => void;
-  onToggleAutoSyncNewChats: () => void;
+  onToggleEnabledProvider: (provider: Provider) => void;
+  onTogglePauseAfterFirstFanOut: () => void;
   onToggleCloseTabsOnDeleteSet: () => void;
   onResetIndicatorPositions: () => void;
   onSetRecordingShortcutId: (id: ShortcutId | null) => void;
@@ -62,6 +64,12 @@ export function AdvancedView(props: {
   onOpenTerms: () => void;
   onOpenPrivacy: () => void;
 }) {
+  const [enabledProvidersExpanded, setEnabledProvidersExpanded] = useState(false);
+  const hasProviderOverflow = ALL_PROVIDERS.length > ENABLED_PROVIDER_COLLAPSED_LIMIT;
+  const visibleProviderOptions = enabledProvidersExpanded
+    ? ALL_PROVIDERS
+    : ALL_PROVIDERS.slice(0, ENABLED_PROVIDER_COLLAPSED_LIMIT);
+
   return (
     <>
       <section className="askem-advanced-heading">
@@ -74,31 +82,56 @@ export function AdvancedView(props: {
         <p className="askem-card-label">Preferences</p>
 
         <div className="askem-us-group">
-          <div className="askem-us-row-header">
-            <span className="askem-us-row-title">Default models</span>
-            <button className="askem-request-link" onClick={props.onOpenRequestModal} type="button">
-              + more
-            </button>
+          <div className="askem-us-row-header askem-ep-header">
+            <div>
+              <span className="askem-us-row-title">Enabled providers</span>
+              <span className="askem-us-row-sub">Choose which providers appear on Home.</span>
+            </div>
+            <div className="askem-ep-header-actions">
+              <span className="askem-ep-count">{props.enabledProviders.length} shown</span>
+              <button className="askem-request-link" onClick={props.onOpenRequestModal} type="button">
+                + more
+              </button>
+            </div>
           </div>
-          <div className="askem-dm-list">
-            {ALL_PROVIDERS.map((provider) => {
-              const active = props.selectedProviders.includes(provider);
+          <div className={`askem-ep-list ${enabledProvidersExpanded ? 'is-expanded' : ''}`}>
+            {visibleProviderOptions.map((provider) => {
+              const active = props.enabledProviders.includes(provider);
+              const locked = active && props.enabledProviders.length <= 1;
               return (
                 <button
                   key={provider}
-                  className={`askem-dm-item ${active ? 'is-active' : ''}`}
-                  onClick={() => props.onToggleDefaultProvider(provider)}
-                  disabled={props.loading}
+                  className={`askem-ep-row ${active ? 'is-active' : ''}`}
+                  onClick={() => props.onToggleEnabledProvider(provider)}
+                  disabled={props.loading || locked}
+                  aria-pressed={active}
+                  aria-label={
+                    locked
+                      ? `Keep ${provider} visible on Home`
+                      : `${active ? 'Hide' : 'Show'} ${provider} on Home`
+                  }
                   type="button"
                 >
-                  <span className="askem-dm-name">{provider}</span>
-                  <span className="askem-dm-check" aria-hidden="true">
-                    {active ? '✓' : ''}
+                  <span className="askem-ep-dot" aria-hidden="true" />
+                  <span className="askem-ep-copy">
+                    <span className="askem-ep-name">{provider}</span>
+                    <span className="askem-ep-state">
+                      {active ? 'Shown on Home' : 'Hidden from Home'}
+                    </span>
                   </span>
                 </button>
               );
             })}
           </div>
+          {hasProviderOverflow ? (
+            <button
+              type="button"
+              className="askem-ep-expand"
+              onClick={() => setEnabledProvidersExpanded((expanded) => !expanded)}
+            >
+              {enabledProvidersExpanded ? 'Show fewer' : `Show ${ALL_PROVIDERS.length - ENABLED_PROVIDER_COLLAPSED_LIMIT} more`}
+            </button>
+          ) : null}
         </div>
 
         <div className="askem-us-divider" />
@@ -106,23 +139,23 @@ export function AdvancedView(props: {
         <div className="askem-us-group">
           <div className="askem-us-toggle-row">
             <div>
-              <span className="askem-us-row-title">Default auto-sync new chats</span>
+              <span className="askem-us-row-title">Pause after first fan-out</span>
               <span className="askem-us-row-sub">
-                {props.autoSyncNewChatsEnabled
-                  ? 'New chats automatically fan-out.'
-                  : 'New chats stay solo.'}
+                {props.status?.pauseAfterFirstFanOutEnabled ?? false
+                  ? 'Follow-up prompts stay local unless you re-enable the set.'
+                  : 'Follow-up prompts keep syncing until you pause the set.'}
               </span>
             </div>
             <button
               type="button"
               className="askem-us-switch"
-              data-enabled={String(props.autoSyncNewChatsEnabled)}
-              onClick={props.onToggleAutoSyncNewChats}
+              data-enabled={String(props.status?.pauseAfterFirstFanOutEnabled ?? false)}
+              onClick={props.onTogglePauseAfterFirstFanOut}
               disabled={props.loading}
               aria-label={
-                props.autoSyncNewChatsEnabled
-                  ? 'Disable auto-sync for new chats'
-                  : 'Enable auto-sync for new chats'
+                props.status?.pauseAfterFirstFanOutEnabled ?? false
+                  ? 'Disable pausing after first fan-out'
+                  : 'Enable pausing after first fan-out'
               }
             />
           </div>

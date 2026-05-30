@@ -94,6 +94,30 @@ export function getWorkspaceProviderDisplay(
     };
   }
 
+  if (input.memberIssue === 'upload-failed') {
+    return {
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Upload failed',
+    };
+  }
+
+  if (input.memberIssue === 'attachment-limit') {
+    return {
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Attachment limit exceeded',
+    };
+  }
+
+  if (input.memberIssue === 'unsupported-attachment') {
+    return {
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Attachment not supported',
+    };
+  }
+
   if (!input.hasMember || input.memberState === 'inactive') {
     return {
       kind: 'will-reopen',
@@ -140,7 +164,10 @@ export function getWorkspaceProviderDotState(
     input.memberIssue === 'needs-login' ||
     input.memberIssue === 'loading' ||
     input.memberIssue === 'delivery-failed' ||
-    input.memberIssue === 'error-page'
+    input.memberIssue === 'upload-failed' ||
+    input.memberIssue === 'error-page' ||
+    input.memberIssue === 'attachment-limit' ||
+    input.memberIssue === 'unsupported-attachment'
   ) {
     return 'warning';
   }

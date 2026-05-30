@@ -27,7 +27,7 @@ describe('content submit memory helpers', () => {
 
     rememberProgrammaticSubmit(state, 'hello', 100);
 
-    expect(shouldSuppressProgrammaticSubmit(state, 'hello', 30_101)).toBe(false);
+    expect(shouldSuppressProgrammaticSubmit(state, 'hello', 120_101)).toBe(false);
   });
 
   it('skips duplicate submit fingerprints inside the dedupe window', () => {
