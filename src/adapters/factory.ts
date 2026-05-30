@@ -18,6 +18,7 @@ import {
   ComposerAttachmentCaptureBuffer,
   getFilesFromDataTransfer,
   getFilesFromFileList,
+  getPlainTextFromDataTransfer,
 } from './attachment-capture';
 import {
   detectObviousErrorPage,
@@ -56,6 +57,7 @@ type DomProviderAdapterConfig = {
   errorKeywords?: string[];
   submitWaitMs?: number;
   submitTimeoutMs?: number;
+  pastedTextAttachmentMinChars?: number;
   isSendButtonEnabled?: (button: HTMLElement) => boolean;
   useGenericAttachmentSnapshot?: boolean;
   setComposerPayload?: (
@@ -369,7 +371,14 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
             return;
           }
 
-          attachmentBuffer.addFiles(getFilesFromDataTransfer(event.clipboardData), 'paste');
+          const files = getFilesFromDataTransfer(event.clipboardData);
+          attachmentBuffer.addFiles(files, 'paste');
+          if (files.length === 0 && config.pastedTextAttachmentMinChars) {
+            attachmentBuffer.addPastedText(
+              getPlainTextFromDataTransfer(event.clipboardData),
+              config.pastedTextAttachmentMinChars,
+            );
+          }
         };
 
         const handleDrop = (event: DragEvent) => {

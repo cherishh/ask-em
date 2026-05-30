@@ -132,6 +132,18 @@ export function getFilesFromDataTransfer(dataTransfer: DataTransfer | null | und
     .filter(isFileLike);
 }
 
+export function getPlainTextFromDataTransfer(dataTransfer: DataTransfer | null | undefined): string {
+  if (!dataTransfer || typeof dataTransfer.getData !== 'function') {
+    return '';
+  }
+
+  try {
+    return dataTransfer.getData('text/plain') ?? '';
+  } catch {
+    return '';
+  }
+}
+
 function compactAttachmentText(value: string): string {
   return value.replace(/\s+/g, '').toLowerCase();
 }
@@ -181,6 +193,7 @@ function findCapturedAttachmentForSnapshotItem(
 export class ComposerAttachmentCaptureBuffer {
   private attachments: CapturedAttachment[] = [];
   private recentCaptureAtByFileKey = new Map<string, number>();
+  private pastedTextCaptureCount = 0;
 
   addFiles(files: File[], source: AttachmentSource): CapturedAttachment[] {
     if (files.length === 0) {
@@ -209,6 +222,23 @@ export class ComposerAttachmentCaptureBuffer {
 
     this.attachments = [...this.attachments, ...captured];
     return captured;
+  }
+
+  addPastedText(text: string, minChars: number): CapturedAttachment[] {
+    if (text.trim().length < minChars) {
+      return [];
+    }
+
+    this.pastedTextCaptureCount += 1;
+    // Some providers turn very long pasted text into their own transient file.
+    // Capture the original text here, then submit-time DOM snapshots still
+    // decide whether that provider-side attachment is currently present.
+    const file = new File([text], `pasted-text-${this.pastedTextCaptureCount}.txt`, {
+      type: 'text/plain',
+      lastModified: Date.now(),
+    });
+
+    return this.addFiles([file], 'pasted-text');
   }
 
   getAttachmentsForSubmit(): CapturedAttachment[] {
@@ -275,6 +305,18 @@ export class ComposerAttachmentCaptureBuffer {
         matchedAttachments.push(match.attachment);
       }
 
+      const missingCount = currentCount - matchedAttachments.length;
+      if (missingCount > 0) {
+        const pastedTextMatches = captured
+          .map((attachment, index) => ({ attachment, index }))
+          .filter(({ attachment, index }) => attachment.source === 'pasted-text' && !usedIndexes.has(index))
+          .slice(0, missingCount);
+
+        if (pastedTextMatches.length === missingCount) {
+          matchedAttachments.push(...pastedTextMatches.map(({ attachment }) => attachment));
+        }
+      }
+
       if (matchedAttachments.length === currentCount) {
         return {
           attachments: matchedAttachments,
@@ -314,5 +356,6 @@ export class ComposerAttachmentCaptureBuffer {
   clear() {
     this.attachments = [];
     this.recentCaptureAtByFileKey.clear();
+    this.pastedTextCaptureCount = 0;
   }
 }

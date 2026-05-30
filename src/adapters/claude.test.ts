@@ -197,6 +197,78 @@ describe('Claude attachment delivery adapter', () => {
     });
   });
 
+  it('counts Claude provider-generated pasted text as one source attachment', () => {
+    document.body.innerHTML = `
+      <fieldset>
+        <input data-testid="file-upload" aria-label="Upload files" type="file" />
+        <div data-testid="file-thumbnail">
+          <button>
+            <h3>Pasted Text</h3>
+            <p>PASTED</p>
+          </button>
+        </div>
+        <button type="button" aria-label="Remove Pasted Text, pasted, 483 lines"></button>
+        <div data-testid="chat-input" contenteditable="true"></div>
+      </fieldset>
+    `;
+
+    expect(claudeAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: 'pasted-text-1.txt',
+        mime: 'text/plain',
+        size: 15_000,
+        source: 'pasted-text',
+        file: new File(['abc'], 'pasted-text-1.txt', { type: 'text/plain' }),
+      },
+    ])).toMatchObject({
+      count: 1,
+      items: [expect.stringContaining('Pasted Text')],
+    });
+  });
+
+  it('combines Claude pasted text and named files in source snapshots', () => {
+    document.body.innerHTML = `
+      <fieldset>
+        <input data-testid="file-upload" aria-label="Upload files" type="file" />
+        <div data-testid="file-thumbnail">
+          <button>
+            <h3>Pasted Text</h3>
+            <p>PASTED</p>
+          </button>
+        </div>
+        <button type="button" aria-label="Remove Pasted Text, pasted, 483 lines"></button>
+        <button type="button" aria-label="Remove report.pdf"></button>
+        <div data-testid="chat-input" contenteditable="true"></div>
+      </fieldset>
+    `;
+
+    expect(claudeAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: 'pasted-text-1.txt',
+        mime: 'text/plain',
+        size: 15_000,
+        source: 'pasted-text',
+        file: new File(['abc'], 'pasted-text-1.txt', { type: 'text/plain' }),
+      },
+      {
+        id: 'a2',
+        name: 'report.pdf',
+        mime: 'application/pdf',
+        size: 3,
+        source: 'file-input',
+        file: new File(['abc'], 'report.pdf', { type: 'application/pdf' }),
+      },
+    ])).toMatchObject({
+      count: 2,
+      items: [
+        expect.stringContaining('report.pdf'),
+        expect.stringContaining('Pasted Text'),
+      ],
+    });
+  });
+
   it('reads submit-time source attachment snapshots from current Claude PDF preview controls', () => {
     document.body.innerHTML = `
       <fieldset>

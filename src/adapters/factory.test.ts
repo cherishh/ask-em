@@ -3,6 +3,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDomProviderAdapter } from './factory';
 
+const PASTED_TEXT_ATTACHMENT_MIN_CHARS = 5_000;
+
 function mockVisibleLayout() {
   return vi
     .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
@@ -306,6 +308,57 @@ describe('dom provider adapter submit detection', () => {
       ],
       onConsumed: expect.any(Function),
     }));
+    unsubscribe?.();
+  });
+
+  it('captures long pasted text when the provider turns it into an attachment', async () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">typed after paste</div>
+      <button id="send">Send</button>
+    `;
+
+    const text = 'log line\n'.repeat(Math.ceil(PASTED_TEXT_ATTACHMENT_MIN_CHARS / 9));
+    const composer = document.getElementById('composer') as HTMLElement;
+    const pasteEvent = new Event('paste', { bubbles: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: {
+        files: [],
+        items: [],
+        getData: (type: string) => type === 'text/plain' ? text : '',
+      },
+    });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      pastedTextAttachmentMinChars: PASTED_TEXT_ATTACHMENT_MIN_CHARS,
+      getComposerAttachmentSnapshot: () => ({
+        count: 1,
+        items: ['Pasted text'],
+      }),
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    composer.dispatchEvent(pasteEvent);
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const payload = onSubmit.mock.calls[0]?.[0];
+    expect(payload).toMatchObject({
+      text: 'typed after paste',
+      attachments: [
+        expect.objectContaining({
+          name: 'pasted-text-1.txt',
+          mime: 'text/plain',
+          source: 'pasted-text',
+        }),
+      ],
+      onConsumed: expect.any(Function),
+    });
+    await expect(payload.attachments[0].file.text()).resolves.toBe(text);
     unsubscribe?.();
   });
 

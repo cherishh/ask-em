@@ -2,7 +2,9 @@ import { getVisibleButtonTexts, isVisible, normalizeWhitespace } from './dom';
 import { createDomProviderAdapter } from './factory';
 import { readAttachmentFiles, setFileInputFiles } from './attachment-delivery';
 import { fileInputAcceptsAttachments, preferFileInputForAttachmentCount } from './file-input';
-import { PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef } from '../runtime/protocol';
+import { PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef, type CapturedAttachment } from '../runtime/protocol';
+
+const CLAUDE_PASTED_TEXT_ATTACHMENT_MIN_CHARS = 5_000;
 
 export function isClaudeLoginRequiredPage(input: {
   pathname: string;
@@ -191,9 +193,34 @@ function getClaudeFileThumbnailItems(container: ParentNode): string[] {
   return getClaudeAttachmentItems(container);
 }
 
+function getClaudePastedTextAttachmentItems(container: ParentNode): string[] {
+  if (!(container instanceof Element || container instanceof Document)) {
+    return [];
+  }
+
+  const thumbnailItems = Array.from(container.querySelectorAll<HTMLElement>('[data-testid="file-thumbnail"]'))
+    .filter(isVisible)
+    .map(getElementTreeAccessibleText)
+    .filter((text) => compactAttachmentText(text).includes('pasted'));
+
+  if (thumbnailItems.length > 0) {
+    return thumbnailItems;
+  }
+
+  return Array.from(container.querySelectorAll<HTMLElement>('button[aria-label^="Remove Pasted Text" i]'))
+    .filter(isVisible)
+    .map(getElementAccessibleText)
+    .filter(Boolean);
+}
+
+function hasCapturedPastedTextAttachment(attachments: CapturedAttachment[]): boolean {
+  return attachments.some((attachment) => attachment.source === 'pasted-text');
+}
+
 export const claudeAdapter = createDomProviderAdapter({
   provider: 'claude',
   uploadCapability: PROVIDER_UPLOAD_CAPABILITIES.claude,
+  pastedTextAttachmentMinChars: CLAUDE_PASTED_TEXT_ATTACHMENT_MIN_CHARS,
   mountId: 'ask-em-claude-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-claude',
   classifyAuth() {
@@ -258,6 +285,30 @@ export const claudeAdapter = createDomProviderAdapter({
   getComposerAttachmentSnapshot({ findComposer }, capturedAttachments) {
     const composer = findComposer();
     const container = findClaudeComposerRoot(composer);
+    if (hasCapturedPastedTextAttachment(capturedAttachments)) {
+      const pastedTextItems = getClaudePastedTextAttachmentItems(container);
+      const nonPastedTextAttachments = capturedAttachments.filter(
+        (attachment) => attachment.source !== 'pasted-text',
+      );
+      const expectedNonPastedTextKeys = nonPastedTextAttachments.length > 0
+        ? getClaudeAttachmentItems(container, nonPastedTextAttachments)
+        : [];
+
+      if (pastedTextItems.length > 0 && expectedNonPastedTextKeys.length > 0) {
+        return {
+          count: pastedTextItems.length + expectedNonPastedTextKeys.length,
+          items: [...expectedNonPastedTextKeys, ...pastedTextItems],
+        };
+      }
+
+      if (pastedTextItems.length > 0 && nonPastedTextAttachments.length === 0) {
+        return {
+          count: pastedTextItems.length,
+          items: pastedTextItems,
+        };
+      }
+    }
+
     const fileThumbnailItems = getClaudeFileThumbnailItems(container);
     const expectedKeys = getClaudeAttachmentItems(container, capturedAttachments);
     const items = expectedKeys.length > 0 ? expectedKeys : fileThumbnailItems;

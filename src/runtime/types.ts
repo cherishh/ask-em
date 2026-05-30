@@ -25,7 +25,7 @@ export type AttachmentRef = {
 
 export type CapturedAttachment = AttachmentRef & {
   file: File;
-  source: 'paste' | 'drop' | 'file-input' | 'transient-file-input';
+  source: 'paste' | 'pasted-text' | 'drop' | 'file-input' | 'transient-file-input';
 };
 
 export type UploadCapability = {

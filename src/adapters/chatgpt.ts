@@ -4,6 +4,8 @@ import { dispatchPasteFiles, readAttachmentFiles, setFileInputFiles } from './at
 import { fileInputAcceptsAttachments, preferFileInputForAttachmentCount } from './file-input';
 import { PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef } from '../runtime/protocol';
 
+const CHATGPT_PASTED_TEXT_ATTACHMENT_MIN_CHARS = 5_000;
+
 export function isChatgptLoginRequiredPage(input: {
   pathname: string;
   buttonTexts: string[];
@@ -186,6 +188,7 @@ function detectChatgptUploadErrorText(): string | null {
 export const chatgptAdapter = createDomProviderAdapter({
   provider: 'chatgpt',
   uploadCapability: PROVIDER_UPLOAD_CAPABILITIES.chatgpt,
+  pastedTextAttachmentMinChars: CHATGPT_PASTED_TEXT_ATTACHMENT_MIN_CHARS,
   mountId: 'ask-em-chatgpt-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-chatgpt',
   classifyAuth() {

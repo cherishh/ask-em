@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { ComposerAttachmentCaptureBuffer, getFilesFromDataTransfer, getFilesFromFileList } from './attachment-capture';
+import {
+  ComposerAttachmentCaptureBuffer,
+  getFilesFromDataTransfer,
+  getFilesFromFileList,
+  getPlainTextFromDataTransfer,
+} from './attachment-capture';
+
+const PASTED_TEXT_ATTACHMENT_MIN_CHARS = 5_000;
 
 function createCrossRealmFileLike(name: string): File {
   return {
@@ -33,6 +40,14 @@ describe('attachment capture file extraction', () => {
     } as unknown as DataTransfer;
 
     expect(getFilesFromDataTransfer(dataTransfer)).toEqual([file]);
+  });
+
+  it('reads plain text from clipboard data safely', () => {
+    const dataTransfer = {
+      getData: (type: string) => type === 'text/plain' ? 'hello' : '',
+    } as DataTransfer;
+
+    expect(getPlainTextFromDataTransfer(dataTransfer)).toBe('hello');
   });
 });
 
@@ -115,6 +130,46 @@ describe('attachment submit snapshot resolution', () => {
       capturedCount: 2,
       currentCount: 2,
       submittedCount: 2,
+    });
+  });
+
+  it('captures long pasted text as a synthetic text attachment', async () => {
+    const buffer = new ComposerAttachmentCaptureBuffer();
+    const text = 'x'.repeat(PASTED_TEXT_ATTACHMENT_MIN_CHARS);
+
+    const captured = buffer.addPastedText(text, PASTED_TEXT_ATTACHMENT_MIN_CHARS);
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toMatchObject({
+      name: 'pasted-text-1.txt',
+      mime: 'text/plain',
+      size: PASTED_TEXT_ATTACHMENT_MIN_CHARS,
+      source: 'pasted-text',
+    });
+    await expect(captured[0].file.text()).resolves.toBe(text);
+  });
+
+  it('ignores short pasted text so normal paste stays plain text only', () => {
+    const buffer = new ComposerAttachmentCaptureBuffer();
+
+    expect(buffer.addPastedText(
+      'x'.repeat(PASTED_TEXT_ATTACHMENT_MIN_CHARS - 1),
+      PASTED_TEXT_ATTACHMENT_MIN_CHARS,
+    )).toEqual([]);
+    expect(buffer.getAttachmentsForSubmit()).toEqual([]);
+  });
+
+  it('matches provider-generated pasted-text attachment labels by count', () => {
+    const buffer = new ComposerAttachmentCaptureBuffer();
+    buffer.addPastedText('x'.repeat(PASTED_TEXT_ATTACHMENT_MIN_CHARS), PASTED_TEXT_ATTACHMENT_MIN_CHARS);
+
+    expect(buffer.resolveAttachmentsForSubmit({
+      count: 1,
+      items: ['Pasted text'],
+    })).toMatchObject({
+      capturedCount: 1,
+      currentCount: 1,
+      submittedCount: 1,
     });
   });
 });

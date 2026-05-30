@@ -219,6 +219,33 @@ describe('ChatGPT attachment delivery adapter', () => {
     });
   });
 
+  it('counts ChatGPT provider-generated pasted text as one source attachment', () => {
+    document.body.innerHTML = `
+      <form data-type="unified-composer">
+        <input id="upload-files" type="file" multiple />
+        <div id="prompt-textarea" role="textbox" aria-label="Chat with ChatGPT" contenteditable="true"></div>
+        <div role="group" aria-label="[" class="group/file-tile">
+          <div>[</div>
+          <button type="button" aria-label="Remove file 1: ["></button>
+        </div>
+      </form>
+    `;
+
+    expect(chatgptAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: 'pasted-text-1.txt',
+        mime: 'text/plain',
+        size: 15_000,
+        source: 'pasted-text',
+        file: new File(['abc'], 'pasted-text-1.txt', { type: 'text/plain' }),
+      },
+    ])).toEqual({
+      count: 1,
+      items: [],
+    });
+  });
+
   it('fails closed for ChatGPT source snapshots when generic preview count differs from captured files', () => {
     document.body.innerHTML = `
       <form data-type="unified-composer">
