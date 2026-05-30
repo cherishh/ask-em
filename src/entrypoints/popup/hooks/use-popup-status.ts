@@ -20,8 +20,13 @@ export function usePopupStatus() {
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [selectedProviders, setSelectedProviders] = useState<Provider[]>(PROVIDERS);
+  const [firstFanOutProviders, setFirstFanOutProviders] = useState<Provider[] | null>(null);
   const [shortcuts, setShortcuts] = useState<ShortcutConfig>(DEFAULT_SHORTCUTS);
   const resolvedShortcuts = useMemo(() => resolveShortcutConfig(shortcuts), [shortcuts]);
+  const firstFanOutSelectedProviders = useMemo(
+    () => firstFanOutProviders ?? selectedProviders,
+    [firstFanOutProviders, selectedProviders],
+  );
 
   const refresh = useCallback(async (options: { silent?: boolean } = {}) => {
     if (!options.silent) {
@@ -36,6 +41,7 @@ export function usePopupStatus() {
           setSelectedProviders(
             PROVIDERS.filter((provider) => nextStatus.defaultEnabledProviders[provider]),
           );
+          setFirstFanOutProviders(nextStatus.firstFanOutProviders ?? null);
           setShortcuts(resolveShortcutConfig(nextStatus.shortcuts));
         }
       });
@@ -117,11 +123,34 @@ export function usePopupStatus() {
       : [...selectedProviders, provider];
 
     setSelectedProviders(nextProviders);
+    setFirstFanOutProviders(null);
     await sendRuntimeMessage({
       type: 'SET_DEFAULT_ENABLED_PROVIDERS',
       providers: nextProviders,
     });
   }, [selectedProviders, sendRuntimeMessage]);
+
+  const toggleFirstFanOutProvider = useCallback(async (provider: Provider) => {
+    if (!selectedProviders.includes(provider)) {
+      return;
+    }
+
+    const currentProviders = firstFanOutProviders ?? selectedProviders;
+    const nextProviders = currentProviders.includes(provider)
+      ? currentProviders.filter((item) => item !== provider)
+      : selectedProviders.filter((item) => currentProviders.includes(item) || item === provider);
+    const normalizedNextProviders = selectedProviders.filter((item) => nextProviders.includes(item));
+    const matchesDefaults =
+      normalizedNextProviders.length === selectedProviders.length &&
+      selectedProviders.every((item) => normalizedNextProviders.includes(item));
+    const overrideProviders = matchesDefaults ? null : normalizedNextProviders;
+
+    setFirstFanOutProviders(overrideProviders);
+    await sendRuntimeMessage({
+      type: 'SET_FIRST_FAN_OUT_PROVIDERS',
+      providers: overrideProviders,
+    }, { silentRefresh: true });
+  }, [firstFanOutProviders, selectedProviders, sendRuntimeMessage]);
 
   const toggleGlobalSync = useCallback(async () => {
     const nextEnabled = !status?.globalSyncEnabled;
@@ -179,12 +208,14 @@ export function usePopupStatus() {
     loading,
     busyKey,
     selectedProviders,
+    firstFanOutSelectedProviders,
     shortcuts,
     resolvedShortcuts,
     refresh,
     clearWorkspace,
     clearProvider,
     toggleDefaultProvider,
+    toggleFirstFanOutProvider,
     toggleAutoSyncNewChats,
     toggleGlobalSync,
     toggleCloseTabsOnDeleteSet,

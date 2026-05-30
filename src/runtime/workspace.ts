@@ -50,6 +50,22 @@ export function getDefaultEnabledProviderList(state: LocalState, sourceProvider?
   return Array.from(new Set(selected));
 }
 
+export function getFirstFanOutEnabledProviderList(
+  state: LocalState,
+  sourceProvider: Provider,
+): Provider[] {
+  const defaultProviders = getDefaultEnabledProviderList(state);
+  const selected = state.firstFanOutProviders
+    ? state.firstFanOutProviders.filter((provider) => defaultProviders.includes(provider))
+    : defaultProviders;
+
+  if (!selected.includes(sourceProvider)) {
+    selected.unshift(sourceProvider);
+  }
+
+  return Array.from(new Set(selected));
+}
+
 export function createPendingWorkspace(
   state: LocalState,
   input: CreatePendingWorkspaceInput,

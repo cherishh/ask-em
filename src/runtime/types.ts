@@ -90,6 +90,7 @@ export type LocalState = {
   showDiagnostics: boolean;
   closeTabsOnDeleteSet: boolean;
   defaultEnabledProviders: DefaultEnabledProviders;
+  firstFanOutProviders?: Provider[] | null;
   shortcuts: ShortcutConfig;
   workspaces: Record<string, Workspace>;
   workspaceIndex: WorkspaceIndex;

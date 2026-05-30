@@ -31,11 +31,13 @@ export default function App() {
     loading,
     busyKey,
     selectedProviders,
+    firstFanOutSelectedProviders,
     resolvedShortcuts,
     refresh,
     clearWorkspace,
     clearProvider,
     toggleDefaultProvider,
+    toggleFirstFanOutProvider,
     toggleAutoSyncNewChats,
     toggleGlobalSync,
     toggleCloseTabsOnDeleteSet,
@@ -169,6 +171,7 @@ export default function App() {
             workspaceCount={workspaceCount}
             workspaces={status?.workspaces ?? []}
             onboardingProviders={onboardingProviders}
+            onboardingFanOutProviders={firstFanOutSelectedProviders}
             version={popupVersion}
             globalSyncEnabled={globalSyncEnabled}
             loading={loading}
@@ -176,6 +179,7 @@ export default function App() {
             onClearWorkspace={clearWorkspace}
             onClearProvider={clearProvider}
             onToggleGlobalSync={() => void toggleGlobalSync()}
+            onToggleFirstFanOutProvider={(provider) => void toggleFirstFanOutProvider(provider)}
           />
         ) : (
           <AdvancedView

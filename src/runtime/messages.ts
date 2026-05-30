@@ -146,6 +146,7 @@ export type StatusResponseMessage = {
   closeTabsOnDeleteSet: boolean;
   workspaceLimit: number;
   defaultEnabledProviders: DefaultEnabledProviders;
+  firstFanOutProviders?: Provider[] | null;
   shortcuts: ShortcutConfig;
   workspaces: WorkspaceSummary[];
   recentLogs: DebugLogEntry[];
@@ -190,6 +191,11 @@ export type ClearWorkspaceProviderMessage = {
 export type SetDefaultEnabledProvidersMessage = {
   type: 'SET_DEFAULT_ENABLED_PROVIDERS';
   providers: Provider[];
+};
+
+export type SetFirstFanOutProvidersMessage = {
+  type: 'SET_FIRST_FAN_OUT_PROVIDERS';
+  providers: Provider[] | null;
 };
 
 export type SetWorkspaceProviderEnabledMessage = {
@@ -281,6 +287,7 @@ export type RuntimeMessage =
   | ClearWorkspaceProviderMessage
   | ClearDebugLogsMessage
   | SetDefaultEnabledProvidersMessage
+  | SetFirstFanOutProvidersMessage
   | SetWorkspaceProviderEnabledMessage
   | SetAutoSyncNewChatsEnabledMessage
   | SetGlobalSyncEnabledMessage

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createDefaultEnabledProviders } from './protocol';
 import type { LocalState, SessionState, UserSubmitMessage } from './protocol';
 import {
   makeClaimedTab,
@@ -736,6 +737,34 @@ describe('background submit routing', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('uses and consumes the first fan-out subset when creating a new workspace', async () => {
+    storageMocks.getLocalState.mockResolvedValue(makeLocalState({
+      defaultEnabledProviders: createDefaultEnabledProviders(['claude', 'chatgpt', 'gemini']),
+      firstFanOutProviders: ['chatgpt'],
+    }));
+    storageMocks.getSessionState.mockResolvedValue(makeSessionState());
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    await handleUserSubmit(
+      makeSubmitMessage({
+        provider: 'claude',
+        currentUrl: 'https://claude.ai/new',
+        sessionId: null,
+        pageKind: 'new-chat',
+        content: 'first run',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    const createdState = storageMocks.setLocalState.mock.calls
+      .map(([state]) => state as LocalState)
+      .find((state) => Object.keys(state.workspaces).length === 1);
+    const createdWorkspace = createdState ? Object.values(createdState.workspaces)[0] : null;
+
+    expect(createdWorkspace?.enabledProviders).toEqual(['claude', 'chatgpt']);
+    expect(createdState?.firstFanOutProviders).toBeNull();
   });
 
   it('releases submit-scoped attachments when submit has no workspace', async () => {

@@ -2,7 +2,7 @@ import type { LocalState, SessionState, UserSubmitMessage } from '../runtime/pro
 import {
   bindWorkspaceMember,
   createPendingWorkspace,
-  getDefaultEnabledProviderList,
+  getFirstFanOutEnabledProviderList,
   getWorkspacesOrdered,
   type WorkspaceLookupResult,
 } from '../runtime/workspace';
@@ -57,7 +57,7 @@ export async function prepareSubmitWorkspaceContext({
   let workspaceLookup = reconciled.workspaceLookup;
 
   if (!workspaceLookup && canCreateWorkspace(localState, message)) {
-    const enabledProviders = getDefaultEnabledProviderList(localState, message.provider);
+    const enabledProviders = getFirstFanOutEnabledProviderList(localState, message.provider);
     const label = message.content.trim().slice(0, 80) || undefined;
     localState = createPendingWorkspace(localState, {
       sourceProvider: message.provider,
@@ -65,6 +65,10 @@ export async function prepareSubmitWorkspaceContext({
       enabledProviders,
       label,
     });
+    localState = {
+      ...localState,
+      firstFanOutProviders: null,
+    };
 
     const workspace = getWorkspacesOrdered(localState)[0];
     workspaceLookup = workspace ? { workspaceId: workspace.id, workspace } : null;

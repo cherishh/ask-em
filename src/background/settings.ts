@@ -95,12 +95,39 @@ export async function handleSetDefaultEnabledProviders(
   await setLocalState({
     ...localState,
     defaultEnabledProviders: nextProviders,
+    firstFanOutProviders: null,
   });
   await logDebug({
     level: 'info',
     scope: 'background',
     message: 'Updated default enabled providers',
     detail: message.providers.join(', '),
+  });
+  return { ok: true };
+}
+
+export async function handleSetFirstFanOutProviders(
+  message: Extract<RuntimeMessage, { type: 'SET_FIRST_FAN_OUT_PROVIDERS' }>,
+) {
+  const localState = await getLocalState();
+  const defaultProviders = Object.entries(localState.defaultEnabledProviders)
+    .filter(([, enabled]) => enabled)
+    .map(([provider]) => provider);
+  const providers = message.providers
+    ? message.providers.filter((provider) => defaultProviders.includes(provider))
+    : null;
+
+  await setLocalState({
+    ...localState,
+    firstFanOutProviders: providers,
+  });
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    message: providers
+      ? 'Updated first fan-out providers'
+      : 'Reset first fan-out providers to defaults',
+    detail: providers?.join(', ') ?? 'default',
   });
   return { ok: true };
 }

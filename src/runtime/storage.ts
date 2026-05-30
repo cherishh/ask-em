@@ -18,6 +18,7 @@ export const DEFAULT_LOCAL_STATE: LocalState = {
   showDiagnostics: false,
   closeTabsOnDeleteSet: false,
   defaultEnabledProviders: createDefaultEnabledProviders(),
+  firstFanOutProviders: null,
   shortcuts: DEFAULT_SHORTCUTS,
   workspaces: {},
   workspaceIndex: {},

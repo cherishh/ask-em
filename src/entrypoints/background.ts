@@ -26,6 +26,7 @@ import {
   handleSetAutoSyncNewChatsEnabled,
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
+  handleSetFirstFanOutProviders,
   handleSetGlobalSyncEnabled,
   handleSetShowDiagnostics,
   handleResetIndicatorPositions,
@@ -58,6 +59,7 @@ export {
   handleSetAutoSyncNewChatsEnabled,
   handleSetDebugLoggingEnabled,
   handleSetDefaultEnabledProviders,
+  handleSetFirstFanOutProviders,
   handleSetGlobalSyncEnabled,
   handleSetShowDiagnostics,
   handleResetIndicatorPositions,
@@ -159,6 +161,9 @@ export default defineBackground(() => {
           return;
         case 'SET_DEFAULT_ENABLED_PROVIDERS':
           sendResponse(await handleSetDefaultEnabledProviders(message));
+          return;
+        case 'SET_FIRST_FAN_OUT_PROVIDERS':
+          sendResponse(await handleSetFirstFanOutProviders(message));
           return;
         case 'SET_WORKSPACE_PROVIDER_ENABLED':
           sendResponse(await handleSetWorkspaceProviderEnabled(message));

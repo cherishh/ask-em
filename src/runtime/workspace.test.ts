@@ -23,6 +23,7 @@ import {
   createPendingWorkspace,
   enforceWorkspaceLimit,
   getDefaultEnabledProviderList,
+  getFirstFanOutEnabledProviderList,
   getWorkspacesOrdered,
   lookupWorkspaceBySession,
   rebuildWorkspaceIndex,
@@ -334,6 +335,16 @@ describe('workspace state', () => {
     };
 
     expect(getDefaultEnabledProviderList(state, 'gemini')).toEqual(['gemini', 'chatgpt', 'deepseek']);
+  });
+
+  it('builds first fan-out providers as a subset of default enabled providers', () => {
+    const state: LocalState = {
+      ...createEmptyState(),
+      defaultEnabledProviders: createDefaultEnabledProviders(['claude', 'chatgpt', 'deepseek']),
+      firstFanOutProviders: ['chatgpt', 'manus'],
+    };
+
+    expect(getFirstFanOutEnabledProviderList(state, 'gemini')).toEqual(['gemini', 'chatgpt']);
   });
 
   it('can pause a provider without removing its binding', () => {
