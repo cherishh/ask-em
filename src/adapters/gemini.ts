@@ -263,6 +263,10 @@ export const geminiAdapter = createDomProviderAdapter({
 
     const baselineContainer = findGeminiComposerRoot(composer, context.findSendButton());
     const baselineCount = getGeminiAttachmentItems(baselineContainer, payload.attachments).length;
+    // TODO: Gemini accepts MP4 through trusted user paste, but synthetic paste does
+    // not currently create the video attachment. A transient Upload files route
+    // still returns `upload input not found`; revisit with a Gemini-specific
+    // xapfileselectortrigger bridge. Keep synthetic paste for documents/images.
     dispatchPasteFiles(composer, await readAttachmentFiles(payload.attachments));
     await waitForGeminiAttachmentOnlySubmitReady(context, payload.attachments, baselineCount);
     await context.setComposerText(payload.text);

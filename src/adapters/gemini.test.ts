@@ -331,6 +331,39 @@ describe('Gemini attachment delivery adapter', () => {
     });
   });
 
+  it('reports Gemini video attachment presence from media preview tooltip text', async () => {
+    document.body.innerHTML = `
+      <div class="text-input-field with-file-preview">
+        <div class="attachment-preview-wrapper">
+          <uploader-file-preview class="file-preview-chip">
+            <div class="file-preview-container" aria-describedby="tooltip-file-1">
+              <gem-media-attachment class="gem-attachment gds-label-l clickable gem-attachment-tile">
+                <span class="gem-attachment-content">0:32</span>
+              </gem-media-attachment>
+            </div>
+          </uploader-file-preview>
+        </div>
+        <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true"></div>
+        <button aria-label="Send message"></button>
+      </div>
+      <div class="cdk-describedby-message-container" style="visibility: hidden;">
+        <div id="tooltip-file-1" role="tooltip">test.mp4</div>
+      </div>
+    `;
+
+    await expect(Promise.resolve(geminiAdapter.composer?.getComposerAttachmentPresence?.([
+      {
+        id: 'a1',
+        name: 'test.mp4',
+        mime: 'video/mp4',
+        size: 4_059_345,
+      },
+    ]))).resolves.toEqual({
+      count: 1,
+      keys: ['test.mp4'],
+    });
+  });
+
   it('matches long Gemini filenames from aria-describedby tooltip text when the visible tile is truncated', async () => {
     document.body.innerHTML = `
       <div class="text-input-field with-file-preview">
