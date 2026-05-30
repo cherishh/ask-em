@@ -1,4 +1,11 @@
-import { createDefaultEnabledProviders, STORAGE_KEYS, type RuntimeMessage } from '../runtime/protocol';
+import {
+  ALL_PROVIDERS,
+  createDefaultEnabledProviders,
+  STORAGE_KEYS,
+  type DefaultEnabledProviders,
+  type Provider,
+  type RuntimeMessage,
+} from '../runtime/protocol';
 import { clearDebugLogs, getLocalState, getSessionState, setLocalState, setSessionState } from '../runtime/storage';
 import { clearAllAttachments } from '../runtime/attachment-store';
 import { clearWorkspace, clearWorkspaceProvider, setWorkspaceProviderEnabled } from '../runtime/workspace';
@@ -11,6 +18,28 @@ import {
   notifyAllTabsToResetIndicatorPosition,
   notifyTabsToRefreshContext,
 } from './tabs';
+
+function toEnabledProviderList(defaultEnabledProviders: DefaultEnabledProviders): Provider[] {
+  return ALL_PROVIDERS.filter((provider) => defaultEnabledProviders[provider]);
+}
+
+function normalizeDefaultFanOutProviders(
+  selectedFanOutProviders: Provider[] | null | undefined,
+  enabledProviders: Provider[],
+): Provider[] | null {
+  if (!selectedFanOutProviders) {
+    return null;
+  }
+
+  const enabledSet = new Set(enabledProviders);
+  const normalized = selectedFanOutProviders.filter((provider) => enabledSet.has(provider));
+
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  return normalized;
+}
 
 export async function handleWorkspaceClear(
   message: Extract<RuntimeMessage, { type: 'CLEAR_WORKSPACE' | 'CLEAR_WORKSPACE_PROVIDER' }>,
@@ -92,41 +121,52 @@ export async function handleSetDefaultEnabledProviders(
 ) {
   const nextProviders = createDefaultEnabledProviders(message.providers);
   const localState = await getLocalState();
+  const enabledProviders = toEnabledProviderList(nextProviders);
+
+  if (enabledProviders.length === 0) {
+    return { ok: false, reason: 'At least one enabled provider is required' };
+  }
+
   await setLocalState({
     ...localState,
     defaultEnabledProviders: nextProviders,
-    firstFanOutProviders: null,
+    defaultFanOutProviders: normalizeDefaultFanOutProviders(
+      localState.defaultFanOutProviders,
+      enabledProviders,
+    ),
   });
   await logDebug({
     level: 'info',
     scope: 'background',
-    message: 'Updated default enabled providers',
-    detail: message.providers.join(', '),
+    message: 'Updated enabled providers',
+    detail: enabledProviders.join(', '),
   });
   return { ok: true };
 }
 
-export async function handleSetFirstFanOutProviders(
-  message: Extract<RuntimeMessage, { type: 'SET_FIRST_FAN_OUT_PROVIDERS' }>,
+export async function handleSetDefaultFanOutProviders(
+  message: Extract<RuntimeMessage, { type: 'SET_DEFAULT_FAN_OUT_PROVIDERS' }>,
 ) {
   const localState = await getLocalState();
-  const defaultProviders = Object.entries(localState.defaultEnabledProviders)
-    .filter(([, enabled]) => enabled)
-    .map(([provider]) => provider);
+  const enabledProviders = toEnabledProviderList(localState.defaultEnabledProviders);
   const providers = message.providers
-    ? message.providers.filter((provider) => defaultProviders.includes(provider))
+    ? message.providers.filter((provider) => enabledProviders.includes(provider))
     : null;
+
+  if (message.providers && providers?.length === 0) {
+    return { ok: false, reason: 'At least one default fan-out provider is required' };
+  }
 
   await setLocalState({
     ...localState,
-    firstFanOutProviders: providers,
+    defaultFanOutProviders: providers,
   });
   await logDebug({
     level: 'info',
     scope: 'background',
     message: providers
-      ? 'Updated first fan-out providers'
-      : 'Reset first fan-out providers to defaults',
+      ? 'Updated default fan-out providers'
+      : 'Reset default fan-out providers to defaults',
     detail: providers?.join(', ') ?? 'default',
   });
   return { ok: true };

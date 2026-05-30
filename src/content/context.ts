@@ -11,6 +11,7 @@ export type PresenceResponse = {
   providerEnabled?: boolean;
   globalSyncEnabled?: boolean;
   autoSyncNewChatsEnabled?: boolean;
+  nextFanOutTargetCount?: number;
   canStartNewSet?: boolean;
   shortcuts?: ShortcutConfig;
   workspaceSummary?: WorkspaceSummary | null;
@@ -50,13 +51,18 @@ export function buildPresenceContextTransition({
   const enteringWorkspace = Boolean(nextWorkspaceId);
   let nextStandaloneCreateSetEnabled = currentContext.standaloneCreateSetEnabled;
   let nextStandaloneCreateSetTouched = standaloneCreateSetTouched;
+  let nextStandaloneFanOutTargetCount = currentContext.standaloneFanOutTargetCount;
 
   if (enteringWorkspace) {
     nextStandaloneCreateSetEnabled = true;
+    nextStandaloneFanOutTargetCount = null;
     nextStandaloneCreateSetTouched = false;
   } else if (!hasHydratedPresence || leavingWorkspace || !standaloneCreateSetTouched) {
     nextStandaloneCreateSetEnabled = defaultStandaloneCreateSetEnabled;
+    nextStandaloneFanOutTargetCount = response?.nextFanOutTargetCount ?? null;
     nextStandaloneCreateSetTouched = false;
+  } else if (response?.nextFanOutTargetCount !== undefined) {
+    nextStandaloneFanOutTargetCount = response.nextFanOutTargetCount;
   }
 
   const uiContext: UiContext = {
@@ -65,6 +71,7 @@ export function buildPresenceContextTransition({
     globalSyncEnabled: response?.globalSyncEnabled ?? true,
     standaloneReady: standaloneVisible,
     standaloneCreateSetEnabled: nextStandaloneCreateSetEnabled,
+    standaloneFanOutTargetCount: nextStandaloneFanOutTargetCount,
     canStartNewSet: response?.canStartNewSet ?? true,
     shortcuts: resolveShortcutConfig(response?.shortcuts ?? currentContext.shortcuts),
   };
@@ -103,6 +110,9 @@ export function buildSubmitContextTransition({
     standaloneCreateSetEnabled: response?.workspaceId
       ? true
       : currentContext.standaloneCreateSetEnabled,
+    standaloneFanOutTargetCount: response?.workspaceId
+      ? null
+      : response?.nextFanOutTargetCount ?? currentContext.standaloneFanOutTargetCount,
     canStartNewSet: response?.canStartNewSet ?? currentContext.canStartNewSet,
     shortcuts: currentContext.shortcuts,
   };

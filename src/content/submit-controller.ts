@@ -130,7 +130,7 @@ export function createSubmitController(
       !uiContext.workspaceId &&
       status.pageKind === 'new-chat' &&
       status.sessionId === null &&
-      !uiContext.standaloneCreateSetEnabled
+      (!uiContext.standaloneCreateSetEnabled || uiContext.standaloneFanOutTargetCount === 0)
     ) {
       state.applyIndicatorPresentation(status);
       await dependencies.logDebug({

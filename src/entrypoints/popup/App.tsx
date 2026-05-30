@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   MAX_WORKSPACES,
 } from '../../runtime/protocol';
@@ -30,14 +30,14 @@ export default function App() {
     status,
     loading,
     busyKey,
-    selectedProviders,
-    firstFanOutSelectedProviders,
+    enabledProviders,
+    defaultFanOutSelectedProviders,
     resolvedShortcuts,
     refresh,
     clearWorkspace,
     clearProvider,
-    toggleDefaultProvider,
-    toggleFirstFanOutProvider,
+    toggleEnabledProvider,
+    toggleDefaultFanOutProvider,
     toggleAutoSyncNewChats,
     toggleGlobalSync,
     toggleCloseTabsOnDeleteSet,
@@ -91,10 +91,6 @@ export default function App() {
     resetFeedback,
     submitFeedback,
   } = useFeedback();
-  const onboardingProviders = useMemo(
-    () => selectedProviders,
-    [selectedProviders],
-  );
   const showDevControl = useDevControl();
 
   const workspaceCount = status?.workspaces.length ?? 0;
@@ -170,8 +166,8 @@ export default function App() {
             atLimit={atLimit}
             workspaceCount={workspaceCount}
             workspaces={status?.workspaces ?? []}
-            onboardingProviders={onboardingProviders}
-            onboardingFanOutProviders={firstFanOutSelectedProviders}
+            enabledProviders={enabledProviders}
+            defaultFanOutProviders={defaultFanOutSelectedProviders}
             version={popupVersion}
             globalSyncEnabled={globalSyncEnabled}
             loading={loading}
@@ -179,20 +175,20 @@ export default function App() {
             onClearWorkspace={clearWorkspace}
             onClearProvider={clearProvider}
             onToggleGlobalSync={() => void toggleGlobalSync()}
-            onToggleFirstFanOutProvider={(provider) => void toggleFirstFanOutProvider(provider)}
+            onToggleDefaultFanOutProvider={(provider) => void toggleDefaultFanOutProvider(provider)}
           />
         ) : (
           <AdvancedView
             status={status}
             loading={loading}
-            selectedProviders={selectedProviders}
+            enabledProviders={enabledProviders}
             resolvedShortcuts={resolvedShortcuts}
             recordingShortcutId={recordingShortcutId}
             logActionBusy={logActionBusy}
             autoSyncNewChatsEnabled={autoSyncNewChatsEnabled}
             showDiagnostics={status?.showDiagnostics ?? false}
             onOpenRequestModal={openRequestModal}
-            onToggleDefaultProvider={(provider) => void toggleDefaultProvider(provider)}
+            onToggleEnabledProvider={(provider) => void toggleEnabledProvider(provider)}
             onToggleAutoSyncNewChats={() => void toggleAutoSyncNewChats()}
             onToggleCloseTabsOnDeleteSet={() => void toggleCloseTabsOnDeleteSet()}
             onResetIndicatorPositions={() => void resetIndicatorPositions()}

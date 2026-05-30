@@ -82,6 +82,7 @@ export function createContentState(
     providerEnabled: viewRuntime.uiContext.providerEnabled,
     standaloneReady: viewRuntime.uiContext.standaloneReady,
     standaloneCreateSetEnabled: viewRuntime.uiContext.standaloneCreateSetEnabled,
+    standaloneFanOutTargetCount: viewRuntime.uiContext.standaloneFanOutTargetCount,
     canStartNewSet: viewRuntime.uiContext.canStartNewSet,
     pageState,
     workspaceSummary: viewRuntime.workspaceSummary,

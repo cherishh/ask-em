@@ -50,14 +50,32 @@ export function getDefaultEnabledProviderList(state: LocalState, sourceProvider?
   return Array.from(new Set(selected));
 }
 
-export function getFirstFanOutEnabledProviderList(
+export function getDefaultFanOutSelectedProviderList(state: LocalState): Provider[] {
+  const defaultProviders = getDefaultEnabledProviderList(state);
+  return state.defaultFanOutProviders
+    ? state.defaultFanOutProviders.filter((provider) => defaultProviders.includes(provider))
+    : defaultProviders;
+}
+
+export function getDefaultFanOutTargetProviderList(
   state: LocalState,
   sourceProvider: Provider,
 ): Provider[] {
-  const defaultProviders = getDefaultEnabledProviderList(state);
-  const selected = state.firstFanOutProviders
-    ? state.firstFanOutProviders.filter((provider) => defaultProviders.includes(provider))
-    : defaultProviders;
+  return getDefaultFanOutSelectedProviderList(state).filter(
+    (provider) => provider !== sourceProvider,
+  );
+}
+
+export function getDefaultFanOutEnabledProviderList(
+  state: LocalState,
+  sourceProvider: Provider,
+): Provider[] {
+  const targets = getDefaultFanOutTargetProviderList(state, sourceProvider);
+  if (targets.length === 0) {
+    return [];
+  }
+
+  const selected = [...targets];
 
   if (!selected.includes(sourceProvider)) {
     selected.unshift(sourceProvider);

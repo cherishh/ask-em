@@ -20,6 +20,7 @@ export type ContentIndicatorInput = {
   providerEnabled: boolean;
   standaloneReady: boolean;
   standaloneCreateSetEnabled: boolean;
+  standaloneFanOutTargetCount: number | null;
   canStartNewSet: boolean;
   pageState: PageState;
   workspaceSummary: WorkspaceSummary | null;
@@ -144,8 +145,19 @@ function getStandaloneSyncStatus(input: ContentIndicatorInput) {
     };
   }
 
+  if (input.standaloneCreateSetEnabled && input.standaloneFanOutTargetCount === 0) {
+    return {
+      label: 'next prompt stays here',
+      tone: 'neutral' as const,
+    };
+  }
+
   return {
-    label: input.standaloneCreateSetEnabled ? 'next prompt will fan out' : 'next prompt stays here',
+    label: input.standaloneCreateSetEnabled
+      ? input.standaloneFanOutTargetCount === null
+        ? 'next prompt will fan out'
+        : `next prompt will fan out to ${formatModelCount(input.standaloneFanOutTargetCount)}`
+      : 'next prompt stays here',
     tone: 'neutral' as const,
   };
 }
@@ -253,7 +265,10 @@ function getIndicatorState(input: ContentIndicatorInput): IndicatorUiState {
   if (!input.hasWorkspace) {
     if (
       input.standaloneReady &&
-      (!input.globalSyncEnabled || !input.canStartNewSet || !input.standaloneCreateSetEnabled)
+      (!input.globalSyncEnabled ||
+        !input.canStartNewSet ||
+        !input.standaloneCreateSetEnabled ||
+        input.standaloneFanOutTargetCount === 0)
     ) {
       return 'blocked';
     }

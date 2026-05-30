@@ -60,7 +60,7 @@ export async function handleGetStatus(): Promise<StatusResponseMessage> {
     closeTabsOnDeleteSet: localState.closeTabsOnDeleteSet ?? false,
     workspaceLimit: MAX_WORKSPACES,
     defaultEnabledProviders: localState.defaultEnabledProviders,
-    firstFanOutProviders: localState.firstFanOutProviders ?? null,
+    defaultFanOutProviders: localState.defaultFanOutProviders ?? null,
     shortcuts: localState.shortcuts,
     workspaces,
     recentLogs: localState.debugLogs.slice(-20).reverse(),

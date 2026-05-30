@@ -15,17 +15,30 @@ import { requestStatus } from '../popup-runtime';
 
 const POPUP_STATUS_POLL_MS = 3_000;
 
+function normalizeDefaultFanOutOverride(
+  selectedFanOutProviders: Provider[] | null,
+  enabledProviders: Provider[],
+): Provider[] | null {
+  if (!selectedFanOutProviders) {
+    return null;
+  }
+
+  const selectedSet = new Set(selectedFanOutProviders);
+  const normalized = enabledProviders.filter((provider) => selectedSet.has(provider));
+  return normalized.length > 0 ? normalized : null;
+}
+
 export function usePopupStatus() {
   const [status, setStatus] = useState<StatusResponseMessage | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [selectedProviders, setSelectedProviders] = useState<Provider[]>(PROVIDERS);
-  const [firstFanOutProviders, setFirstFanOutProviders] = useState<Provider[] | null>(null);
+  const [enabledProviders, setEnabledProviders] = useState<Provider[]>(PROVIDERS);
+  const [defaultFanOutProviders, setDefaultFanOutProviders] = useState<Provider[] | null>(null);
   const [shortcuts, setShortcuts] = useState<ShortcutConfig>(DEFAULT_SHORTCUTS);
   const resolvedShortcuts = useMemo(() => resolveShortcutConfig(shortcuts), [shortcuts]);
-  const firstFanOutSelectedProviders = useMemo(
-    () => firstFanOutProviders ?? selectedProviders,
-    [firstFanOutProviders, selectedProviders],
+  const defaultFanOutSelectedProviders = useMemo(
+    () => defaultFanOutProviders ?? enabledProviders,
+    [defaultFanOutProviders, enabledProviders],
   );
 
   const refresh = useCallback(async (options: { silent?: boolean } = {}) => {
@@ -38,10 +51,10 @@ export function usePopupStatus() {
       startTransition(() => {
         if (nextStatus) {
           setStatus(nextStatus);
-          setSelectedProviders(
+          setEnabledProviders(
             PROVIDERS.filter((provider) => nextStatus.defaultEnabledProviders[provider]),
           );
-          setFirstFanOutProviders(nextStatus.firstFanOutProviders ?? null);
+          setDefaultFanOutProviders(nextStatus.defaultFanOutProviders ?? null);
           setShortcuts(resolveShortcutConfig(nextStatus.shortcuts));
         }
       });
@@ -117,40 +130,53 @@ export function usePopupStatus() {
     });
   }, [runBusyAction, sendRuntimeMessage]);
 
-  const toggleDefaultProvider = useCallback(async (provider: Provider) => {
-    const nextProviders = selectedProviders.includes(provider)
-      ? selectedProviders.filter((item) => item !== provider)
-      : [...selectedProviders, provider];
+  const toggleEnabledProvider = useCallback(async (provider: Provider) => {
+    const active = enabledProviders.includes(provider);
+    if (active && enabledProviders.length <= 1) {
+      return;
+    }
 
-    setSelectedProviders(nextProviders);
-    setFirstFanOutProviders(null);
+    const nextProviders = active
+      ? enabledProviders.filter((item) => item !== provider)
+      : PROVIDERS.filter((item) => enabledProviders.includes(item) || item === provider);
+    const nextDefaultFanOutProviders = normalizeDefaultFanOutOverride(
+      defaultFanOutProviders,
+      nextProviders,
+    );
+
+    setEnabledProviders(nextProviders);
+    setDefaultFanOutProviders(nextDefaultFanOutProviders);
     await sendRuntimeMessage({
       type: 'SET_DEFAULT_ENABLED_PROVIDERS',
       providers: nextProviders,
     });
-  }, [selectedProviders, sendRuntimeMessage]);
+  }, [defaultFanOutProviders, enabledProviders, sendRuntimeMessage]);
 
-  const toggleFirstFanOutProvider = useCallback(async (provider: Provider) => {
-    if (!selectedProviders.includes(provider)) {
+  const toggleDefaultFanOutProvider = useCallback(async (provider: Provider) => {
+    if (!enabledProviders.includes(provider)) {
       return;
     }
 
-    const currentProviders = firstFanOutProviders ?? selectedProviders;
+    const currentProviders = defaultFanOutProviders ?? enabledProviders;
+    if (currentProviders.includes(provider) && currentProviders.length <= 1) {
+      return;
+    }
+
     const nextProviders = currentProviders.includes(provider)
       ? currentProviders.filter((item) => item !== provider)
-      : selectedProviders.filter((item) => currentProviders.includes(item) || item === provider);
-    const normalizedNextProviders = selectedProviders.filter((item) => nextProviders.includes(item));
+      : enabledProviders.filter((item) => currentProviders.includes(item) || item === provider);
+    const normalizedNextProviders = enabledProviders.filter((item) => nextProviders.includes(item));
     const matchesDefaults =
-      normalizedNextProviders.length === selectedProviders.length &&
-      selectedProviders.every((item) => normalizedNextProviders.includes(item));
+      normalizedNextProviders.length === enabledProviders.length &&
+      enabledProviders.every((item) => normalizedNextProviders.includes(item));
     const overrideProviders = matchesDefaults ? null : normalizedNextProviders;
 
-    setFirstFanOutProviders(overrideProviders);
+    setDefaultFanOutProviders(overrideProviders);
     await sendRuntimeMessage({
-      type: 'SET_FIRST_FAN_OUT_PROVIDERS',
+      type: 'SET_DEFAULT_FAN_OUT_PROVIDERS',
       providers: overrideProviders,
     }, { silentRefresh: true });
-  }, [firstFanOutProviders, selectedProviders, sendRuntimeMessage]);
+  }, [defaultFanOutProviders, enabledProviders, sendRuntimeMessage]);
 
   const toggleGlobalSync = useCallback(async () => {
     const nextEnabled = !status?.globalSyncEnabled;
@@ -207,15 +233,15 @@ export function usePopupStatus() {
     status,
     loading,
     busyKey,
-    selectedProviders,
-    firstFanOutSelectedProviders,
+    enabledProviders,
+    defaultFanOutSelectedProviders,
     shortcuts,
     resolvedShortcuts,
     refresh,
     clearWorkspace,
     clearProvider,
-    toggleDefaultProvider,
-    toggleFirstFanOutProvider,
+    toggleEnabledProvider,
+    toggleDefaultFanOutProvider,
     toggleAutoSyncNewChats,
     toggleGlobalSync,
     toggleCloseTabsOnDeleteSet,

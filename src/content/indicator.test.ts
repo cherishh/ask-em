@@ -40,6 +40,7 @@ function createInput(overrides: Partial<ContentIndicatorInput> = {}): ContentInd
     providerEnabled: true,
     standaloneReady: true,
     standaloneCreateSetEnabled: true,
+    standaloneFanOutTargetCount: 2,
     canStartNewSet: true,
     pageState: 'ready',
     workspaceSummary: null,
@@ -53,7 +54,23 @@ describe('content indicator presentation', () => {
     expect(getContentIndicatorPresentation(createInput())).toEqual({
       state: 'idle',
       label: 'ready',
-      syncLabel: 'next prompt will fan out',
+      syncLabel: 'next prompt will fan out to 2 models',
+      syncTone: 'neutral',
+      alertLevel: 'normal',
+    });
+  });
+
+  it('shows standalone local-only state when no fan-out target is available', () => {
+    expect(
+      getContentIndicatorPresentation(
+        createInput({
+          standaloneFanOutTargetCount: 0,
+        }),
+      ),
+    ).toEqual({
+      state: 'blocked',
+      label: 'ready',
+      syncLabel: 'next prompt stays here',
       syncTone: 'neutral',
       alertLevel: 'normal',
     });

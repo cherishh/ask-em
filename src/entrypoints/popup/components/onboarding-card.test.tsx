@@ -42,34 +42,50 @@ describe('OnboardingCard', () => {
     return onToggleProvider;
   }
 
-  it('renders only default-enabled providers with first fan-out state', () => {
-    renderCard(['claude', 'chatgpt', 'gemini'], ['claude']);
+  it('renders only default-enabled providers with default fan-out state', () => {
+    renderCard(['claude', 'chatgpt', 'gemini'], ['claude', 'chatgpt']);
 
-    const buttons = Array.from(container.querySelectorAll('button'));
+    const buttons = Array.from(
+      container.querySelectorAll('button.askem-onboarding-provider-btn'),
+    );
     expect(buttons).toHaveLength(3);
     expect(
       container.querySelector<HTMLButtonElement>(
-        'button[aria-label="Disable claude for first fan-out"]',
+        'button[aria-label="Disable claude for default fan-out"]',
       )?.getAttribute('aria-pressed'),
     ).toBe('true');
     expect(
       container.querySelector<HTMLButtonElement>(
-        'button[aria-label="Enable gemini for first fan-out"]',
+        'button[aria-label="Enable gemini for default fan-out"]',
       )?.getAttribute('aria-pressed'),
     ).toBe('false');
     expect(container.textContent).not.toContain('deepseek');
   });
 
-  it('toggles first fan-out participation instead of opening a provider tab', () => {
+  it('toggles default fan-out participation instead of opening a provider tab', () => {
     const onToggleProvider = renderCard(['claude', 'chatgpt'], ['claude']);
 
     act(() => {
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="Enable chatgpt for first fan-out"]')
+        .querySelector<HTMLButtonElement>('button[aria-label="Enable chatgpt for default fan-out"]')
         ?.click();
     });
 
     expect(onToggleProvider).toHaveBeenCalledTimes(1);
     expect(onToggleProvider).toHaveBeenCalledWith('chatgpt');
+  });
+
+  it('does not allow turning off the last default fan-out provider', () => {
+    const onToggleProvider = renderCard(['claude', 'chatgpt'], ['claude']);
+    const lastProviderButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Keep claude for default fan-out"]',
+    );
+
+    expect(lastProviderButton?.disabled).toBe(true);
+    act(() => {
+      lastProviderButton?.click();
+    });
+
+    expect(onToggleProvider).not.toHaveBeenCalled();
   });
 });

@@ -455,3 +455,28 @@ type UploadCapability = {
 
 - [x] 抽公共 file input helper：复用 `accept` 解析、extension/MIME 匹配、`multiple` 选择等纯函数；provider-specific root/selector 继续留在各 adapter。
 - [x] 封装 `ComposerAttachmentPresence` delta/key 语义：集中 `count + keys` 的 baseline/delta 计算、duplicate filename/聚合卡片约束和测试，避免 adapter 误用 keys。
+
+
+
+---
+
+
+- 总体原则是把复杂度都留给 provider-specific 的逻辑，插件核心逻辑保持尽可能干净鲁棒
+
+- 支持的文件采用黑名单策略
+- 防止用户在源页面添加又删除附件，保留 capture buffer 作为 bytes cache，但不在系统内维护shadow state，而是在源页面发送前一刻通过DOM 决定最终附件集合。
+- 上传同名附件、上传又删除、上传同名附件又删除
+
+
+
+
+- 手动新建 set。可以输入 urls，但不复用 tab 而是新开，来收集 tabid
+- 首次 fanout 后不再默认开启同步/第一条之后，默认关闭同步
+- 为什么 chatgpt ready 这么慢，实际已经可以 fan out
+- default on/off 应该跟随用户设置落存储
+- Default auto-sync new chats，default to 御三家
+
+- 消息的格式化要保留
+- ext & 落地页要接 posthog，要获取 什么 work 什么不 work 的信息
+- ~~统一 input。可以统一输入 prompt，也可以分开不同 provider 输入不同 prompt 方便首次 fanout 之后的输入~~
+- 隐身模式发起

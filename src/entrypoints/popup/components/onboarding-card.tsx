@@ -26,11 +26,11 @@ export function OnboardingCard({
         <div className="askem-onboarding-steps">
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">1</span>
-            <span>Choose who joins the first fan-out</span>
+            <span>Choose who joins the default fan-out</span>
           </div>
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">2</span>
-            <span>Open any AI chat and send</span>
+            <span>Open any AI chat as usual</span>
           </div>
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">3</span>
@@ -44,6 +44,7 @@ export function OnboardingCard({
           {providers.length > 0 ? (
             providers.map((provider) => {
               const active = enabledProviders.includes(provider);
+              const locked = active && enabledProviders.length <= 1;
 
               return (
                 <button
@@ -51,9 +52,13 @@ export function OnboardingCard({
                   className="askem-onboarding-provider-btn"
                   onClick={() => onToggleProvider(provider)}
                   type="button"
-                  disabled={loading}
+                  disabled={loading || locked}
                   aria-pressed={active}
-                  aria-label={`${active ? 'Disable' : 'Enable'} ${provider} for first fan-out`}
+                  aria-label={
+                    locked
+                      ? `Keep ${provider} for default fan-out`
+                      : `${active ? 'Disable' : 'Enable'} ${provider} for default fan-out`
+                  }
                   data-enabled={String(active)}
                 >
                   {provider}
@@ -64,7 +69,7 @@ export function OnboardingCard({
               );
             })
           ) : (
-            <span className="askem-onboarding-empty">Enable a default model in Settings.</span>
+            <span className="askem-onboarding-empty">Enable providers in Settings.</span>
           )}
         </div>
       </div>

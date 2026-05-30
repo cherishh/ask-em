@@ -18,7 +18,7 @@ export const DEFAULT_LOCAL_STATE: LocalState = {
   showDiagnostics: false,
   closeTabsOnDeleteSet: false,
   defaultEnabledProviders: createDefaultEnabledProviders(),
-  firstFanOutProviders: null,
+  defaultFanOutProviders: null,
   shortcuts: DEFAULT_SHORTCUTS,
   workspaces: {},
   workspaceIndex: {},
@@ -35,6 +35,10 @@ type StorageArea = Pick<
   chrome.storage.StorageArea,
   'get' | 'set' | 'remove'
 >;
+
+type LegacyLocalState = LocalState & {
+  firstFanOutProviders?: Provider[] | null;
+};
 
 function createStorageQueue() {
   let tail = Promise.resolve();
@@ -77,6 +81,21 @@ function isWorkspaceIndexEqual(left: LocalState['workspaceIndex'], right: LocalS
 
 function normalizeLocalState(state: LocalState): LocalState {
   let normalized = state;
+  const legacyState = state as LegacyLocalState;
+
+  if ('firstFanOutProviders' in legacyState || legacyState.defaultFanOutProviders === undefined) {
+    const {
+      firstFanOutProviders,
+      ...stateWithoutLegacyFirstFanOut
+    } = legacyState;
+    normalized = {
+      ...stateWithoutLegacyFirstFanOut,
+      defaultFanOutProviders:
+        stateWithoutLegacyFirstFanOut.defaultFanOutProviders === undefined
+          ? firstFanOutProviders ?? null
+          : stateWithoutLegacyFirstFanOut.defaultFanOutProviders,
+    };
+  }
 
   const workspaceIndex = rebuildWorkspaceIndex(normalized.workspaces);
 

@@ -243,7 +243,7 @@ describe('usePopupStatus', () => {
     hook.unmount();
   });
 
-  it('toggles first fan-out providers without changing default providers', async () => {
+  it('toggles default fan-out providers without changing default providers', async () => {
     const initialStatus = {
       type: 'STATUS_RESPONSE',
       workspaces: [],
@@ -256,7 +256,7 @@ describe('usePopupStatus', () => {
         deepseek: false,
         manus: false,
       },
-      firstFanOutProviders: null,
+      defaultFanOutProviders: null,
       shortcuts: undefined,
       debugLoggingEnabled: true,
       showDiagnostics: false,
@@ -269,7 +269,7 @@ describe('usePopupStatus', () => {
       .mockResolvedValueOnce(initialStatus)
       .mockResolvedValueOnce({
         ...initialStatus,
-        firstFanOutProviders: ['claude'],
+        defaultFanOutProviders: ['claude'],
       });
 
     const sendMessage = vi.fn().mockResolvedValue({ ok: true });
@@ -282,18 +282,117 @@ describe('usePopupStatus', () => {
     const hook = renderHookHarness(() => usePopupStatus());
     await flushMicrotasks();
 
-    expect(hook.current.selectedProviders).toEqual(['claude', 'chatgpt']);
-    expect(hook.current.firstFanOutSelectedProviders).toEqual(['claude', 'chatgpt']);
+    expect(hook.current.enabledProviders).toEqual(['claude', 'chatgpt']);
+    expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude', 'chatgpt']);
 
     await act(async () => {
-      await hook.current.toggleFirstFanOutProvider('chatgpt');
+      await hook.current.toggleDefaultFanOutProvider('chatgpt');
     });
 
-    expect(hook.current.selectedProviders).toEqual(['claude', 'chatgpt']);
-    expect(hook.current.firstFanOutSelectedProviders).toEqual(['claude']);
+    expect(hook.current.enabledProviders).toEqual(['claude', 'chatgpt']);
+    expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude']);
     expect(sendMessage).toHaveBeenCalledWith(
-      { type: 'SET_FIRST_FAN_OUT_PROVIDERS', providers: ['claude'] },
+      { type: 'SET_DEFAULT_FAN_OUT_PROVIDERS', providers: ['claude'] },
     );
+    hook.unmount();
+  });
+
+  it('does not turn off the last default fan-out provider', async () => {
+    const initialStatus = {
+      type: 'STATUS_RESPONSE',
+      workspaces: [],
+      globalSyncEnabled: true,
+      autoSyncNewChatsEnabled: true,
+      defaultEnabledProviders: {
+        claude: true,
+        chatgpt: true,
+        gemini: false,
+        deepseek: false,
+        manus: false,
+      },
+      defaultFanOutProviders: ['claude'],
+      shortcuts: undefined,
+      debugLoggingEnabled: true,
+      showDiagnostics: false,
+      closeTabsOnDeleteSet: false,
+      workspaceLimit: 3,
+      recentLogs: [],
+    };
+    popupRuntimeMocks.requestStatus.mockResolvedValue(initialStatus);
+
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const hook = renderHookHarness(() => usePopupStatus());
+    await flushMicrotasks();
+
+    await act(async () => {
+      await hook.current.toggleDefaultFanOutProvider('claude');
+    });
+
+    expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude']);
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SET_DEFAULT_FAN_OUT_PROVIDERS' }),
+    );
+    hook.unmount();
+  });
+
+  it('keeps default fan-out selection when changing enabled providers', async () => {
+    const initialStatus = {
+      type: 'STATUS_RESPONSE',
+      workspaces: [],
+      globalSyncEnabled: true,
+      autoSyncNewChatsEnabled: true,
+      defaultEnabledProviders: {
+        claude: true,
+        chatgpt: true,
+        gemini: true,
+        deepseek: false,
+        manus: false,
+      },
+      defaultFanOutProviders: ['claude', 'chatgpt'],
+      shortcuts: undefined,
+      debugLoggingEnabled: true,
+      showDiagnostics: false,
+      closeTabsOnDeleteSet: false,
+      workspaceLimit: 3,
+      recentLogs: [],
+    };
+    popupRuntimeMocks.requestStatus
+      .mockResolvedValueOnce(initialStatus)
+      .mockResolvedValueOnce({
+        ...initialStatus,
+        defaultEnabledProviders: {
+          ...initialStatus.defaultEnabledProviders,
+          gemini: false,
+        },
+      });
+
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const hook = renderHookHarness(() => usePopupStatus());
+    await flushMicrotasks();
+
+    await act(async () => {
+      await hook.current.toggleEnabledProvider('gemini');
+      await flushMicrotasks();
+    });
+
+    expect(hook.current.enabledProviders).toEqual(['claude', 'chatgpt']);
+    expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude', 'chatgpt']);
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'SET_DEFAULT_ENABLED_PROVIDERS',
+      providers: ['claude', 'chatgpt'],
+    });
     hook.unmount();
   });
 });

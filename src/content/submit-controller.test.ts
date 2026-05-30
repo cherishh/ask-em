@@ -38,6 +38,7 @@ function createState() {
     getUiContext: vi.fn(() => ({
       workspaceId: 'w1',
       standaloneCreateSetEnabled: true,
+      standaloneFanOutTargetCount: 1,
     })),
     setSyncing: vi.fn(),
     applySubmitResponse: vi.fn(),

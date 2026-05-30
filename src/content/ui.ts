@@ -33,6 +33,7 @@ export type UiContext = {
   globalSyncEnabled: boolean;
   standaloneReady: boolean;
   standaloneCreateSetEnabled: boolean;
+  standaloneFanOutTargetCount: number | null;
   canStartNewSet: boolean;
   shortcuts: ShortcutConfig;
 };
@@ -198,6 +199,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     globalSyncEnabled: true,
     standaloneReady: false,
     standaloneCreateSetEnabled: true,
+    standaloneFanOutTargetCount: null,
     canStartNewSet: true,
     shortcuts: DEFAULT_SHORTCUTS,
   };
@@ -347,6 +349,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         globalSyncEnabled: context.globalSyncEnabled,
         canStartNewSet: context.canStartNewSet,
         standaloneCreateSetEnabled: context.standaloneCreateSetEnabled,
+        standaloneFanOutTargetCount: context.standaloneFanOutTargetCount,
         toggleShortcutKeys: formatBindingKeys(context.shortcuts.togglePageParticipation),
       }),
     );
@@ -717,6 +720,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       context.globalSyncEnabled = nextContext.globalSyncEnabled;
       context.standaloneReady = nextContext.standaloneReady;
       context.standaloneCreateSetEnabled = nextContext.standaloneCreateSetEnabled;
+      context.standaloneFanOutTargetCount = nextContext.standaloneFanOutTargetCount;
       context.canStartNewSet = nextContext.canStartNewSet;
       context.shortcuts = resolveShortcutConfig(nextContext.shortcuts);
       mount.dataset.providerEnabled = String(nextContext.providerEnabled);

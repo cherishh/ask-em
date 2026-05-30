@@ -23,6 +23,7 @@ export function createInitialViewRuntime(): ViewRuntime {
       globalSyncEnabled: true,
       standaloneReady: false,
       standaloneCreateSetEnabled: true,
+      standaloneFanOutTargetCount: null,
       canStartNewSet: true,
       shortcuts: DEFAULT_SHORTCUTS,
     },

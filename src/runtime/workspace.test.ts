@@ -23,7 +23,8 @@ import {
   createPendingWorkspace,
   enforceWorkspaceLimit,
   getDefaultEnabledProviderList,
-  getFirstFanOutEnabledProviderList,
+  getDefaultFanOutEnabledProviderList,
+  getDefaultFanOutTargetProviderList,
   getWorkspacesOrdered,
   lookupWorkspaceBySession,
   rebuildWorkspaceIndex,
@@ -337,14 +338,26 @@ describe('workspace state', () => {
     expect(getDefaultEnabledProviderList(state, 'gemini')).toEqual(['gemini', 'chatgpt', 'deepseek']);
   });
 
-  it('builds first fan-out providers as a subset of default enabled providers', () => {
+  it('builds default fan-out providers as a subset of default enabled providers', () => {
     const state: LocalState = {
       ...createEmptyState(),
       defaultEnabledProviders: createDefaultEnabledProviders(['claude', 'chatgpt', 'deepseek']),
-      firstFanOutProviders: ['chatgpt', 'manus'],
+      defaultFanOutProviders: ['chatgpt', 'manus'],
     };
 
-    expect(getFirstFanOutEnabledProviderList(state, 'gemini')).toEqual(['gemini', 'chatgpt']);
+    expect(getDefaultFanOutEnabledProviderList(state, 'gemini')).toEqual(['gemini', 'chatgpt']);
+    expect(getDefaultFanOutTargetProviderList(state, 'gemini')).toEqual(['chatgpt']);
+  });
+
+  it('does not build a source-only default fan-out provider list', () => {
+    const state: LocalState = {
+      ...createEmptyState(),
+      defaultEnabledProviders: createDefaultEnabledProviders(['claude']),
+      defaultFanOutProviders: null,
+    };
+
+    expect(getDefaultFanOutTargetProviderList(state, 'claude')).toEqual([]);
+    expect(getDefaultFanOutEnabledProviderList(state, 'claude')).toEqual([]);
   });
 
   it('can pause a provider without removing its binding', () => {

@@ -739,10 +739,10 @@ describe('background submit routing', () => {
     vi.unstubAllGlobals();
   });
 
-  it('uses and consumes the first fan-out subset when creating a new workspace', async () => {
+  it('uses and preserves the default fan-out subset when creating a new workspace', async () => {
     storageMocks.getLocalState.mockResolvedValue(makeLocalState({
       defaultEnabledProviders: createDefaultEnabledProviders(['claude', 'chatgpt', 'gemini']),
-      firstFanOutProviders: ['chatgpt'],
+      defaultFanOutProviders: ['chatgpt'],
     }));
     storageMocks.getSessionState.mockResolvedValue(makeSessionState());
 
@@ -764,7 +764,31 @@ describe('background submit routing', () => {
     const createdWorkspace = createdState ? Object.values(createdState.workspaces)[0] : null;
 
     expect(createdWorkspace?.enabledProviders).toEqual(['claude', 'chatgpt']);
-    expect(createdState?.firstFanOutProviders).toBeNull();
+    expect(createdState?.defaultFanOutProviders).toEqual(['chatgpt']);
+  });
+
+  it('does not create a source-only workspace when there are no fan-out targets', async () => {
+    storageMocks.getLocalState.mockResolvedValue(makeLocalState({
+      defaultEnabledProviders: createDefaultEnabledProviders(['claude']),
+      defaultFanOutProviders: null,
+    }));
+    storageMocks.getSessionState.mockResolvedValue(makeSessionState());
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    const result = await handleUserSubmit(
+      makeSubmitMessage({
+        provider: 'claude',
+        currentUrl: 'https://claude.ai/new',
+        sessionId: null,
+        pageKind: 'new-chat',
+        content: 'source only',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(result.synced).toBe(false);
+    expect(result.workspaceId).toBeNull();
+    expect(storageMocks.setLocalState).not.toHaveBeenCalled();
   });
 
   it('releases submit-scoped attachments when submit has no workspace', async () => {
