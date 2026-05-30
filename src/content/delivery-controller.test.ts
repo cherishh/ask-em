@@ -103,6 +103,7 @@ describe('content delivery controller attachment flow', () => {
     const calls: string[] = [];
     let presenceCalls = 0;
     const attachment = { id: 'a1', name: 'a.png', mime: 'image/png', size: 1 };
+    const logDebug = vi.fn();
     const adapter = createAdapter({
       prepareForDelivery: vi.fn(() => {
         calls.push('prepare');
@@ -126,7 +127,7 @@ describe('content delivery controller attachment flow', () => {
     }, {
       reportPresence: vi.fn(),
       resetIndicatorPosition: vi.fn(),
-      logDebug: vi.fn(),
+      logDebug,
     });
 
     controller.handleRuntimeMessage({
@@ -151,6 +152,12 @@ describe('content delivery controller attachment flow', () => {
       expectedUrl: 'https://claude.ai/chat/c-1',
     });
     expect(calls.slice(0, 3)).toEqual(['prepare', 'presence', 'payload']);
+    expect(logDebug).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'info',
+      message: 'Prompt payload injected',
+      detail: 'attachments=1',
+      workspaceId: 'w1',
+    }));
   });
 
   it('uses count delta as a fallback when attachment keys are not unique', async () => {

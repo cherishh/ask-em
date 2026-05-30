@@ -195,6 +195,13 @@ export function createDeliveryController(
           await adapter.composer.setComposerText(message.content);
         }
 
+        await dependencies.logDebug({
+          level: 'info',
+          message: 'Prompt payload injected',
+          detail: `attachments=${message.attachments.length}`,
+          workspaceId: message.workspaceId,
+        });
+
         if (message.attachments.length > 0) {
           const baseline = attachmentBaseline;
           if (!baseline) {

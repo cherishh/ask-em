@@ -422,7 +422,7 @@ type UploadCapability = {
 - [ ] 5 个 provider（含 Claude）作为 target 都能收到 fanned-out 已支持附件。
 - [ ] 任一 provider 不支持某格式/数量时，只标记该 provider，不影响其他 provider。
 - [ ] 任一 provider attachment injection 静默失败时，不发送纯文本，标记 `delivery-failed`。
-- [ ] 每家 target 的日志序列可用于排查：delivery started → payload injected → attachment presence confirmed → submit dispatched / delivery failed。
+- [x] 每家 target 的日志序列可用于排查：delivery started → payload injected → attachment presence confirmed → submit dispatched / delivery failed。
 - [ ] `pnpm compile`、`pnpm test`、`pnpm build` 通过。
 
 ### Phase 6：UI Surfacing
