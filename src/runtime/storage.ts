@@ -9,13 +9,13 @@ import {
   type SessionState,
 } from './protocol';
 import { toClaimedTabKey } from './protocol';
-import { trimDebugLogsForStorage } from './debug-log-retention';
+import { appendDebugLogForStorage, trimDebugLogsForStorage } from './debug-log-retention';
 import { rebuildWorkspaceIndex } from './workspace';
 
 export const DEFAULT_LOCAL_STATE: LocalState = {
   globalSyncEnabled: true,
   autoSyncNewChatsEnabled: true,
-  pauseAfterFirstFanOutEnabled: true,
+  pauseAfterFirstFanOutEnabled: false,
   debugLoggingEnabled: true,
   showDiagnostics: false,
   closeTabsOnDeleteSet: false,
@@ -100,7 +100,7 @@ function normalizeLocalState(state: LocalState): LocalState {
   if (normalized.pauseAfterFirstFanOutEnabled === undefined) {
     normalized = {
       ...normalized,
-      pauseAfterFirstFanOutEnabled: true,
+      pauseAfterFirstFanOutEnabled: false,
     };
   }
 
@@ -205,7 +205,7 @@ export async function appendDebugLog(entry: Omit<DebugLogEntry, 'id' | 'timestam
 
     return {
       ...state,
-      debugLogs: trimDebugLogsForStorage([...state.debugLogs, debugLog]),
+      debugLogs: appendDebugLogForStorage(state.debugLogs, debugLog),
     };
   });
 }

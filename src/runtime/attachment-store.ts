@@ -7,6 +7,7 @@ import {
   type AttachmentRef,
 } from './protocol';
 import type { AttachmentReadChunkResponse } from './messages';
+import { base64ToBytes, bytesToBase64 } from './base64-chunk';
 
 const ATTACHMENT_DB_NAME = 'ask-em-attachments';
 const ATTACHMENT_DB_VERSION = 1;
@@ -69,6 +70,21 @@ function createQueue() {
 }
 
 const attachmentQueue = createQueue();
+
+// In-flight chunk bytes for attachments still in `writing` status. Accumulating
+// the chunks in memory and writing the assembled Blob to IndexedDB exactly once
+// at finalize keeps the at-rest write cost O(file size) instead of O(file size^2)
+// — the previous read-prior-Blob + re-put-whole-Blob per chunk wrote ~1.25GB for
+// a single 25MB file. A service-worker restart mid-upload abandons these parts by
+// design (we never resume an in-flight delivery); finalize validates the assembled
+// size so a restart-truncated upload fails closed instead of finalizing short.
+const pendingBlobParts = new Map<string, ArrayBuffer[]>();
+
+function purgePendingBlobParts(attachmentIds: string[]): void {
+  for (const attachmentId of attachmentIds) {
+    pendingBlobParts.delete(attachmentId);
+  }
+}
 
 function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -167,29 +183,6 @@ async function writeMetadataState(state: AttachmentMetadataState): Promise<void>
   await chrome.storage.session.set({ [STORAGE_KEYS.attachments]: state });
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  const batchSize = 0x8000;
-
-  for (let offset = 0; offset < bytes.length; offset += batchSize) {
-    const batch = bytes.subarray(offset, offset + batchSize);
-    binary += String.fromCharCode(...batch);
-  }
-
-  return btoa(binary);
-}
-
-function base64ToBytes(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
-}
-
 function getReservedBytes(state: AttachmentMetadataState): number {
   return Object.values(state).reduce((total, metadata) => total + metadata.ref.size, 0);
 }
@@ -229,6 +222,7 @@ async function sweepExpiredFromState(
     delete nextState[attachmentId];
   }
 
+  purgePendingBlobParts(expiredIds);
   await deleteBlobs(expiredIds);
   return nextState;
 }
@@ -246,6 +240,7 @@ async function deleteMetadataEntries(
     delete nextState[attachmentId];
   }
 
+  purgePendingBlobParts(attachmentIds);
   await deleteBlobs(attachmentIds);
   return nextState;
 }
@@ -315,15 +310,11 @@ export async function appendAttachmentChunk(input: AppendChunkInput): Promise<At
       throw new Error('Attachment chunk exceeds declared size');
     }
 
-    const existingBlob = await getBlob(input.attachmentId);
-    const chunk = bytes.buffer.slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength,
-    ) as ArrayBuffer;
-    const nextBlob = new Blob(existingBlob ? [existingBlob, chunk] : [chunk], {
-      type: metadata.ref.mime,
-    });
-    await putBlob(input.attachmentId, nextBlob);
+    // base64ToBytes returns a fresh, full-length Uint8Array, so its backing buffer
+    // is exactly this chunk — reference it directly (zero-copy) as a Blob part.
+    const parts = pendingBlobParts.get(input.attachmentId) ?? [];
+    parts.push(bytes.buffer as ArrayBuffer);
+    pendingBlobParts.set(input.attachmentId, parts);
 
     const nextMetadata: AttachmentMetadata = {
       ...metadata,
@@ -352,9 +343,19 @@ export async function finalizeAttachment(input: FinalizeAttachmentInput): Promis
       throw new Error('Attachment is incomplete');
     }
 
-    if (metadata.ref.size === 0 && !(await getBlob(input.attachmentId))) {
-      await putBlob(input.attachmentId, new Blob([], { type: metadata.ref.mime }));
+    const parts = pendingBlobParts.get(input.attachmentId) ?? [];
+    const blob = new Blob(parts, { type: metadata.ref.mime });
+
+    // Guards a service-worker restart mid-upload: the persisted bytesWritten can
+    // still claim the full size while the in-memory parts only hold the chunks
+    // appended after the restart. Assemble-and-verify fails closed instead of
+    // finalizing a truncated Blob.
+    if (blob.size !== metadata.ref.size) {
+      throw new Error('Attachment is incomplete');
     }
+
+    await putBlob(input.attachmentId, blob);
+    pendingBlobParts.delete(input.attachmentId);
 
     const nextMetadata: AttachmentMetadata = {
       ...metadata,
@@ -493,6 +494,7 @@ export async function sweepAttachmentsByOwnerTab(tabId: number): Promise<number>
 
 export async function clearAllAttachments(): Promise<void> {
   await attachmentQueue.run(async () => {
+    pendingBlobParts.clear();
     await Promise.all([
       chrome.storage.session.remove(STORAGE_KEYS.attachments),
       clearBlobs(),

@@ -6,6 +6,34 @@ import { PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef, type CapturedAttachme
 
 const CLAUDE_PASTED_TEXT_ATTACHMENT_MIN_CHARS = 5_000;
 
+function detectClaudeUploadErrorText(): string | null {
+  // Scope to alert/toast/error surfaces. Reading document.body.innerText would
+  // also scan the just-injected synced prompt and the whole conversation
+  // transcript, so a prompt or prior message containing "upload failed" would
+  // spuriously fail an attachment delivery that actually succeeded.
+  const errorSelectors = [
+    '[role="alert"]',
+    '[aria-live]',
+    '[data-testid*="toast" i]',
+    '[class*="toast" i]',
+    '[class*="error" i]',
+  ];
+  const visibleText = errorSelectors
+    .flatMap((selector) => Array.from(document.querySelectorAll<HTMLElement>(selector)))
+    .filter(isVisible)
+    .map((element) =>
+      normalizeWhitespace(
+        [element.getAttribute('aria-label'), element.getAttribute('title'), element.innerText || element.textContent]
+          .filter(Boolean)
+          .join(' '),
+      ),
+    )
+    .join(' ')
+    .toLowerCase();
+
+  return visibleText.includes('upload failed') || visibleText.includes('failed to upload') ? 'upload failed' : null;
+}
+
 export function isClaudeLoginRequiredPage(input: {
   pathname: string;
   buttonTexts: string[];
@@ -334,7 +362,6 @@ export const claudeAdapter = createDomProviderAdapter({
     );
   },
   detectAttachmentUploadError() {
-    const text = document.body?.innerText?.toLowerCase() ?? '';
-    return text.includes('upload failed') || text.includes('failed to upload') ? 'upload failed' : null;
+    return detectClaudeUploadErrorText();
   },
 });

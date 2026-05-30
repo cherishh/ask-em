@@ -71,7 +71,11 @@ export function installFileInputDeliveryBridge(): () => void {
   }
 
   const listener = (event: MessageEvent) => {
-    if ((event.source && event.source !== window) || !isAskEmFileInputDeliveryMessage(event.data)) {
+    if (
+      (event.source && event.source !== window) ||
+      (event.origin && event.origin !== window.location.origin) ||
+      !isAskEmFileInputDeliveryMessage(event.data)
+    ) {
       return;
     }
 

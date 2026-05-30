@@ -131,7 +131,11 @@ describe('storage update queues', () => {
     expect(getDebugLogsByteLength(finalState.debugLogs)).toBeLessThanOrEqual(DEBUG_LOG_MAX_BYTES);
     expect(finalState.debugLogs.at(-1)?.id).toBe(`log-${DEBUG_LOG_MAX_ENTRIES + 49}`);
     expect(finalState.debugLogs.at(-1)?.detail).toContain('...[truncated ');
-  });
+    // Stress test: 550 appends each re-measure the serialized byte budget over a
+    // ~500-entry / ~4MB array, so this is inherently a few seconds. The default 5s
+    // timeout is too tight under parallel/CI load; debug logging is a dev-only
+    // opt-in path so this cost never hits normal use.
+  }, 20_000);
 
   it('serializes session state updates so concurrent claimed-tab writes are merged', async () => {
     const storage = await import('./storage');

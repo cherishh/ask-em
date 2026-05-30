@@ -161,9 +161,16 @@ export function createSubmitController(
       payload.attachmentResolution.reason !== 'no-current-attachments'
     ) {
       state.showCurrentWarning('attachment sync skipped');
-      if (payload.attachmentResolution.reason === 'ambiguous-current-attachments') {
-        state.showToast('Attachment sync skipped: current files could not be confirmed.', 'warning');
-      }
+      // Toast every captured-but-unconfirmed reason, not only the ambiguous one:
+      // the pill warning is overwritten by the applyIndicatorPresentation() call
+      // at the end of this function, so the toast is the only durable signal that
+      // attachment fan-out was silently dropped (still sends natively).
+      state.showToast(
+        payload.attachmentResolution.reason === 'ambiguous-current-attachments'
+          ? 'Attachment sync skipped: current files could not be confirmed.'
+          : 'Attachment sync skipped: current files could not be matched.',
+        'warning',
+      );
       await dependencies.logDebug({
         level: 'warn',
         message: 'Skipped source attachments before staging',
@@ -191,12 +198,19 @@ export function createSubmitController(
       }
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      state.showCurrentWarning(
-        error instanceof Error && reason === 'too many files'
-          ? 'too many files'
-          : error instanceof Error && reason.includes('large')
-            ? 'attachment too large'
-            : 'attachment sync skipped',
+      const warningLabel = error instanceof Error && reason === 'too many files'
+        ? 'too many files'
+        : error instanceof Error && reason.includes('large')
+          ? 'attachment too large'
+          : 'attachment sync skipped';
+      state.showCurrentWarning(warningLabel);
+      // The pill warning is overwritten by applyIndicatorPresentation() below, so
+      // surface a durable toast for the staging-failure drop reasons too.
+      state.showToast(
+        warningLabel === 'attachment sync skipped'
+          ? 'Attachment sync skipped.'
+          : `Attachment sync skipped: ${warningLabel}.`,
+        'warning',
       );
       await dependencies.logDebug({
         level: 'warn',

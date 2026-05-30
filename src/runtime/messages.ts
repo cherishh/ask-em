@@ -311,11 +311,3 @@ export type RuntimeMessage =
   | DebugLogsResponseMessage
   | WorkspaceContextResponseMessage
   | StatusResponseMessage;
-
-export function isRuntimeMessage(value: unknown): value is RuntimeMessage {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  return 'type' in value;
-}

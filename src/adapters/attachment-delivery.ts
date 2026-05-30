@@ -11,20 +11,10 @@ import {
   isAskEmFileInputDeliveryResultMessage,
   isAskEmTransientFileInputDeliveryResultMessage,
 } from '../runtime/protocol';
+import { base64ToArrayBuffer } from '../runtime/base64-chunk';
 
 const FILE_INPUT_DELIVERY_TIMEOUT_MS = 2_000;
 const TRANSIENT_FILE_INPUT_DELIVERY_TIMEOUT_MS = 6_000;
-
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes.buffer;
-}
 
 function createDeliveryRequestId(): string {
   return (
@@ -65,7 +55,11 @@ function waitForFileInputDeliveryResult(requestId: string): Promise<void> {
     }, FILE_INPUT_DELIVERY_TIMEOUT_MS);
 
     const listener = (event: MessageEvent) => {
-      if ((event.source && event.source !== window) || !isAskEmFileInputDeliveryResultMessage(event.data)) {
+      if (
+        (event.source && event.source !== window) ||
+        (event.origin && event.origin !== window.location.origin) ||
+        !isAskEmFileInputDeliveryResultMessage(event.data)
+      ) {
         return;
       }
 
@@ -100,6 +94,7 @@ function waitForTransientFileInputDeliveryResult(requestId: string): Promise<voi
     const listener = (event: MessageEvent) => {
       if (
         (event.source && event.source !== window) ||
+        (event.origin && event.origin !== window.location.origin) ||
         !isAskEmTransientFileInputDeliveryResultMessage(event.data)
       ) {
         return;

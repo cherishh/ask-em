@@ -116,6 +116,27 @@ describe('attachment submit snapshot resolution', () => {
     });
   });
 
+  it('prefers the longest filename match so a shorter name is not mis-paired by substring', () => {
+    const buffer = new ComposerAttachmentCaptureBuffer();
+    buffer.addFiles([
+      new File(['a'], 'port.png', { type: 'image/png' }),
+      new File(['b'], 'report.png', { type: 'image/png' }),
+    ], 'file-input');
+
+    // The DOM shows both files; "port.png" is a substring of "report.png", so a
+    // first-match-wins strategy would pair the "report.png" item with port.png.
+    expect(buffer.resolveAttachmentsForSubmit({
+      count: 2,
+      items: ['report.png', 'port.png'],
+    })).toMatchObject({
+      attachments: [
+        expect.objectContaining({ name: 'report.png' }),
+        expect.objectContaining({ name: 'port.png' }),
+      ],
+      submittedCount: 2,
+    });
+  });
+
   it('allows duplicate filenames when the submit-time snapshot still shows all copies', () => {
     const buffer = new ComposerAttachmentCaptureBuffer();
     buffer.addFiles([

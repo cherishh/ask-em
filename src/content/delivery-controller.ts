@@ -144,10 +144,14 @@ export function createDeliveryController(
 
       try {
         const submitTimeoutMs = message.attachments.length > 0 ? ATTACHMENT_DELIVERY_TIMEOUT_MS : undefined;
-        submitController.suppressObservedSubmissionsFor(
-          (submitTimeoutMs ?? 2_500) + PROGRAMMATIC_SUBMIT_BUFFER_MS,
-        );
-        adapter.composer.suppressAttachmentCaptureFor?.(2_500);
+        const suppressionMs = (submitTimeoutMs ?? 2_500) + PROGRAMMATIC_SUBMIT_BUFFER_MS;
+        submitController.suppressObservedSubmissionsFor(suppressionMs);
+        // Capture suppression must cover the WHOLE delivery window, not a fixed
+        // 2.5s: a target's injection (readAttachmentFiles over the message bus +
+        // file-input `change`) can land well after 2.5s within the 30s attachment
+        // window, otherwise the injected files get re-captured as the target tab's
+        // own source attachments and leak into its next user submit.
+        adapter.composer.suppressAttachmentCaptureFor?.(suppressionMs);
         await dependencies.logDebug({
           level: 'info',
           message: 'Starting prompt delivery in content',
@@ -219,9 +223,8 @@ export function createDeliveryController(
           detail: `attachments=${message.attachments.length}`,
           workspaceId: message.workspaceId,
         });
-        submitController.suppressObservedSubmissionsFor(
-          (submitTimeoutMs ?? 2_500) + PROGRAMMATIC_SUBMIT_BUFFER_MS,
-        );
+        submitController.suppressObservedSubmissionsFor(suppressionMs);
+        adapter.composer.suppressAttachmentCaptureFor?.(suppressionMs);
         submitController.rememberProgrammaticSubmit(message.content);
         await adapter.composer.submit({ timeoutMs: submitTimeoutMs });
         await dependencies.logDebug({

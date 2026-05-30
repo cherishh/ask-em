@@ -45,9 +45,20 @@ export type AskEmFileInputDeliveryResultMessage = {
 };
 
 function isFileLike(value: unknown): value is File {
+  // Duck-type rather than `instanceof File`: the isolated content world and the
+  // page MAIN world can hand each other cross-realm File-like objects whose
+  // prototype chain differs, so identity checks are unreliable. This mirrors the
+  // capture-side isFileLike (adapters/attachment-capture.ts) per design §6.
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<File>;
   return (
-    (typeof File !== 'undefined' && value instanceof File) ||
-    Object.prototype.toString.call(value) === '[object File]'
+    typeof candidate.name === 'string' &&
+    typeof candidate.type === 'string' &&
+    typeof candidate.size === 'number' &&
+    typeof candidate.arrayBuffer === 'function'
   );
 }
 

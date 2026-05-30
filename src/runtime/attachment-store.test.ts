@@ -221,6 +221,35 @@ describe('attachment store', () => {
     expect(indexedDb.data.get('a1')?.size).toBe(4);
   });
 
+  it('defers the IndexedDB blob write until finalize (no per-chunk re-put)', async () => {
+    const store = await import('./attachment-store');
+
+    await store.createAttachment({
+      submitId: 'submit-1',
+      ref: makeRef({ size: 4 }),
+      ownerTabId: 9,
+    });
+    await store.appendAttachmentChunk({
+      submitId: 'submit-1',
+      attachmentId: 'a1',
+      offset: 0,
+      chunkBase64: bytesToBase64(new Uint8Array([1, 2])),
+    });
+    await store.appendAttachmentChunk({
+      submitId: 'submit-1',
+      attachmentId: 'a1',
+      offset: 2,
+      chunkBase64: bytesToBase64(new Uint8Array([3, 4])),
+    });
+
+    // Bytes accumulate in memory; nothing is persisted to IndexedDB mid-write.
+    expect(indexedDb.data.has('a1')).toBe(false);
+
+    await store.finalizeAttachment({ submitId: 'submit-1', attachmentId: 'a1' });
+
+    expect(indexedDb.data.get('a1')?.size).toBe(4);
+  });
+
   it('binds metadata to a workspace and releases metadata plus blob by submitId', async () => {
     const store = await import('./attachment-store');
 

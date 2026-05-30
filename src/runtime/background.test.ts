@@ -741,6 +741,7 @@ describe('background submit routing', () => {
 
   it('uses and preserves the default fan-out subset when creating a new workspace', async () => {
     storageMocks.getLocalState.mockResolvedValue(makeLocalState({
+      pauseAfterFirstFanOutEnabled: true,
       defaultEnabledProviders: createDefaultEnabledProviders(['claude', 'chatgpt', 'gemini']),
       defaultFanOutProviders: ['chatgpt'],
     }));

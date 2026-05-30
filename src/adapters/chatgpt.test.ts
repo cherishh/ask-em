@@ -166,6 +166,61 @@ describe('ChatGPT attachment delivery adapter', () => {
     });
   });
 
+  it('confirms presence of a filename-less ChatGPT image tile via generic count', async () => {
+    document.body.innerHTML = `
+      <form data-type="unified-composer">
+        <input id="upload-files" type="file" multiple />
+        <div id="prompt-textarea" role="textbox" aria-label="Chat with ChatGPT" contenteditable="true"></div>
+        <button id="composer-submit-button" data-testid="send-button" aria-label="Send prompt"></button>
+        <div data-testid="composer-image-preview">
+          <img alt="Uploaded image" src="blob:https://chatgpt.com/image-1" />
+          <button type="button" aria-label="Remove attachment"></button>
+        </div>
+      </form>
+    `;
+
+    // The image exposes no filename, so filename matching finds nothing; the
+    // generic-count fallback must still report it so delivery does not falsely
+    // time out as 'upload failed'.
+    await expect(Promise.resolve(chatgptAdapter.composer?.getComposerAttachmentPresence?.([
+      {
+        id: 'a1',
+        name: 'gavin5.jpg',
+        mime: 'image/jpeg',
+        size: 3,
+      },
+    ]))).resolves.toMatchObject({
+      count: 1,
+    });
+  });
+
+  it('confirms a mixed fan-out of a named file plus a filename-less image tile', async () => {
+    document.body.innerHTML = `
+      <form data-type="unified-composer">
+        <input id="upload-files" type="file" multiple />
+        <div id="prompt-textarea" role="textbox" aria-label="Chat with ChatGPT" contenteditable="true"></div>
+        <button id="composer-submit-button" data-testid="send-button" aria-label="Send prompt"></button>
+        <div role="group" aria-label="report.pdf" class="group/file-tile">
+          <div>report.pdf</div>
+          <button type="button" aria-label="Remove file 1: report.pdf"></button>
+        </div>
+        <div data-testid="composer-image-preview">
+          <img alt="Uploaded image" src="blob:https://chatgpt.com/image-1" />
+          <button type="button" aria-label="Remove attachment"></button>
+        </div>
+      </form>
+    `;
+
+    // The pdf confirms by filename match; the image is only countable as a
+    // filename-less tile. Both must contribute so the delta reaches 2.
+    await expect(Promise.resolve(chatgptAdapter.composer?.getComposerAttachmentPresence?.([
+      { id: 'a1', name: 'report.pdf', mime: 'application/pdf', size: 3 },
+      { id: 'a2', name: 'gavin5.jpg', mime: 'image/jpeg', size: 3 },
+    ]))).resolves.toMatchObject({
+      count: 2,
+    });
+  });
+
   it('reads submit-time source attachment snapshots from ChatGPT file tiles', () => {
     document.body.innerHTML = `
       <form data-type="unified-composer">

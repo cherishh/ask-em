@@ -111,7 +111,7 @@ describe('transient file input MAIN-world hook', () => {
         files: [file],
       },
     }));
-    vi.advanceTimersByTime(5_000);
+    vi.advanceTimersByTime(10_000);
 
     expect(postMessage).toHaveBeenCalledWith({
       source: ASK_EM_BRIDGE_SOURCE,

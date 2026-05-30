@@ -413,7 +413,11 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
         };
 
         const handleTransientFilesMessage = (event: MessageEvent) => {
-          if (event.source !== window || isAttachmentCaptureSuppressed()) {
+          if (
+            event.source !== window ||
+            (event.origin && event.origin !== window.location.origin) ||
+            isAttachmentCaptureSuppressed()
+          ) {
             return;
           }
 
@@ -421,6 +425,11 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
             return;
           }
 
+          // The MAIN-world transient hook shares the page's global, so a malicious
+          // page script could forge this message. That cannot exfiltrate files:
+          // the submit-time source-DOM snapshot gate (resolveAttachmentsForSubmit)
+          // fan-out only files that match a real composer attachment card, so a
+          // forged buffer entry is dropped fail-closed rather than synced.
           attachmentBuffer.addFiles(event.data.files, 'transient-file-input');
         };
 

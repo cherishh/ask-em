@@ -39,7 +39,7 @@ export function makeLocalState(overrides: Partial<LocalState> = {}): LocalState 
   return {
     globalSyncEnabled: true,
     autoSyncNewChatsEnabled: true,
-    pauseAfterFirstFanOutEnabled: true,
+    pauseAfterFirstFanOutEnabled: false,
     debugLoggingEnabled: true,
     showDiagnostics: false,
     closeTabsOnDeleteSet: false,

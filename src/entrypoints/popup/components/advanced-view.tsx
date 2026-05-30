@@ -141,7 +141,7 @@ export function AdvancedView(props: {
             <div>
               <span className="askem-us-row-title">Pause after first fan-out</span>
               <span className="askem-us-row-sub">
-                {props.status?.pauseAfterFirstFanOutEnabled ?? true
+                {props.status?.pauseAfterFirstFanOutEnabled ?? false
                   ? 'Follow-up prompts stay local unless you re-enable the set.'
                   : 'Follow-up prompts keep syncing until you pause the set.'}
               </span>
@@ -149,11 +149,11 @@ export function AdvancedView(props: {
             <button
               type="button"
               className="askem-us-switch"
-              data-enabled={String(props.status?.pauseAfterFirstFanOutEnabled ?? true)}
+              data-enabled={String(props.status?.pauseAfterFirstFanOutEnabled ?? false)}
               onClick={props.onTogglePauseAfterFirstFanOut}
               disabled={props.loading}
               aria-label={
-                props.status?.pauseAfterFirstFanOutEnabled ?? true
+                props.status?.pauseAfterFirstFanOutEnabled ?? false
                   ? 'Disable pausing after first fan-out'
                   : 'Enable pausing after first fan-out'
               }

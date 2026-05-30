@@ -173,21 +173,32 @@ function findCapturedAttachmentForSnapshotItem(
     return null;
   }
 
+  // The snapshot item is DOM text that may wrap the filename in noise ("report.png
+  // 2 MB Remove"), so we substring-match the filename inside it. But a shorter
+  // filename can be a coincidental substring of a different one ("port.png" inside
+  // "report.png"), so prefer an exact match, then fall back to the LONGEST (most
+  // specific) substring match rather than the first one encountered.
+  let best: { index: number; attachment: CapturedAttachment; length: number } | null = null;
   for (let index = 0; index < attachments.length; index += 1) {
     if (usedIndexes.has(index)) {
       continue;
     }
 
     const compactName = compactAttachmentText(attachments[index].name);
-    if (compactName && compactItem.includes(compactName)) {
-      return {
-        index,
-        attachment: attachments[index],
-      };
+    if (!compactName) {
+      continue;
+    }
+
+    if (compactName === compactItem) {
+      return { index, attachment: attachments[index] };
+    }
+
+    if (compactItem.includes(compactName) && (!best || compactName.length > best.length)) {
+      best = { index, attachment: attachments[index], length: compactName.length };
     }
   }
 
-  return null;
+  return best ? { index: best.index, attachment: best.attachment } : null;
 }
 
 export class ComposerAttachmentCaptureBuffer {

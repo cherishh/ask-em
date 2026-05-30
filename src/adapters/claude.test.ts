@@ -447,6 +447,19 @@ describe('Claude attachment delivery adapter', () => {
     });
   });
 
+  it('detects upload errors only inside alert/toast surfaces, not the prompt or transcript', async () => {
+    document.body.innerHTML = `
+      <div data-testid="chat-input" contenteditable="true">My essay on why every upload failed in 1998.</div>
+      <div class="message">Earlier message: the build failed to upload to S3.</div>
+    `;
+    // The injected prompt and transcript mention the trigger phrases but must NOT
+    // be treated as an upload error.
+    expect(await claudeAdapter.composer?.detectAttachmentUploadError?.()).toBeNull();
+
+    document.body.innerHTML += `<div role="alert">Upload failed</div>`;
+    expect(await claudeAdapter.composer?.detectAttachmentUploadError?.()).toBe('upload failed');
+  });
+
   it('clicks Claude send buttons with current aria labels', async () => {
     document.body.innerHTML = `
       <form>

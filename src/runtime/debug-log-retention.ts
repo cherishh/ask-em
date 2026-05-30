@@ -134,6 +134,32 @@ export function getDebugLogsByteLength(logs: DebugLogEntry[]): number {
   return getUtf8ByteLength(JSON.stringify(logs));
 }
 
+// Enforce the entry-count and byte caps on an array whose entries are ALREADY
+// normalized. Drops oldest entries until under the byte budget, keeping a running
+// byte total — measured once for the whole array, then decremented by each dropped
+// entry's own serialized size — instead of re-stringifying the whole array on
+// every drop (the old `while (... getDebugLogsByteLength(nextLogs) ...)` was
+// O(n^2) when many entries had to go). Removing the head entry drops its JSON
+// bytes plus the one comma that joined it to the next entry.
+function enforceDebugLogLimits(
+  logs: DebugLogEntry[],
+  limits: DebugLogRetentionLimits,
+): DebugLogEntry[] {
+  let nextLogs = logs.length > limits.maxEntries ? logs.slice(-limits.maxEntries) : logs;
+
+  let totalBytes = getDebugLogsByteLength(nextLogs);
+  let start = 0;
+  while (start < nextLogs.length && totalBytes > limits.maxBytes) {
+    totalBytes -= getUtf8ByteLength(JSON.stringify(nextLogs[start])) + 1;
+    start += 1;
+  }
+  if (start > 0) {
+    nextLogs = nextLogs.slice(start);
+  }
+
+  return nextLogs;
+}
+
 function trimDebugLogs(
   logs: DebugLogEntry[],
   limits: DebugLogRetentionLimits,
@@ -151,15 +177,21 @@ function trimDebugLogs(
     }
   }
 
-  if (nextLogs.length > limits.maxEntries) {
-    nextLogs = nextLogs.slice(-limits.maxEntries);
-  }
+  return enforceDebugLogLimits(nextLogs, limits);
+}
 
-  while (nextLogs.length > 0 && getDebugLogsByteLength(nextLogs) > limits.maxBytes) {
-    nextLogs = nextLogs.slice(1);
-  }
-
-  return nextLogs;
+// Hot append path: `existing` already went through a prior trim/append, so its
+// entries are normalized and within caps. Re-normalizing all of them on every
+// append re-encoded every entry's (already-truncated) detail through TextEncoder,
+// which was O(n) per append and O(n^2) over a full session — enough to push the
+// storage debug-log bound test over its timeout under load. Normalize only the
+// new entry, then enforce caps.
+export function appendDebugLogForStorage(
+  existing: DebugLogEntry[],
+  entry: DebugLogEntry,
+): DebugLogEntry[] {
+  const normalized = normalizeDebugLogEntry(entry, DEFAULT_DEBUG_LOG_LIMITS);
+  return enforceDebugLogLimits([...existing, normalized], DEFAULT_DEBUG_LOG_LIMITS);
 }
 
 export function trimDebugLogsForStorage(logs: DebugLogEntry[]): DebugLogEntry[] {

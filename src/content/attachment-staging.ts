@@ -5,19 +5,8 @@ import {
   type AttachmentRef,
   type CapturedAttachment,
 } from '../runtime/protocol';
+import { bytesToBase64 } from '../runtime/base64-chunk';
 import { sendRuntimeMessage } from './routing';
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  const batchSize = 0x8000;
-
-  for (let offset = 0; offset < bytes.length; offset += batchSize) {
-    const batch = bytes.subarray(offset, offset + batchSize);
-    binary += String.fromCharCode(...batch);
-  }
-
-  return btoa(binary);
-}
 
 async function readFileBytes(file: File, start: number, end: number): Promise<Uint8Array> {
   return new Uint8Array(await file.slice(start, end).arrayBuffer());

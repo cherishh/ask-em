@@ -149,7 +149,7 @@ export function usePopupStatus() {
     await sendRuntimeMessage({
       type: 'SET_DEFAULT_ENABLED_PROVIDERS',
       providers: nextProviders,
-    });
+    }, { silentRefresh: true });
   }, [defaultFanOutProviders, enabledProviders, sendRuntimeMessage]);
 
   const toggleDefaultFanOutProvider = useCallback(async (provider: Provider) => {
@@ -187,7 +187,7 @@ export function usePopupStatus() {
   }, [sendRuntimeMessage, status?.globalSyncEnabled]);
 
   const togglePauseAfterFirstFanOut = useCallback(async () => {
-    const nextEnabled = !(status?.pauseAfterFirstFanOutEnabled ?? true);
+    const nextEnabled = !(status?.pauseAfterFirstFanOutEnabled ?? false);
     await sendRuntimeMessage({
       type: 'SET_PAUSE_AFTER_FIRST_FAN_OUT_ENABLED',
       enabled: nextEnabled,

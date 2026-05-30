@@ -7,7 +7,13 @@ import {
   isAskEmTransientFileInputDeliveryMessage,
 } from '../runtime/protocol';
 
-const TRANSIENT_DELIVERY_TIMEOUT_MS = 5_000;
+// Must exceed the worst-case provider menu-navigation budget before the transient
+// file input is clicked. Manus alone can take ~7s (5s wait for the tools button +
+// 2s wait for the "Add from local files" item), so a 5s arming window would
+// disarm first — the file input click would then fall through to the capture
+// branch and re-post the delivered file as a source attachment instead of
+// injecting it. Keep this comfortably above that budget.
+const TRANSIENT_DELIVERY_TIMEOUT_MS = 10_000;
 
 type TransientHookState = {
   installed: boolean;
@@ -101,7 +107,11 @@ export function installTransientFileInputHook(): () => void {
     installed: true,
     originalClick,
     listener(event) {
-      if ((event.source && event.source !== window) || !isAskEmTransientFileInputDeliveryMessage(event.data)) {
+      if (
+        (event.source && event.source !== window) ||
+        (event.origin && event.origin !== window.location.origin) ||
+        !isAskEmTransientFileInputDeliveryMessage(event.data)
+      ) {
         return;
       }
 

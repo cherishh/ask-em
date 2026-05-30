@@ -73,6 +73,15 @@ function compactAttachmentText(value: string): string {
   return normalizeWhitespace(value).replace(/\s+/g, '').toLowerCase();
 }
 
+// True when an element's accessible text exposes a filename token (e.g. a file
+// tile labeled "old.pdf"). Image tiles expose no filename ("Uploaded image"), so
+// they return false. Used to tell a non-matching NAMED draft (skip — it is a
+// different file) apart from a filename-less image (count — it may be the file we
+// are waiting for) when expected-filename matching finds nothing.
+function exposesFilename(element: HTMLElement): boolean {
+  return /[^\s/\\]+\.[a-z0-9]{1,8}\b/i.test(getElementAccessibleText(element));
+}
+
 function getExpectedAttachmentElements(
   container: ParentNode,
   expectedAttachments: AttachmentRef[] | undefined,
@@ -249,11 +258,31 @@ export const chatgptAdapter = createDomProviderAdapter({
   },
   getComposerAttachmentPresence({ findComposer, findSendButton }, expectedAttachments) {
     const container = findChatgptComposerRoot(findComposer(), findSendButton());
+
+    if (!expectedAttachments || expectedAttachments.length === 0) {
+      const generic = getGenericAttachmentElements(container);
+      return {
+        count: generic.length,
+        keys: Array.from(new Set(generic.map(getElementAccessibleText).filter(Boolean))),
+      };
+    }
+
+    // Count filename-matched expected tiles, PLUS filename-less generic tiles
+    // (ChatGPT image previews expose no filename). The union is required for a
+    // MIXED fan-out such as report.pdf + image.jpg: the pdf confirms by filename
+    // match while the image is only countable as a filename-less tile — counting
+    // only one set would leave the other uploaded file forever short of the delta
+    // and time out. A NAMED tile that does not match an expected filename is a
+    // different/stale draft, so it lands in neither set and is correctly excluded.
     const expectedElements = getExpectedAttachmentElements(container, expectedAttachments);
-    const genericElements = expectedAttachments && expectedAttachments.length > 0
-      ? []
-      : getGenericAttachmentElements(container);
-    const elements = expectedElements.length > 0 ? expectedElements : genericElements;
+    const expectedSet = new Set(expectedElements);
+    const filenamelessGeneric = getGenericAttachmentElements(container).filter(
+      (element) =>
+        !exposesFilename(element) &&
+        !expectedSet.has(element) &&
+        !expectedElements.some((expected) => expected.contains(element) || element.contains(expected)),
+    );
+    const elements = [...expectedElements, ...filenamelessGeneric];
     const keys = Array.from(new Set(elements.map(getElementAccessibleText).filter(Boolean)));
 
     return {
