@@ -38,7 +38,6 @@ export default function App() {
     clearProvider,
     toggleEnabledProvider,
     toggleDefaultFanOutProvider,
-    toggleAutoSyncNewChats,
     toggleGlobalSync,
     toggleCloseTabsOnDeleteSet,
     toggleShowDiagnostics,
@@ -97,7 +96,6 @@ export default function App() {
   const limit = status?.workspaceLimit ?? MAX_WORKSPACES;
   const atLimit = workspaceCount >= limit;
   const globalSyncEnabled = status?.globalSyncEnabled ?? true;
-  const autoSyncNewChatsEnabled = status?.autoSyncNewChatsEnabled ?? true;
 
   const handleClearPersistentStorage = useCallback(async () => {
     setDevActionBusy(true);
@@ -185,11 +183,9 @@ export default function App() {
             resolvedShortcuts={resolvedShortcuts}
             recordingShortcutId={recordingShortcutId}
             logActionBusy={logActionBusy}
-            autoSyncNewChatsEnabled={autoSyncNewChatsEnabled}
             showDiagnostics={status?.showDiagnostics ?? false}
             onOpenRequestModal={openRequestModal}
             onToggleEnabledProvider={(provider) => void toggleEnabledProvider(provider)}
-            onToggleAutoSyncNewChats={() => void toggleAutoSyncNewChats()}
             onToggleCloseTabsOnDeleteSet={() => void toggleCloseTabsOnDeleteSet()}
             onResetIndicatorPositions={() => void resetIndicatorPositions()}
             onSetRecordingShortcutId={setRecordingShortcutId}

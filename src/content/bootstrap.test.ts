@@ -232,6 +232,48 @@ describe('content bootstrap wiring', () => {
     expect(sendResponse).toHaveBeenCalledWith({ ok: true });
   });
 
+  it('persists standalone fan-out toggle through the auto-sync setting', async () => {
+    status = {
+      provider: 'claude',
+      currentUrl: 'https://claude.ai/new',
+      sessionId: null,
+      pageKind: 'new-chat',
+      pageState: 'ready',
+    };
+    routingMocks.sendRuntimeMessage.mockResolvedValueOnce(
+      createHelloResponse({
+        workspaceId: null,
+        providerEnabled: false,
+        autoSyncNewChatsEnabled: true,
+        nextFanOutTargetCount: 2,
+        workspaceSummary: null,
+      }),
+    );
+
+    await bootstrap();
+
+    const handlers = uiMocks.createContentUi.mock.calls[0]?.[1] as
+      | {
+          onStandaloneSetCreationToggle(nextEnabled: boolean): Promise<void>;
+        }
+      | undefined;
+    routingMocks.sendRuntimeMessage.mockClear();
+
+    await handlers?.onStandaloneSetCreationToggle(false);
+
+    expect(routingMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+      type: 'SET_AUTO_SYNC_NEW_CHATS_ENABLED',
+      enabled: false,
+    });
+    expect(ui.setContext).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        standaloneCreateSetEnabled: false,
+      }),
+    );
+    expect(ui.setState).toHaveBeenLastCalledWith('blocked', 'Local only');
+    expect(ui.setSyncStatus).toHaveBeenLastCalledWith('next prompt stays here', 'neutral');
+  });
+
   it('marks progress failures as set warnings', async () => {
     await bootstrap();
 

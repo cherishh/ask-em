@@ -26,14 +26,11 @@ type PresenceContextTransitionInput = {
   currentContext: UiContext;
   response: PresenceResponse | null;
   standaloneVisible: boolean;
-  hasHydratedPresence: boolean;
-  standaloneCreateSetTouched: boolean;
 };
 
 type PresenceContextTransitionResult = {
   uiContext: UiContext;
   workspaceSummary: WorkspaceSummary | null;
-  standaloneCreateSetTouched: boolean;
   hasHydratedPresence: boolean;
   visible: boolean;
 };
@@ -42,27 +39,19 @@ export function buildPresenceContextTransition({
   currentContext,
   response,
   standaloneVisible,
-  hasHydratedPresence,
-  standaloneCreateSetTouched,
 }: PresenceContextTransitionInput): PresenceContextTransitionResult {
   const defaultStandaloneCreateSetEnabled = response?.autoSyncNewChatsEnabled ?? true;
   const nextWorkspaceId = response?.workspaceId ?? null;
-  const leavingWorkspace = Boolean(currentContext.workspaceId) && !nextWorkspaceId;
   const enteringWorkspace = Boolean(nextWorkspaceId);
   let nextStandaloneCreateSetEnabled = currentContext.standaloneCreateSetEnabled;
-  let nextStandaloneCreateSetTouched = standaloneCreateSetTouched;
   let nextStandaloneFanOutTargetCount = currentContext.standaloneFanOutTargetCount;
 
   if (enteringWorkspace) {
     nextStandaloneCreateSetEnabled = true;
     nextStandaloneFanOutTargetCount = null;
-    nextStandaloneCreateSetTouched = false;
-  } else if (!hasHydratedPresence || leavingWorkspace || !standaloneCreateSetTouched) {
+  } else if (response) {
     nextStandaloneCreateSetEnabled = defaultStandaloneCreateSetEnabled;
     nextStandaloneFanOutTargetCount = response?.nextFanOutTargetCount ?? null;
-    nextStandaloneCreateSetTouched = false;
-  } else if (response?.nextFanOutTargetCount !== undefined) {
-    nextStandaloneFanOutTargetCount = response.nextFanOutTargetCount;
   }
 
   const uiContext: UiContext = {
@@ -79,7 +68,6 @@ export function buildPresenceContextTransition({
   return {
     uiContext,
     workspaceSummary: response?.workspaceSummary ?? null,
-    standaloneCreateSetTouched: nextStandaloneCreateSetTouched,
     hasHydratedPresence: true,
     visible: Boolean(nextWorkspaceId) || standaloneVisible,
   };

@@ -40,7 +40,7 @@ export type UiContext = {
 
 export type UiHandlers = {
   onWorkspaceProviderToggle: (provider: Provider, nextEnabled: boolean) => Promise<void>;
-  onStandaloneSetCreationToggle: (nextEnabled: boolean) => void;
+  onStandaloneSetCreationToggle: (nextEnabled: boolean) => Promise<void>;
   onProviderTabSwitch: (direction: 'next' | 'previous') => Promise<{
     ok?: boolean;
     switched?: boolean;
@@ -420,19 +420,23 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     }
   };
 
-  const toggleStandaloneSetCreation = () => {
+  const toggleStandaloneSetCreation = async () => {
     if (currentProviderToggleBusy || !context.globalSyncEnabled || !context.canStartNewSet) {
       return;
     }
 
     const nextEnabled = !context.standaloneCreateSetEnabled;
-    handlers.onStandaloneSetCreationToggle(nextEnabled);
-    context.standaloneCreateSetEnabled = nextEnabled;
-    mount.dataset.standaloneCreateSetEnabled = String(nextEnabled);
-    refreshLayout();
+    setCurrentProviderToggleBusy(true);
 
-    if (panel.dataset.visible === 'true' && panel.dataset.mode === 'tooltip') {
-      renderStandaloneTooltip();
+    try {
+      await handlers.onStandaloneSetCreationToggle(nextEnabled);
+      refreshLayout();
+
+      if (panel.dataset.visible === 'true' && panel.dataset.mode === 'tooltip') {
+        renderStandaloneTooltip();
+      }
+    } finally {
+      setCurrentProviderToggleBusy(false);
     }
   };
 
@@ -477,7 +481,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     event.stopPropagation();
 
     if (!context.workspaceId && context.standaloneReady) {
-      toggleStandaloneSetCreation();
+      void toggleStandaloneSetCreation();
       return;
     }
 
@@ -667,7 +671,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     if (context.standaloneReady) {
       event.preventDefault();
       event.stopPropagation();
-      toggleStandaloneSetCreation();
+      void toggleStandaloneSetCreation();
     }
   };
   document.addEventListener('keydown', handleDocumentKeyDown);

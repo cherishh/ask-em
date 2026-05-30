@@ -34,7 +34,11 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
 
       state.applyIndicatorPresentation();
     },
-    onStandaloneSetCreationToggle(nextEnabled) {
+    async onStandaloneSetCreationToggle(nextEnabled) {
+      await sendRuntimeMessage({
+        type: 'SET_AUTO_SYNC_NEW_CHATS_ENABLED',
+        enabled: nextEnabled,
+      });
       state.setStandaloneCreateSetEnabled(nextEnabled);
       state.applyIndicatorPresentation();
     },

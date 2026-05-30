@@ -49,11 +49,9 @@ export function AdvancedView(props: {
   resolvedShortcuts: ShortcutConfig;
   recordingShortcutId: ShortcutId | null;
   logActionBusy: boolean;
-  autoSyncNewChatsEnabled: boolean;
   showDiagnostics: boolean;
   onOpenRequestModal: () => void;
   onToggleEnabledProvider: (provider: Provider) => void;
-  onToggleAutoSyncNewChats: () => void;
   onToggleCloseTabsOnDeleteSet: () => void;
   onResetIndicatorPositions: () => void;
   onSetRecordingShortcutId: (id: ShortcutId | null) => void;
@@ -133,33 +131,6 @@ export function AdvancedView(props: {
               {enabledProvidersExpanded ? 'Show fewer' : `Show ${ALL_PROVIDERS.length - ENABLED_PROVIDER_COLLAPSED_LIMIT} more`}
             </button>
           ) : null}
-        </div>
-
-        <div className="askem-us-divider" />
-
-        <div className="askem-us-group">
-          <div className="askem-us-toggle-row">
-            <div>
-              <span className="askem-us-row-title">Default auto-sync new chats</span>
-              <span className="askem-us-row-sub">
-                {props.autoSyncNewChatsEnabled
-                  ? 'New chats automatically fan-out.'
-                  : 'New chats stay solo.'}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="askem-us-switch"
-              data-enabled={String(props.autoSyncNewChatsEnabled)}
-              onClick={props.onToggleAutoSyncNewChats}
-              disabled={props.loading}
-              aria-label={
-                props.autoSyncNewChatsEnabled
-                  ? 'Disable auto-sync for new chats'
-                  : 'Enable auto-sync for new chats'
-              }
-            />
-          </div>
         </div>
 
         <div className="askem-us-divider" />

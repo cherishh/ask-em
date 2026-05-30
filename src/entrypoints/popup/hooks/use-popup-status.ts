@@ -186,14 +186,6 @@ export function usePopupStatus() {
     }, { silentRefresh: true });
   }, [sendRuntimeMessage, status?.globalSyncEnabled]);
 
-  const toggleAutoSyncNewChats = useCallback(async () => {
-    const nextEnabled = !status?.autoSyncNewChatsEnabled;
-    await sendRuntimeMessage({
-      type: 'SET_AUTO_SYNC_NEW_CHATS_ENABLED',
-      enabled: nextEnabled,
-    }, { silentRefresh: true });
-  }, [sendRuntimeMessage, status?.autoSyncNewChatsEnabled]);
-
   const toggleCloseTabsOnDeleteSet = useCallback(async () => {
     const nextEnabled = !status?.closeTabsOnDeleteSet;
     await sendRuntimeMessage({
@@ -242,7 +234,6 @@ export function usePopupStatus() {
     clearProvider,
     toggleEnabledProvider,
     toggleDefaultFanOutProvider,
-    toggleAutoSyncNewChats,
     toggleGlobalSync,
     toggleCloseTabsOnDeleteSet,
     toggleShowDiagnostics,
