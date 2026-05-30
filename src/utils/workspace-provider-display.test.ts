@@ -101,6 +101,22 @@ describe('workspace provider display', () => {
     });
   });
 
+  it('surfaces attachment limit issues as needs attention', () => {
+    expect(
+      getWorkspaceProviderDisplay({
+        memberState: 'ready',
+        memberIssue: 'attachment-limit',
+        enabled: true,
+        globalSyncEnabled: true,
+        hasMember: true,
+      }),
+    ).toEqual({
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Attachment limit exceeded',
+    });
+  });
+
   it('returns a single presentation object with popup tone', () => {
     expect(
       getWorkspaceProviderPresentation({

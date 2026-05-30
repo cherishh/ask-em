@@ -5,6 +5,9 @@ import {
   ATTACHMENT_MAX_FILE_BYTES,
   type AttachmentRef,
   type CapturedAttachment,
+  type Provider,
+  type ProviderDeliveryResult,
+  PROVIDER_UPLOAD_CAPABILITIES,
 } from '../runtime/protocol';
 import { formatAttachmentSummary, shortSubmitId } from '../runtime/attachment-log';
 import { isProbablyPlainTextBytes } from '../runtime/attachment-text';
@@ -12,6 +15,14 @@ import { buildUserSubmitMessage, createSubmitId, sendRuntimeMessage } from './ro
 import type { ContentStateController, SubmitResponse } from './state';
 
 type SubmitInput = string | UserSubmissionPayload;
+
+const PROVIDER_LABELS: Record<Provider, string> = {
+  claude: 'Claude',
+  chatgpt: 'ChatGPT',
+  gemini: 'Gemini',
+  deepseek: 'DeepSeek',
+  manus: 'Manus',
+};
 
 function normalizeSubmitInput(input: SubmitInput): UserSubmissionPayload {
   if (typeof input === 'string') {
@@ -34,6 +45,43 @@ function bytesToBase64(bytes: Uint8Array): string {
   }
 
   return btoa(binary);
+}
+
+function formatFileCount(count: number): string {
+  return `${count} ${count === 1 ? 'file' : 'files'}`;
+}
+
+function buildAttachmentLimitToast(
+  deliveryResults: ProviderDeliveryResult[] | undefined,
+  attachmentCount: number,
+): string | null {
+  const limitedResults = (deliveryResults ?? []).filter((result) =>
+    !result.ok && result.reason?.toLowerCase().includes('attachment count not supported'),
+  );
+
+  if (limitedResults.length === 0) {
+    return null;
+  }
+
+  const providerLabels = limitedResults.map((result) => PROVIDER_LABELS[result.provider]);
+  const skippedPrefix = providerLabels.length === 1
+    ? `${providerLabels[0]} skipped`
+    : `${providerLabels.join(', ')} skipped`;
+  const successSuffix = (deliveryResults ?? []).some((result) => result.ok)
+    ? ' Other providers synced.'
+    : '';
+
+  if (limitedResults.length === 1) {
+    const provider = limitedResults[0].provider;
+    const maxFiles = PROVIDER_UPLOAD_CAPABILITIES[provider]?.maxFiles;
+    const limitDetail = maxFiles
+      ? `${PROVIDER_LABELS[provider]} supports ${formatFileCount(maxFiles)}`
+      : `${PROVIDER_LABELS[provider]} supports fewer files`;
+
+    return `${skippedPrefix}: this prompt has ${formatFileCount(attachmentCount)}; ${limitDetail}.${successSuffix}`;
+  }
+
+  return `${skippedPrefix}: this prompt has ${formatFileCount(attachmentCount)}; those models support fewer files.${successSuffix}`;
 }
 
 export function createSubmitController(
@@ -208,7 +256,7 @@ export function createSubmitController(
     ) {
       state.showCurrentWarning('attachment sync skipped');
       if (payload.attachmentResolution.reason === 'ambiguous-current-attachments') {
-        state.showToast('Attachment sync skipped: duplicate filenames are ambiguous.', 'warning');
+        state.showToast('Attachment sync skipped: current files could not be confirmed.', 'warning');
       }
       await dependencies.logDebug({
         level: 'warn',
@@ -266,6 +314,10 @@ export function createSubmitController(
       },
     );
     state.applySubmitResponse(response);
+    const attachmentLimitToast = buildAttachmentLimitToast(response?.deliveryResults, attachments.length);
+    if (attachmentLimitToast) {
+      state.showToast(attachmentLimitToast, 'warning');
+    }
     state.applyIndicatorPresentation();
   };
 

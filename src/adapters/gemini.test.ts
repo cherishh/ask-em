@@ -3,6 +3,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { geminiAdapter } from './gemini';
 
+async function flushMicrotasks() {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 function mockVisibleLayout() {
   return vi
     .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
@@ -62,6 +68,13 @@ describe('Gemini attachment delivery adapter', () => {
     let pastedFiles: File[] = [];
     composer?.addEventListener('paste', (event) => {
       pastedFiles = Array.from((event as ClipboardEvent).clipboardData?.files ?? []);
+      document.querySelector('.text-input-field')?.insertAdjacentHTML('afterbegin', `
+        <uploader-file-preview class="file-preview-chip">
+          <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+            <span class="gem-attachment-text">notes.md</span>
+          </gem-attachment>
+        </uploader-file-preview>
+      `);
     });
 
     await geminiAdapter.composer?.setComposerPayload?.({
@@ -79,6 +92,149 @@ describe('Gemini attachment delivery adapter', () => {
     expect(composer?.textContent).toBe('hello');
     expect(pastedFiles[0]).toEqual(expect.any(File));
     expect(pastedFiles[0]?.name).toBe('notes.md');
+  });
+
+  it('waits for attachment-only submit readiness before writing prompt text', async () => {
+    vi.useFakeTimers({
+      toFake: ['Date', 'setTimeout', 'clearTimeout'],
+    });
+    try {
+      document.body.innerHTML = `
+        <div class="text-input-field">
+          <rich-textarea>
+            <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true"></div>
+          </rich-textarea>
+          <button aria-label="Send message" disabled></button>
+        </div>
+      `;
+
+      const composer = document.querySelector<HTMLElement>('.ql-editor');
+      const sendButton = document.querySelector<HTMLButtonElement>('button[aria-label="Send message"]');
+      composer?.addEventListener('paste', () => {
+        document.querySelector('.text-input-field')?.insertAdjacentHTML('afterbegin', `
+          <uploader-file-preview class="file-preview-chip">
+            <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+              <span class="gem-attachment-text">notes.md</span>
+            </gem-attachment>
+          </uploader-file-preview>
+        `);
+      });
+
+      const delivery = geminiAdapter.composer?.setComposerPayload?.({
+        text: 'hello',
+        attachments: [
+          {
+            id: 'a1',
+            name: 'notes.md',
+            mime: 'text/markdown',
+            size: 3,
+          },
+        ],
+      });
+
+      await flushMicrotasks();
+      expect(composer?.textContent).not.toContain('hello');
+
+      sendButton?.removeAttribute('disabled');
+      await vi.advanceTimersByTimeAsync(250);
+      await delivery;
+
+      expect(composer?.textContent).toContain('hello');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses a Gemini attachment baseline so existing matching drafts do not release prompt text early', async () => {
+    vi.useFakeTimers({
+      toFake: ['Date', 'setTimeout', 'clearTimeout'],
+    });
+    try {
+      document.body.innerHTML = `
+        <div class="text-input-field">
+          <uploader-file-preview class="file-preview-chip">
+            <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+              <span class="gem-attachment-text">notes.md</span>
+            </gem-attachment>
+          </uploader-file-preview>
+          <rich-textarea>
+            <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true"></div>
+          </rich-textarea>
+          <button aria-label="Send message"></button>
+        </div>
+      `;
+
+      const composer = document.querySelector<HTMLElement>('.ql-editor');
+      composer?.addEventListener('paste', () => {
+        window.setTimeout(() => {
+          document.querySelector('.text-input-field')?.insertAdjacentHTML('afterbegin', `
+            <uploader-file-preview class="file-preview-chip">
+              <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+                <span class="gem-attachment-text">notes.md</span>
+              </gem-attachment>
+            </uploader-file-preview>
+          `);
+        }, 250);
+      });
+
+      const delivery = geminiAdapter.composer?.setComposerPayload?.({
+        text: 'hello',
+        attachments: [
+          {
+            id: 'a1',
+            name: 'notes.md',
+            mime: 'text/markdown',
+            size: 3,
+          },
+        ],
+      });
+
+      await flushMicrotasks();
+      expect(composer?.textContent).not.toContain('hello');
+
+      await vi.advanceTimersByTimeAsync(250);
+      await delivery;
+
+      expect(composer?.textContent).toContain('hello');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails closed when Gemini reports upload failure before readiness', async () => {
+    document.body.innerHTML = `
+      <div class="text-input-field">
+        <rich-textarea>
+          <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true"></div>
+        </rich-textarea>
+        <button aria-label="Send message" disabled></button>
+      </div>
+    `;
+
+    const composer = document.querySelector<HTMLElement>('.ql-editor');
+    composer?.addEventListener('paste', () => {
+      document.querySelector('.text-input-field')?.insertAdjacentHTML('afterbegin', `
+        <uploader-file-preview class="file-preview-chip">
+          <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+            <span class="gem-attachment-text">notes.md</span>
+          </gem-attachment>
+        </uploader-file-preview>
+      `);
+      document.body.insertAdjacentHTML('beforeend', '<div class="mat-mdc-snack-bar-container">Failed to upload notes.md</div>');
+    });
+
+    await expect(geminiAdapter.composer?.setComposerPayload?.({
+      text: 'hello',
+      attachments: [
+        {
+          id: 'a1',
+          name: 'notes.md',
+          mime: 'text/markdown',
+          size: 3,
+        },
+      ],
+    })).rejects.toThrow('upload failed');
+    expect(composer?.textContent).not.toContain('hello');
   });
 
   it('reports attachment presence from Gemini file preview chips', async () => {

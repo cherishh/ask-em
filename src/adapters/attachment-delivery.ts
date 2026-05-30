@@ -3,13 +3,17 @@ import {
   ATTACHMENT_CHUNK_BYTES,
   ASK_EM_FILE_INPUT_DELIVERY,
   ASK_EM_FILE_INPUT_TOKEN_ATTRIBUTE,
+  ASK_EM_TRANSIENT_FILE_INPUT_DELIVERY,
   type AttachmentReadChunkResponse,
   type AttachmentRef,
   type AskEmFileInputDeliveryMessage,
+  type AskEmTransientFileInputDeliveryMessage,
   isAskEmFileInputDeliveryResultMessage,
+  isAskEmTransientFileInputDeliveryResultMessage,
 } from '../runtime/protocol';
 
 const FILE_INPUT_DELIVERY_TIMEOUT_MS = 2_000;
+const TRANSIENT_FILE_INPUT_DELIVERY_TIMEOUT_MS = 6_000;
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binary = atob(base64);
@@ -62,6 +66,42 @@ function waitForFileInputDeliveryResult(requestId: string): Promise<void> {
 
     const listener = (event: MessageEvent) => {
       if ((event.source && event.source !== window) || !isAskEmFileInputDeliveryResultMessage(event.data)) {
+        return;
+      }
+
+      if (event.data.requestId !== requestId) {
+        return;
+      }
+
+      cleanup();
+      if (event.data.ok) {
+        resolve();
+      } else {
+        reject(new Error(event.data.error ?? 'upload failed'));
+      }
+    };
+
+    function cleanup() {
+      window.clearTimeout(timeout);
+      window.removeEventListener('message', listener);
+    }
+
+    window.addEventListener('message', listener);
+  });
+}
+
+function waitForTransientFileInputDeliveryResult(requestId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error('upload bridge unavailable'));
+    }, TRANSIENT_FILE_INPUT_DELIVERY_TIMEOUT_MS);
+
+    const listener = (event: MessageEvent) => {
+      if (
+        (event.source && event.source !== window) ||
+        !isAskEmTransientFileInputDeliveryResultMessage(event.data)
+      ) {
         return;
       }
 
@@ -139,6 +179,30 @@ export function setFileInputFiles(input: HTMLInputElement, files: File[]): Promi
   return result.finally(() => {
     input.removeAttribute(ASK_EM_FILE_INPUT_TOKEN_ATTRIBUTE);
   });
+}
+
+export async function setNextTransientFileInputFiles(
+  files: File[],
+  triggerInputClick: () => Promise<void> | void,
+): Promise<void> {
+  const requestId = createDeliveryRequestId();
+  const result = waitForTransientFileInputDeliveryResult(requestId);
+  window.postMessage({
+    source: ASK_EM_BRIDGE_SOURCE,
+    type: ASK_EM_TRANSIENT_FILE_INPUT_DELIVERY,
+    requestId,
+    files,
+  } satisfies AskEmTransientFileInputDeliveryMessage, getPostMessageTargetOrigin());
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+  try {
+    await triggerInputClick();
+  } catch (error) {
+    void result.catch(() => undefined);
+    throw error;
+  }
+
+  return result;
 }
 
 export function dispatchPasteFiles(target: HTMLElement, files: File[]): void {

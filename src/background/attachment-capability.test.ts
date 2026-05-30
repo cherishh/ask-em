@@ -93,4 +93,16 @@ describe('provider attachment capability gate', () => {
       reason: 'gemini attachment count not supported',
     });
   });
+
+  it('rejects Manus multi-file batches on the free-plan target cap', () => {
+    expect(
+      checkProviderAttachmentCapability('manus', [
+        { id: 'a1', name: 'one.txt', mime: 'text/plain', size: 1 },
+        { id: 'a2', name: 'two.txt', mime: 'text/plain', size: 1 },
+      ]),
+    ).toEqual({
+      ok: false,
+      reason: 'manus attachment count not supported',
+    });
+  });
 });

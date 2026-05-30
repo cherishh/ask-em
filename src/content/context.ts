@@ -1,4 +1,5 @@
 import type {
+  ProviderDeliveryResult,
   ShortcutConfig,
   WorkspaceSummary,
 } from '../runtime/protocol';
@@ -17,6 +18,7 @@ export type PresenceResponse = {
 
 export type SubmitResponse = PresenceResponse & {
   synced?: boolean;
+  deliveryResults?: ProviderDeliveryResult[];
 };
 
 type PresenceContextTransitionInput = {

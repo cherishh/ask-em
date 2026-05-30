@@ -62,6 +62,7 @@ export type WorkspaceIssue =
   | 'loading'
   | 'delivery-failed'
   | 'error-page'
+  | 'attachment-limit'
   | 'unsupported-attachment';
 
 export type DefaultEnabledProviders = Record<Provider, boolean>;

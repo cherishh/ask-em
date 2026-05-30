@@ -996,7 +996,7 @@ describe('background submit routing', () => {
         w1: {
           ...localState.workspaces.w1,
           memberIssues: {
-            gemini: 'unsupported-attachment',
+            gemini: 'attachment-limit',
           },
         },
       },
@@ -1070,7 +1070,7 @@ describe('background submit routing', () => {
         }),
       ]),
     );
-    expect(result.workspaceSummary?.memberIssues.gemini).toBe('unsupported-attachment');
+    expect(result.workspaceSummary?.memberIssues.gemini).toBe('attachment-limit');
   });
 
   it('does not fan out when submit comes from a claimed tab on an unrelated existing session', async () => {

@@ -40,7 +40,7 @@ describe('classifyDeliveryIssue', () => {
     ).toBe('loading');
   });
 
-  it('maps attachment capability failures to unsupported-attachment', () => {
+  it('maps attachment type failures to unsupported-attachment', () => {
     expect(
       classifyDeliveryIssue({
         provider: 'chatgpt',
@@ -48,5 +48,15 @@ describe('classifyDeliveryIssue', () => {
         reason: 'chatgpt attachment type not supported',
       }),
     ).toBe('unsupported-attachment');
+  });
+
+  it('maps attachment count failures to attachment-limit', () => {
+    expect(
+      classifyDeliveryIssue({
+        provider: 'manus',
+        ok: false,
+        reason: 'manus attachment count not supported',
+      }),
+    ).toBe('attachment-limit');
   });
 });

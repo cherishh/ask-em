@@ -62,7 +62,7 @@ type DragState = {
 const DRAG_THRESHOLD_PX = 6;
 const FALLBACK_PILL_WIDTH = 260;
 const FALLBACK_PILL_HEIGHT = 44;
-const TOAST_VISIBLE_MS = 10_000;
+const TOAST_VISIBLE_MS = 20_000;
 
 function matchesShortcut(event: KeyboardEvent, binding: ShortcutBinding): boolean {
   const apple = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
@@ -141,6 +141,26 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     toast.setAttribute('role', 'status');
     toast.setAttribute('aria-live', 'polite');
     shell.appendChild(toast);
+  }
+
+  let toastMessage = toast.querySelector('.ask-em-toast-message') as HTMLSpanElement | null;
+  if (!toastMessage) {
+    const existingText = toast.textContent ?? '';
+    toast.textContent = '';
+    toastMessage = document.createElement('span');
+    toastMessage.className = 'ask-em-toast-message';
+    toastMessage.textContent = existingText;
+    toast.appendChild(toastMessage);
+  }
+
+  let toastCloseButton = toast.querySelector('.ask-em-toast-close') as HTMLButtonElement | null;
+  if (!toastCloseButton) {
+    toastCloseButton = document.createElement('button');
+    toastCloseButton.type = 'button';
+    toastCloseButton.className = 'ask-em-toast-close';
+    toastCloseButton.setAttribute('aria-label', 'Close notification');
+    toastCloseButton.textContent = 'x';
+    toast.appendChild(toastCloseButton);
   }
 
   let mount = document.getElementById(mountId) as HTMLButtonElement | null;
@@ -283,21 +303,26 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     }
   };
 
+  const clearToastTimer = () => {
+    if (toastTimer !== null) {
+      window.clearTimeout(toastTimer);
+      toastTimer = null;
+    }
+  };
+
   const hideToast = () => {
+    clearToastTimer();
     toast.dataset.visible = 'false';
   };
 
   const showToast = (message: string, tone: 'neutral' | 'warning' = 'neutral') => {
-    if (toastTimer !== null) {
-      window.clearTimeout(toastTimer);
-    }
+    clearToastTimer();
 
-    toast.textContent = message;
+    toastMessage.textContent = message;
     toast.dataset.tone = tone;
     toast.dataset.visible = 'true';
     toastTimer = window.setTimeout(() => {
       hideToast();
-      toastTimer = null;
     }, TOAST_VISIBLE_MS);
   };
 
@@ -648,6 +673,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     applyPlacement();
   };
   window.addEventListener('resize', handleWindowResize);
+  toastCloseButton.addEventListener('click', hideToast);
 
   applyPlacement();
   void loadIndicatorPlacement(adapter.name).then((savedPlacement) => {
@@ -712,9 +738,8 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       await resetPosition();
     },
     destroy() {
-      if (toastTimer !== null) {
-        window.clearTimeout(toastTimer);
-      }
+      clearToastTimer();
+      toastCloseButton.removeEventListener('click', hideToast);
       mount.removeEventListener('click', handleMountClick);
       mount.removeEventListener('mousemove', handleMountMouseMove);
       mount.removeEventListener('mouseleave', handleMountMouseLeave);

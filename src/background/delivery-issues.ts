@@ -9,10 +9,13 @@ export function classifyDeliveryIssue(result: ProviderDeliveryResult): Workspace
 
   const normalizedReason = (result.reason ?? '').toLowerCase();
 
+  if (normalizedReason.includes('attachment count not supported')) {
+    return 'attachment-limit';
+  }
+
   if (
     normalizedReason.includes('attachment not supported') ||
-    normalizedReason.includes('attachment type not supported') ||
-    normalizedReason.includes('attachment count not supported')
+    normalizedReason.includes('attachment type not supported')
   ) {
     return 'unsupported-attachment';
   }

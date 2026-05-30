@@ -52,6 +52,7 @@ function isWarningIssue(issue: WorkspaceIssue | null | undefined) {
     issue === 'loading' ||
     issue === 'delivery-failed' ||
     issue === 'error-page' ||
+    issue === 'attachment-limit' ||
     issue === 'unsupported-attachment'
   );
 }

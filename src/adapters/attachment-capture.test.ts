@@ -37,6 +37,51 @@ describe('attachment capture file extraction', () => {
 });
 
 describe('attachment submit snapshot resolution', () => {
+  it('deduplicates the same file reported by overlapping capture events', () => {
+    const buffer = new ComposerAttachmentCaptureBuffer();
+    const first = new File(['a'], 'report.pdf', {
+      type: 'application/pdf',
+      lastModified: 123,
+    });
+    const duplicate = new File(['a'], 'report.pdf', {
+      type: 'application/pdf',
+      lastModified: 123,
+    });
+
+    expect(buffer.addFiles([first], 'transient-file-input')).toHaveLength(1);
+    expect(buffer.addFiles([duplicate], 'file-input')).toHaveLength(0);
+    expect(buffer.resolveAttachmentsForSubmit({
+      count: 1,
+      items: ['report.pdf'],
+    })).toMatchObject({
+      capturedCount: 1,
+      currentCount: 1,
+      submittedCount: 1,
+    });
+  });
+
+  it('keeps duplicate file entries from the same capture event', () => {
+    const buffer = new ComposerAttachmentCaptureBuffer();
+    const first = new File(['a'], 'report.pdf', {
+      type: 'application/pdf',
+      lastModified: 123,
+    });
+    const second = new File(['a'], 'report.pdf', {
+      type: 'application/pdf',
+      lastModified: 123,
+    });
+
+    expect(buffer.addFiles([first, second], 'file-input')).toHaveLength(2);
+    expect(buffer.resolveAttachmentsForSubmit({
+      count: 2,
+      items: ['report.pdf', 'report.pdf'],
+    })).toMatchObject({
+      capturedCount: 2,
+      currentCount: 2,
+      submittedCount: 2,
+    });
+  });
+
   it('fails closed when duplicate captured filenames become ambiguous at submit time', () => {
     const buffer = new ComposerAttachmentCaptureBuffer();
     buffer.addFiles([

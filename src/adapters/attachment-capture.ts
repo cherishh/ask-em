@@ -7,6 +7,8 @@ import type {
 
 type AttachmentSource = CapturedAttachment['source'];
 
+const DUPLICATE_CAPTURE_WINDOW_MS = 1_000;
+
 const MIME_BY_EXTENSION: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -67,6 +69,16 @@ function normalizeName(file: File, source: AttachmentSource, index: number): str
 
   const extension = EXTENSION_BY_MIME[file.type.trim().toLowerCase()] ?? 'bin';
   return `${source}-${index + 1}.${extension}`;
+}
+
+function getFileCaptureKey(file: File): string {
+  const lastModified = typeof file.lastModified === 'number' ? file.lastModified : 0;
+  return [
+    file.name.trim().toLowerCase(),
+    file.type.trim().toLowerCase(),
+    file.size,
+    lastModified,
+  ].join('\u0000');
 }
 
 export function normalizeCapturedFiles(
@@ -168,13 +180,33 @@ function findCapturedAttachmentForSnapshotItem(
 
 export class ComposerAttachmentCaptureBuffer {
   private attachments: CapturedAttachment[] = [];
+  private recentCaptureAtByFileKey = new Map<string, number>();
 
   addFiles(files: File[], source: AttachmentSource): CapturedAttachment[] {
     if (files.length === 0) {
       return [];
     }
 
-    const captured = normalizeCapturedFiles(files, source);
+    const now = Date.now();
+    for (const [key, capturedAt] of this.recentCaptureAtByFileKey) {
+      if (now - capturedAt > DUPLICATE_CAPTURE_WINDOW_MS) {
+        this.recentCaptureAtByFileKey.delete(key);
+      }
+    }
+
+    const recentlyCapturedKeys = new Set(this.recentCaptureAtByFileKey.keys());
+    const filesToAdd = files.filter((file) => {
+      return !recentlyCapturedKeys.has(getFileCaptureKey(file));
+    });
+    if (filesToAdd.length === 0) {
+      return [];
+    }
+
+    const captured = normalizeCapturedFiles(filesToAdd, source);
+    for (const file of filesToAdd) {
+      this.recentCaptureAtByFileKey.set(getFileCaptureKey(file), now);
+    }
+
     this.attachments = [...this.attachments, ...captured];
     return captured;
   }
@@ -281,5 +313,6 @@ export class ComposerAttachmentCaptureBuffer {
 
   clear() {
     this.attachments = [];
+    this.recentCaptureAtByFileKey.clear();
   }
 }

@@ -382,6 +382,30 @@ describe('content indicator presentation', () => {
     });
   });
 
+  it('counts attachment limit issues as set warnings', () => {
+    const summary = createWorkspaceSummary({
+      memberIssues: {
+        claude: null,
+        chatgpt: 'attachment-limit',
+        gemini: null,
+      },
+    });
+
+    expect(countWorkspaceIssues(summary)).toBe(1);
+    expect(
+      getContentIndicatorPresentation(
+        createInput({
+          hasWorkspace: true,
+          workspaceSummary: summary,
+        }),
+      ),
+    ).toMatchObject({
+      syncLabel: '1 model needs attention',
+      syncTone: 'warning',
+      alertLevel: 'set-warning',
+    });
+  });
+
   it('shows initial sync progress before any target has completed', () => {
     expect(
       getContentIndicatorPresentation(

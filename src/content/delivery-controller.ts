@@ -55,7 +55,7 @@ async function waitForAttachmentPresence(
       return current;
     }
 
-    await new Promise((resolve) => window.setTimeout(resolve, ATTACHMENT_DELIVERY_POLL_MS));
+    await new Promise((resolve) => globalThis.setTimeout(resolve, ATTACHMENT_DELIVERY_POLL_MS));
   }
 
   throw new Error(

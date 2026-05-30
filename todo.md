@@ -28,7 +28,7 @@
 - MAIN-world transient input hook 必须 narrow、idempotent、可 teardown，只观察 `input[type=file]`，并通过受控 bridge 把文件交回 isolated content script。
 - ask'em v1 不阻止源 provider 原生发送。capture 失败、超预算/超限、submit-time source snapshot 无法确认当前附件时，只跳过附件 fan-out 并提示 indicator。
 - Target fan-out 不依赖 synthetic drop。drop 只用于 source capture。
-- Adapter 必须能控制 payload 顺序；默认 text-first，但 Manus 可能需要 attach-first。
+- Adapter 必须能控制 payload 顺序；默认 text-first。Manus 现场验证后也走 text-first，附件注入细节仍留在 Manus adapter。
 - **预算与上限（本轮调整）**：
   - 每次 submit 最多 `20 files`（`ATTACHMENT_MAX_COUNT`）。
   - **单文件 ≤ `25 MB`（`ATTACHMENT_MAX_FILE_BYTES`，新增）**。超过则跳过附件 fan-out + 提示 `attachment too large`，不阻断原生发送。
@@ -60,7 +60,7 @@
   - `source: 'paste' | 'drop' | 'file-input' | 'transient-file-input'`
 - [ ] `UserSubmitMessage` 增加 `attachments: AttachmentRef[]`（text-only 为空数组）+ `submitId`（content 过 dedupe 后铸的唯一 handle，贯穿 staging create、bind、release [R2-P1-2]）。
 - [ ] `DeliverPromptMessage` 增加 `attachments: AttachmentRef[]`，text-only 时为空数组。
-- [ ] `WorkspaceIssue` 增加 `unsupported-attachment`。
+- [ ] `WorkspaceIssue` 增加 `unsupported-attachment` / `attachment-limit`。
 - [ ] `ProviderAdapter` 增加 `uploadCapability?: UploadCapability`。
 - [ ] `ProviderComposerAdapter` 增加 `setComposerPayload?({ text, attachments })`。
 - [ ] `ProviderComposerAdapter` 增加 `detectAttachmentUploadError?()`（先 TODO stub，smoke test 补 selector）。
@@ -159,12 +159,12 @@ type UploadCapability = {
 
 - [ ] gate 逻辑：source 侧 `isPlainText` byte sniff + background blacklist；先拒绝音视频/压缩包/可执行/字体等，再允许图片、常见文档、实际文本或明确文本 MIME/extension。
 - [ ] 不能证明是图片/常见文档/实际文本，或 blacklist 命中 → 判 `unsupported-attachment`。
-- [ ] count 超 `min(ATTACHMENT_MAX_COUNT, capability.maxFiles)` → `unsupported-attachment`。
+- [ ] count 超 `min(ATTACHMENT_MAX_COUNT, capability.maxFiles)` → `attachment-limit`。
 - [ ] capability 为 `null` 的 provider → `unsupported-attachment`，跳过该 provider，不重试，不影响其他 provider。
 
 ## UI 和 Issue
 
-- [ ] **`unsupported-attachment` presentation helper 与 Phase 2 capability gate 同批完成**（不拖到 Phase 6），否则 background 已产 issue、UI 解释不了。展示短语如 `attachment not supported`。
+- [ ] **`unsupported-attachment` / `attachment-limit` presentation helper 与 Phase 2 capability gate 同批完成**（不拖到 Phase 6），否则 background 已产 issue、UI 解释不了。展示短语如 `attachment not supported` / `attachment limit exceeded`。
 - [ ] target attachment upload rejection 使用现有 `delivery-failed`，展示 `upload failed`。
 - [ ] 不增加新的 uploading phase，继续复用现有 syncing/failure 状态。
 - [ ] debug log CSV 测试中 grep，确保没有 base64 或 dataURL。
@@ -220,13 +220,14 @@ type UploadCapability = {
 - [x] 为 Claude / ChatGPT / Gemini / DeepSeek / Manus 声明 blacklist + image/text/document/count capability。
 - [x] background delivery 增加 capability gate（blacklist、图片、常见文档、actual plain text、count gate）。
 - [x] mixed 附件 all-or-nothing → `unsupported-attachment` [P2-a]。
+- [x] target 附件数量超 provider 上限 → `attachment-limit`，跳过该 target，不拆分、不发纯文本。
 - [x] 不支持时返回 `unsupported-attachment`，不影响其他 provider。
-- [x] **presentation helper 支持 `unsupported-attachment`（同批）**。
+- [x] **presentation helper 支持 `unsupported-attachment` / `attachment-limit`（同批）**。
 
 验收：
 - [x] text-only 行为不变。
 - [x] synthetic attachment payload 的 capability gate 测试通过（含 mixed all-or-nothing、actual plain text、blacklist、extension 兜底、空-空→unsupported）。
-- [x] presentation helper 测试覆盖 `unsupported-attachment`。
+- [x] presentation helper 测试覆盖 `unsupported-attachment` / `attachment-limit`。
 
 ### Phase 2.5：Source-capture Spike（执行前 spike）
 
@@ -293,7 +294,7 @@ type UploadCapability = {
   - [x] ChatGPT：target composer DOM 已复核（`form[data-type="unified-composer"]` / `#upload-files` / file tile / submit button）。
   - [x] Gemini：target composer DOM 已复核（`.ql-editor[aria-label="Enter a prompt for Gemini"]` / `uploader-file-preview` / `gem-attachment` / `button[aria-label="Send message"]`；长文件名会在 visible chip 截断，完整 filename 在 `aria-describedby` tooltip；当前无稳定 file input）。
   - [x] DeepSeek：target composer DOM 已复核（`textarea[placeholder="Message DeepSeek"]` / composer-scoped hidden `input[type="file"][multiple]` / `.ds-animated-size-item` / `div.ds-icon-button[role="button"][aria-disabled]`）。
-  - [ ] Manus。
+  - [x] Manus：target composer DOM 已复核（`.tiptap.ProseMirror` / plus tools button / `role=dialog` 菜单项 `Add from local files` / transient `<input type="file" multiple>` / `[class*="group/attach"]` attachment card / `+N` aggregate / `bg-[var(--Button-black)]` send button；free plan 一次选 2 个文件会弹 `You can upload up to 1 file at once` modal）。
 - [ ] 每家 provider 的 adapter 测试都覆盖：
   - [x] Claude/ChatGPT 当前链路覆盖注入、presence、baseline+delta、同名重复附件和 source snapshot 过滤。
   - [x] Gemini 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
@@ -304,10 +305,10 @@ type UploadCapability = {
   - [x] DeepSeek target 已有旧草稿附件时，baseline+delta 不误判。
   - [x] DeepSeek 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`（通用 controller gate + adapter fail-fast/old-draft fixture）。
   - [x] DeepSeek 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认（adapter fixture 覆盖多文件/同名 preview 计数；真实 smoke 待手测）。
-  - [ ] Manus 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
-  - [ ] Manus target 已有旧草稿附件时，baseline+delta 不误判。
-  - [ ] Manus 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`。
-  - [ ] Manus 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认。
+  - [x] Manus 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key（visible cards 有 keys；`+N` 聚合时保留 count delta）。
+  - [x] Manus target 已有旧草稿附件时，baseline+delta 不误判（adapter fixture 覆盖可见卡 + 聚合 count）。
+  - [x] Manus 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`（通用 controller gate + transient delivery timeout）。
+  - [x] Manus free-plan 多文件作为 target 时由 capability gate 拦截为 `attachment-limit`，不进入 transient 注入；adapter 仍能识别 Manus 自身 `up to 1 file` modal 为 `upload failed` 兜底。
 - [ ] 每家 smoke 后复核 `uploadCapability`，若 provider 实际拒绝某类文件，收紧该 provider capability。
 - [ ] 保持 debug log 只记生命周期/bytes/count/id prefix，不记 base64、dataURL、完整 filename。
 
@@ -340,7 +341,7 @@ type UploadCapability = {
 
 - [x] 实测 Gemini 当前 composer DOM：`.ql-editor`、附件 chip/preview、upload error、send button。
 - [x] 实现 Gemini `setComposerPayload`：
-  - [x] 默认 text-first。
+  - [x] attach-first：先清空文本并注入附件，等 attachment-only send readiness delta 后再写入 prompt 文本。
   - [x] 优先 synthetic paste 注入附件。
   - [ ] 若 Gemini 只接受 file picker/input，改为 Gemini provider override，不改 delivery core。
   - [x] suppression 覆盖文本写入和附件注入。
@@ -348,6 +349,7 @@ type UploadCapability = {
   - [x] count delta。
   - [x] filename/preview key 可用时返回 keys。
   - [x] 旧草稿附件不参与新增确认。
+- [x] Gemini 不依赖固定 delay：preview presence delta 之后必须等无文本状态下 send button 因附件 ready 而可用，再写文本；失败 fail closed。
 - [x] 实现或明确保留 Gemini `detectAttachmentUploadError()`：
   - [x] unsupported file / upload failed / retry / toast。
   - [ ] 真实 upload rejection smoke 后补更精确 selector（如果当前 selector 漏报则保留 30s timeout 兜底）。
@@ -355,6 +357,7 @@ type UploadCapability = {
   - [x] adapter DOM fixture 覆盖 payload injection path。
   - [x] presence baseline+delta 测试覆盖已有旧附件。
   - [x] delivery-controller 负向测试覆盖 Gemini presence 不足不 submit（通用 controller 已覆盖，Gemini adapter fixture 覆盖 count/key）。
+  - [x] Gemini adapter 测试覆盖 attachment-only ready 前不写文本、旧草稿同名附件不提前放行，以及 upload error 时 fail closed。
 - [ ] 手测：
   - [ ] Claude/任一 source → Gemini target：单图。
   - [ ] Claude/任一 source → Gemini target：`.md/.txt`。
@@ -386,30 +389,32 @@ type UploadCapability = {
 
 #### Phase 5.4：Manus target delivery
 
-- [ ] 实测 Manus 当前 composer DOM：`.tiptap.ProseMirror`、工具按钮、`Add from local files` 菜单项、transient input、附件 chip、upload error、send button。
-- [ ] 实现 Manus `setComposerPayload`：
-  - [ ] 明确 payload 顺序：若实测需要 attach-first，就在 Manus adapter override，不改 delivery core。
-  - [ ] 点击 composer-scoped 工具按钮。
-  - [ ] 选择 `Add from local files`。
-  - [ ] 复用 Phase 3.5 MAIN-world transient input bridge，把文件注入 transient input。
-  - [ ] 任一步找不到目标时关闭菜单/清理 hook 后 fail fast。
-  - [ ] suppression 覆盖 menu-triggered transient input 的 `input/change`。
-- [ ] 实现 Manus `getComposerAttachmentPresence(expected)`：
-  - [ ] count delta。
-  - [ ] 可用 filename/preview key 时精确匹配。
-  - [ ] 同名重复文件无法唯一确认时 fail-closed。
-- [ ] 实现或明确保留 Manus `detectAttachmentUploadError()`：
-  - [ ] upload failed / unsupported / retry / toast。
-  - [ ] 无稳定 selector 时靠 timeout，并记录 TODO evidence。
-- [ ] 测试：
-  - [ ] adapter DOM fixture 覆盖菜单触发路径。
-  - [ ] transient hook teardown 测试覆盖成功、失败、timeout。
-  - [ ] presence baseline+delta 测试覆盖已有旧附件。
-  - [ ] delivery-controller 负向测试覆盖 Manus presence 不足不 submit。
+- [x] 实测 Manus 当前 composer DOM：`.tiptap.ProseMirror`、工具按钮、`Add from local files` 菜单项、transient input、附件 chip、upload error、send button。
+- [x] 实现 Manus `setComposerPayload`：
+  - [x] 明确 payload 顺序：text-first；附件通过 Manus adapter override 注入，不改 delivery core。
+  - [x] capability 收紧为 `maxFiles=1`；多文件 fan-out 到 Manus target 时跳过该 target，不触发 Manus 升级 modal。
+  - [x] 点击 composer-scoped 工具按钮。
+  - [x] 选择 `Add from local files`。
+  - [x] 复用 Phase 3.5 MAIN-world transient input bridge，把文件注入 transient input。
+  - [x] 任一步找不到目标时 fail fast；pending transient delivery 有 timeout 清理。
+  - [x] suppression 覆盖 menu-triggered transient input 的 `input/change`。
+- [x] 实现 Manus `getComposerAttachmentPresence(expected)`：
+  - [x] count delta。
+  - [x] 可用 filename/preview key 时精确匹配。
+  - [x] `+N` 聚合隐藏 filenames 时只返回 count，不返回不完整 keys，避免 key 误导。
+- [x] 实现或明确保留 Manus `detectAttachmentUploadError()`：
+  - [x] upload failed / unsupported / retry / toast。
+  - [x] free-plan 多文件 modal（`You can upload up to 1 file at once`）识别为 `upload failed`。
+  - [x] 无稳定 selector 时保留 30s timeout 兜底。
+- [x] 测试：
+  - [x] adapter DOM fixture 覆盖菜单触发路径。
+  - [x] transient hook teardown 测试覆盖成功、失败、timeout。
+  - [x] presence baseline+delta 测试覆盖已有旧附件。
+  - [x] delivery-controller 负向测试覆盖 Manus presence 不足不 submit（通用 controller gate 已覆盖，Manus adapter fixture 提供 count/key 负样本）。
 - [ ] 手测：
   - [ ] Claude/任一 source → Manus target：单图。
   - [ ] Claude/任一 source → Manus target：`.md/.txt`。
-  - [ ] Claude/任一 source → Manus target：多文件。
+  - [ ] Claude/任一 source → Manus target：多文件应跳过 Manus target 并展示 `attachment limit exceeded` / toast，其他 provider 不受影响。
 
 #### Phase 5.5：Provider delivery 收口
 
@@ -421,13 +426,13 @@ type UploadCapability = {
 
 ### Phase 6：UI Surfacing
 
-- [ ] indicator/popup 展示 `attachment not supported`（presentation helper 已在 Phase 2 就绪，这里接线）。
+- [ ] indicator/popup 展示 `attachment not supported` / `attachment limit exceeded`（presentation helper 已在 Phase 2 就绪，这里接线）。
 - [ ] target 上传失败展示 `upload failed`。
 - [ ] 不增加新 uploading 状态。
 - [ ] debug logs 不含 payload（grep 测试）。
 
 验收：
-- [ ] 不支持附件时 popup 能看到 `attachment not supported`。
+- [ ] 不支持附件时 popup 能看到 `attachment not supported`；超 target 数量上限时能看到 `attachment limit exceeded`。
 - [ ] target 上传失败时能看到 `upload failed`。
 - [ ] log grep 无 base64/dataURL。
 

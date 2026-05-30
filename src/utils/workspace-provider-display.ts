@@ -94,6 +94,14 @@ export function getWorkspaceProviderDisplay(
     };
   }
 
+  if (input.memberIssue === 'attachment-limit') {
+    return {
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Attachment limit exceeded',
+    };
+  }
+
   if (input.memberIssue === 'unsupported-attachment') {
     return {
       kind: 'needs-attention',
@@ -149,6 +157,7 @@ export function getWorkspaceProviderDotState(
     input.memberIssue === 'loading' ||
     input.memberIssue === 'delivery-failed' ||
     input.memberIssue === 'error-page' ||
+    input.memberIssue === 'attachment-limit' ||
     input.memberIssue === 'unsupported-attachment'
   ) {
     return 'warning';

@@ -3,6 +3,9 @@ import { createDomProviderAdapter } from './factory';
 import { dispatchPasteFiles, readAttachmentFiles } from './attachment-delivery';
 import { PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef } from '../runtime/protocol';
 
+const GEMINI_ATTACHMENT_READY_TIMEOUT_MS = 30_000;
+const GEMINI_ATTACHMENT_READY_POLL_MS = 250;
+
 export function isGeminiLoginRequiredPage(input: {
   pathname: string;
   buttonTexts: string[];
@@ -83,7 +86,7 @@ function getGeminiAttachmentItems(container: ParentNode, expectedAttachments?: A
     }
 
     const usedIndexes = new Set<number>();
-    const matchedItems: string[] = [];
+    let matchedExpectedCount = 0;
     for (const expectedName of expectedNames) {
       const matchedIndex = candidateTexts.findIndex((text, index) => {
         if (usedIndexes.has(index)) {
@@ -99,11 +102,23 @@ function getGeminiAttachmentItems(container: ParentNode, expectedAttachments?: A
 
       if (matchedIndex >= 0) {
         usedIndexes.add(matchedIndex);
-        matchedItems.push(expectedName.name);
+        matchedExpectedCount += 1;
       }
     }
 
-    return matchedItems;
+    if (matchedExpectedCount < expectedNames.length) {
+      return [];
+    }
+
+    return candidateTexts.flatMap((text) => {
+      const compactText = compactAttachmentText(text);
+      const matchedExpected = expectedNames.find((expectedName) => (
+        (expectedName.full && compactText.includes(expectedName.full)) ||
+        (expectedName.stem && compactText.includes(expectedName.stem))
+      ));
+
+      return matchedExpected ? [matchedExpected.name] : [];
+    });
   };
   const selectors = [
     '.gem-attachment-text',
@@ -128,6 +143,53 @@ function getGeminiAttachmentItems(container: ParentNode, expectedAttachments?: A
   }
 
   return [];
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+}
+
+function isGeminiSendButtonEnabled(button: HTMLElement | null): boolean {
+  if (!button || !isVisible(button)) {
+    return false;
+  }
+
+  const className = typeof button.className === 'string' ? button.className.toLowerCase() : '';
+  return (
+    !button.hasAttribute('disabled') &&
+    button.getAttribute('aria-disabled') !== 'true' &&
+    button.getAttribute('data-disabled') !== 'true' &&
+    !className.includes('disabled')
+  );
+}
+
+async function waitForGeminiAttachmentOnlySubmitReady(
+  context: {
+    findComposer: () => HTMLElement | null;
+    findSendButton: () => HTMLElement | null;
+  },
+  expectedAttachments: AttachmentRef[],
+  baselineCount: number,
+): Promise<void> {
+  const deadline = Date.now() + GEMINI_ATTACHMENT_READY_TIMEOUT_MS;
+  const expectedCount = baselineCount + expectedAttachments.length;
+
+  while (Date.now() <= deadline) {
+    const uploadError = detectGeminiUploadErrorText();
+    if (uploadError) {
+      throw new Error(uploadError);
+    }
+
+    const container = findGeminiComposerRoot(context.findComposer(), context.findSendButton());
+    const items = getGeminiAttachmentItems(container, expectedAttachments);
+    if (items.length >= expectedCount && isGeminiSendButtonEnabled(context.findSendButton())) {
+      return;
+    }
+
+    await sleep(GEMINI_ATTACHMENT_READY_POLL_MS);
+  }
+
+  throw new Error('upload failed');
 }
 
 function detectGeminiUploadErrorText(): string | null {
@@ -177,20 +239,25 @@ export const geminiAdapter = createDomProviderAdapter({
   },
   composerSelectors: ['.ql-editor[role="textbox"]', '[aria-label="Enter a prompt for Gemini"]'],
   sendButtonSelectors: ['button[aria-label="Send message"]', 'button.send-button[aria-label="Send message"]'],
+  isSendButtonEnabled: isGeminiSendButtonEnabled,
   errorKeywords: ['something went wrong', 'try again in a bit'],
   async setComposerPayload(payload, context) {
-    await context.setComposerText(payload.text);
-
     if (payload.attachments.length === 0) {
+      await context.setComposerText(payload.text);
       return;
     }
 
+    await context.setComposerText('');
     const composer = context.findComposer();
     if (!composer) {
       throw new Error('upload failed');
     }
 
+    const baselineContainer = findGeminiComposerRoot(composer, context.findSendButton());
+    const baselineCount = getGeminiAttachmentItems(baselineContainer, payload.attachments).length;
     dispatchPasteFiles(composer, await readAttachmentFiles(payload.attachments));
+    await waitForGeminiAttachmentOnlySubmitReady(context, payload.attachments, baselineCount);
+    await context.setComposerText(payload.text);
   },
   getComposerAttachmentPresence({ findComposer, findSendButton }, expectedAttachments) {
     const container = findGeminiComposerRoot(findComposer(), findSendButton());

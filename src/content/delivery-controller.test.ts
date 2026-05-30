@@ -54,6 +54,7 @@ function createAdapter(overrides: Partial<NonNullable<ProviderAdapter['composer'
       setComposerText: vi.fn(),
       setComposerPayload: vi.fn(),
       getComposerAttachmentPresence: vi.fn()
+        .mockResolvedValue({ count: 1 })
         .mockResolvedValueOnce({ count: 0 })
         .mockResolvedValueOnce({ count: 1 }),
       detectAttachmentUploadError: vi.fn(() => null),

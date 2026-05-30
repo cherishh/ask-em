@@ -126,6 +126,77 @@ describe('submit controller attachment staging', () => {
     expect(onConsumed).toHaveBeenCalled();
   });
 
+  it('shows a provider-limit toast when a target skips an over-count attachment batch', async () => {
+    const sendMessage = vi.fn(async (message: { type: string; attachmentId?: string }) => {
+      if (message.type === 'ATTACHMENT_FINALIZE') {
+        return {
+          ok: true,
+          ref: {
+            id: message.attachmentId ?? 'a1',
+            name: `${message.attachmentId ?? 'a1'}.txt`,
+            mime: 'text/plain',
+            size: 3,
+          },
+        };
+      }
+
+      if (message.type === 'USER_SUBMIT') {
+        return {
+          ok: true,
+          synced: true,
+          workspaceId: 'w1',
+          providerEnabled: true,
+          globalSyncEnabled: true,
+          canStartNewSet: true,
+          deliveryResults: [
+            { provider: 'manus', ok: false, reason: 'manus attachment count not supported' },
+            { provider: 'chatgpt', ok: true },
+          ],
+        };
+      }
+
+      return { ok: true };
+    });
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const state = createState();
+    const controller = createSubmitController(createAdapter(), state as any, {
+      reportPresence: vi.fn(),
+      logDebug: vi.fn(),
+    });
+
+    await controller.reportUserSubmit({
+      text: 'hello',
+      attachments: [
+        {
+          id: 'a1',
+          name: 'one.txt',
+          mime: 'text/plain',
+          size: 3,
+          source: 'file-input',
+          file: new File(['one'], 'one.txt', { type: 'text/plain' }),
+        },
+        {
+          id: 'a2',
+          name: 'two.txt',
+          mime: 'text/plain',
+          size: 3,
+          source: 'file-input',
+          file: new File(['two'], 'two.txt', { type: 'text/plain' }),
+        },
+      ],
+    });
+
+    expect(state.showToast).toHaveBeenCalledWith(
+      'Manus skipped: this prompt has 2 files; Manus supports 1 file. Other providers synced.',
+      'warning',
+    );
+  });
+
   it('does not write attachments when duplicate submit is skipped', async () => {
     const sendMessage = vi.fn();
     vi.stubGlobal('chrome', {
@@ -236,7 +307,7 @@ describe('submit controller attachment staging', () => {
     });
     expect(state.showCurrentWarning).toHaveBeenCalledWith('attachment sync skipped');
     expect(state.showToast).toHaveBeenCalledWith(
-      'Attachment sync skipped: duplicate filenames are ambiguous.',
+      'Attachment sync skipped: current files could not be confirmed.',
       'warning',
     );
   });

@@ -228,7 +228,8 @@ export const PROVIDER_UPLOAD_CAPABILITIES: Record<Provider, UploadCapability> = 
   },
   manus: {
     ...COMMON_UPLOAD_CAPABILITY,
-    maxFiles: 20,
+    // Manus free plan renders a multiple file input, but rejects batches with an upgrade modal.
+    maxFiles: 1,
   },
 };
 
