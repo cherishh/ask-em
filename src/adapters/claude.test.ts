@@ -124,6 +124,50 @@ describe('Claude attachment delivery adapter', () => {
     });
   });
 
+  it('counts mixed Claude document and PDF preview card shapes together', async () => {
+    document.body.innerHTML = `
+      <fieldset>
+        <input data-testid="file-upload" aria-label="Upload files" type="file" />
+        <div>
+          <div data-testid="file-thumbnail">
+            <button aria-label="test3.html, html, 146 lines">
+              <div>test3.html</div>
+              <div>146 lines</div>
+              <div>HTML</div>
+            </button>
+          </div>
+          <div>
+            <img alt="The_Murders.pdf" />
+            <button type="button" aria-label="Remove The_Murders.pdf"></button>
+          </div>
+          <div data-testid="chat-input" contenteditable="true"></div>
+          <button type="button" aria-label="Send message"></button>
+        </div>
+      </fieldset>
+    `;
+
+    await expect(Promise.resolve(claudeAdapter.composer?.getComposerAttachmentPresence?.([
+      {
+        id: 'a1',
+        name: 'The_Murders.pdf',
+        mime: 'application/pdf',
+        size: 3,
+      },
+      {
+        id: 'a2',
+        name: 'test3.html',
+        mime: 'text/html',
+        size: 3,
+      },
+    ]))).resolves.toMatchObject({
+      count: 2,
+      keys: expect.arrayContaining([
+        expect.stringContaining('The_Murders.pdf'),
+        expect.stringContaining('test3.html'),
+      ]),
+    });
+  });
+
   it('reads submit-time source attachment snapshots from Claude file cards', () => {
     document.body.innerHTML = `
       <fieldset>

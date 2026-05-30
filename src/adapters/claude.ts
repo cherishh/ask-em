@@ -129,6 +129,41 @@ function compactAttachmentText(value: string): string {
   return normalizeWhitespace(value).replace(/\s+/g, '').toLowerCase();
 }
 
+function getClaudeAttachmentCandidateTexts(container: ParentNode): string[] {
+  if (!(container instanceof Element || container instanceof Document)) {
+    return [];
+  }
+
+  const fileThumbnailItems = Array.from(container.querySelectorAll<HTMLElement>('[data-testid="file-thumbnail"]'))
+    .filter(isVisible)
+    .map(getElementTreeAccessibleText)
+    .filter(Boolean);
+
+  // Claude document/PDF cards often expose the filename through per-file remove
+  // buttons. Counting buttons preserves same-name duplicates better than a set
+  // of filename keys.
+  const removeButtonItems = Array.from(container.querySelectorAll<HTMLElement>('button[aria-label^="Remove " i]'))
+    .filter(isVisible)
+    .map(getElementAccessibleText)
+    .filter(Boolean);
+  const removeButtonTexts = removeButtonItems.map(compactAttachmentText);
+
+  // Fallback for current Claude file cards where the only stable filename is
+  // the thumbnail img alt text; this is not image-only logic. If a named remove
+  // control already represents the same card, skip the img to avoid double
+  // counting one PDF.
+  const imageAltItems = Array.from(container.querySelectorAll<HTMLElement>('img[alt]'))
+    .filter(isVisible)
+    .map(getElementAccessibleText)
+    .filter(Boolean)
+    .filter((text) => {
+      const compactText = compactAttachmentText(text);
+      return !removeButtonTexts.some((removeText) => removeText.includes(compactText));
+    });
+
+  return [...fileThumbnailItems, ...removeButtonItems, ...imageAltItems];
+}
+
 function getClaudeAttachmentItems(container: ParentNode, expectedAttachments?: AttachmentRef[]): string[] {
   if (!(container instanceof Element || container instanceof Document)) {
     return [];
@@ -137,39 +172,26 @@ function getClaudeAttachmentItems(container: ParentNode, expectedAttachments?: A
   const expectedNames = (expectedAttachments ?? [])
     .map((attachment) => compactAttachmentText(attachment.name))
     .filter(Boolean);
-  const matchesExpected = (text: string) => (
-    expectedNames.length === 0 ||
-    expectedNames.some((name) => compactAttachmentText(text).includes(name))
-  );
+  const candidates = getClaudeAttachmentCandidateTexts(container);
 
-  const fileThumbnailItems = Array.from(container.querySelectorAll<HTMLElement>('[data-testid="file-thumbnail"]'))
-    .filter(isVisible)
-    .map(getElementTreeAccessibleText)
-    .filter(Boolean)
-    .filter(matchesExpected);
-  if (fileThumbnailItems.length > 0) {
-    return fileThumbnailItems;
+  if (expectedNames.length === 0) {
+    return candidates;
   }
 
-  // Claude document/PDF cards often expose the filename through per-file remove
-  // buttons. Counting buttons preserves same-name duplicates better than a set
-  // of filename keys.
-  const removeButtonItems = Array.from(container.querySelectorAll<HTMLElement>('button[aria-label^="Remove " i]'))
-    .filter(isVisible)
-    .map(getElementAccessibleText)
-    .filter(Boolean)
-    .filter(matchesExpected);
-  if (removeButtonItems.length > 0) {
-    return removeButtonItems;
+  const usedIndexes = new Set<number>();
+  const matchedItems: string[] = [];
+  for (const expectedName of expectedNames) {
+    const matchedIndex = candidates.findIndex((candidate, index) => (
+      !usedIndexes.has(index) &&
+      compactAttachmentText(candidate).includes(expectedName)
+    ));
+    if (matchedIndex >= 0) {
+      usedIndexes.add(matchedIndex);
+      matchedItems.push(candidates[matchedIndex]);
+    }
   }
 
-  // Fallback for current Claude file cards where the only stable filename is
-  // the thumbnail img alt text; this is not image-only logic.
-  return Array.from(container.querySelectorAll<HTMLElement>('img[alt]'))
-    .filter(isVisible)
-    .map(getElementAccessibleText)
-    .filter(Boolean)
-    .filter(matchesExpected);
+  return matchedItems;
 }
 
 function findClaudeSendButton(findComposer: () => HTMLElement | null): HTMLElement | null {

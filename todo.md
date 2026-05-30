@@ -23,7 +23,7 @@
 
 ## 核心决策
 
-- Source capture 覆盖 4 类入口：`paste`、`drop`、稳定 DOM `input[type=file]`、Manus 这类 transient detached file input。
+- Source capture 覆盖 4 类入口：`paste`、`drop`、稳定 DOM `input[type=file]`、Manus/Gemini 这类 transient detached file input。
 - File input capture 不能只看 composer subtree；用 document-level capture，再用 provider-specific scoping 判断是否属于当前 composer。
 - MAIN-world transient input hook 必须 narrow、idempotent、可 teardown，只观察 `input[type=file]`，并通过受控 bridge 把文件交回 isolated content script。
 - ask'em v1 不阻止源 provider 原生发送。capture 失败、超预算/超限、submit-time source snapshot 无法确认当前附件时，只跳过附件 fan-out 并提示 indicator。
@@ -123,7 +123,7 @@ type UploadCapability = {
 - [ ] 在 composer/root 区域监听 `drop`，读取 `dataTransfer.files/items`。
 - [ ] document-level capture `input[type=file] change`，再用 provider-specific scoping 判断是否属于当前 composer。
 - [ ] **填 per-provider「上传按钮 → 文件落点」矩阵**：哪些 provider 按钮上传落在 ISOLATED 可观察的稳定 input，哪些落在 detached input（需 MAIN-world hook）。
-- [ ] MAIN-world transient file-input hook（Manus 类）——见 Phase 3.5，从主 capture 拆出。
+- [ ] MAIN-world transient file-input hook（Manus/Gemini 类）——见 Phase 3.5，从主 capture 拆出。
 - [ ] bridge MAIN world 捕获的文件到 isolated content script（候选机制：`window.postMessage` structured-clone `File[]`；执行前由 Phase 2.5 spike 钉死）。
 - [ ] 为 clipboard 文件无 filename、`file.type` 为空的情况生成 name/mime。
 - [ ] **per-tab in-memory buffer 保存 `File`，capture 时分配稳定 id 并保持到 buffer 清空 [A3]**（不在每次 onSubmit 重新生成 id）。
@@ -231,7 +231,7 @@ type UploadCapability = {
 ### Phase 2.5：Source-capture Spike（执行前 spike）
 
 - [x] 验证 `File` 跨 MAIN→ISOLATED world 回传机制（候选：`window.postMessage` structured-clone `File[]`）。
-- [x] 验证 Manus 类 transient detached input 的捕获可行性。
+- [x] 验证 Manus/Gemini 类 transient detached input 的捕获可行性。
 - [x] 产出：钉死的 bridge 机制说明 + fixture，供 Phase 3/3.5 直接用。
 
 ### Phase 3：Source Capture（paste / drop / 稳定 input）
@@ -253,13 +253,14 @@ type UploadCapability = {
 - [x] duplicate-submit dedupe 仍工作（keydown+click 双触发不产生双写）。
 - [x] 删除附件后 submit-time snapshot 不再包含该文件，本次不再同步已删除附件。
 
-### Phase 3.5：Manus 类 transient input（MAIN-world hook）
+### Phase 3.5：Manus / Gemini 类 transient input（MAIN-world hook）
 
 - [x] 实现 narrow / idempotent / 可 teardown 的 MAIN-world `input[type=file]` hook。
 - [x] 通过 Phase 2.5 钉死的 bridge 把 File 交回 isolated content。
 
 验收：
 - [x] Manus detached input 上传一个已支持附件后 submit，`USER_SUBMIT` 有一个 `AttachmentRef`。
+- [x] Gemini detached input 上传一个已支持附件后 submit，经同一 transient hook 捕获 raw `File`；submit-time snapshot 仍以 Gemini preview 为准。
 
 ### Phase 4：Claude Target Delivery
 
@@ -290,14 +291,14 @@ type UploadCapability = {
 - [ ] 每家 provider 开工前先用 Chrome/extension 实测当前 composer DOM，记录：file injection 入口、attachment preview/chip selector、upload error selector、send button enable 条件。
   - [x] Claude：source snapshot / upload input / PDF preview DOM 已复核（`img[alt]` + `Remove <filename>`，上传后 `input.files` 会清空）。
   - [x] ChatGPT：target composer DOM 已复核（`form[data-type="unified-composer"]` / `#upload-files` / file tile / submit button）。
-  - [ ] Gemini。
+  - [x] Gemini：target composer DOM 已复核（`.ql-editor[aria-label="Enter a prompt for Gemini"]` / `uploader-file-preview` / `gem-attachment` / `button[aria-label="Send message"]`；当前无稳定 file input）。
   - [ ] DeepSeek。
   - [ ] Manus。
 - [ ] 每家 provider 的 adapter 测试都覆盖：
   - [x] Claude/ChatGPT 当前链路覆盖注入、presence、baseline+delta、同名重复附件和 source snapshot 过滤。
-  - [ ] Gemini 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
-  - [ ] Gemini target 已有旧草稿附件时，baseline+delta 不误判。
-  - [ ] Gemini 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`。
+  - [x] Gemini 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
+  - [x] Gemini target 已有旧草稿附件时，baseline+delta 不误判。
+  - [x] Gemini 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`（通用 controller gate + adapter presence fixture）。
   - [ ] Gemini 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认。
   - [ ] DeepSeek 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
   - [ ] DeepSeek target 已有旧草稿附件时，baseline+delta 不误判。
@@ -337,23 +338,23 @@ type UploadCapability = {
 
 #### Phase 5.2：Gemini target delivery
 
-- [ ] 实测 Gemini 当前 composer DOM：`.ql-editor`、附件 chip/preview、upload error、send button。
-- [ ] 实现 Gemini `setComposerPayload`：
-  - [ ] 默认 text-first。
-  - [ ] 优先 synthetic paste 注入附件。
+- [x] 实测 Gemini 当前 composer DOM：`.ql-editor`、附件 chip/preview、upload error、send button。
+- [x] 实现 Gemini `setComposerPayload`：
+  - [x] 默认 text-first。
+  - [x] 优先 synthetic paste 注入附件。
   - [ ] 若 Gemini 只接受 file picker/input，改为 Gemini provider override，不改 delivery core。
-  - [ ] suppression 覆盖文本写入和附件注入。
-- [ ] 实现 Gemini `getComposerAttachmentPresence(expected)`：
-  - [ ] count delta。
-  - [ ] filename/preview key 可用时返回 keys。
-  - [ ] 旧草稿附件不参与新增确认。
-- [ ] 实现或明确保留 Gemini `detectAttachmentUploadError()`：
-  - [ ] unsupported file / upload failed / retry / toast。
-  - [ ] 无稳定 selector 时靠 timeout，但记录 TODO evidence。
-- [ ] 测试：
-  - [ ] adapter DOM fixture 覆盖 payload injection path。
-  - [ ] presence baseline+delta 测试覆盖已有旧附件。
-  - [ ] delivery-controller 负向测试覆盖 Gemini presence 不足不 submit。
+  - [x] suppression 覆盖文本写入和附件注入。
+- [x] 实现 Gemini `getComposerAttachmentPresence(expected)`：
+  - [x] count delta。
+  - [x] filename/preview key 可用时返回 keys。
+  - [x] 旧草稿附件不参与新增确认。
+- [x] 实现或明确保留 Gemini `detectAttachmentUploadError()`：
+  - [x] unsupported file / upload failed / retry / toast。
+  - [ ] 真实 upload rejection smoke 后补更精确 selector（如果当前 selector 漏报则保留 30s timeout 兜底）。
+- [x] 测试：
+  - [x] adapter DOM fixture 覆盖 payload injection path。
+  - [x] presence baseline+delta 测试覆盖已有旧附件。
+  - [x] delivery-controller 负向测试覆盖 Gemini presence 不足不 submit（通用 controller 已覆盖，Gemini adapter fixture 覆盖 count/key）。
 - [ ] 手测：
   - [ ] Claude/任一 source → Gemini target：单图。
   - [ ] Claude/任一 source → Gemini target：`.md/.txt`。
