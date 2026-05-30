@@ -1,4 +1,4 @@
-const PROGRAMMATIC_SUBMIT_SUPPRESS_MS = 30_000;
+const PROGRAMMATIC_SUBMIT_SUPPRESS_MS = 120_000;
 
 export type RecentProgrammaticSubmitState = {
   recentProgrammaticSubmits: Map<string, number>;

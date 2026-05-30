@@ -192,6 +192,68 @@ describe('ChatGPT attachment delivery adapter', () => {
     });
   });
 
+  it('uses generic image preview count for ChatGPT source snapshots when filenames are hidden', () => {
+    document.body.innerHTML = `
+      <form data-type="unified-composer">
+        <input id="upload-files" type="file" multiple />
+        <div id="prompt-textarea" role="textbox" aria-label="Chat with ChatGPT" contenteditable="true"></div>
+        <div data-testid="composer-image-preview">
+          <img alt="Uploaded image" src="blob:https://chatgpt.com/image-1" />
+          <button type="button" aria-label="Remove attachment"></button>
+        </div>
+      </form>
+    `;
+
+    expect(chatgptAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: 'gavin5.jpg',
+        mime: 'image/jpeg',
+        size: 3,
+        source: 'paste',
+        file: new File(['abc'], 'gavin5.jpg', { type: 'image/jpeg' }),
+      },
+    ])).toEqual({
+      count: 1,
+      items: [],
+    });
+  });
+
+  it('fails closed for ChatGPT source snapshots when generic preview count differs from captured files', () => {
+    document.body.innerHTML = `
+      <form data-type="unified-composer">
+        <input id="upload-files" type="file" multiple />
+        <div id="prompt-textarea" role="textbox" aria-label="Chat with ChatGPT" contenteditable="true"></div>
+        <div data-testid="composer-image-preview">
+          <img alt="Uploaded image" src="blob:https://chatgpt.com/image-1" />
+          <button type="button" aria-label="Remove attachment"></button>
+        </div>
+      </form>
+    `;
+
+    expect(chatgptAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: 'one.jpg',
+        mime: 'image/jpeg',
+        size: 3,
+        source: 'paste',
+        file: new File(['abc'], 'one.jpg', { type: 'image/jpeg' }),
+      },
+      {
+        id: 'a2',
+        name: 'two.jpg',
+        mime: 'image/jpeg',
+        size: 3,
+        source: 'paste',
+        file: new File(['def'], 'two.jpg', { type: 'image/jpeg' }),
+      },
+    ])).toEqual({
+      count: 1,
+      items: [],
+    });
+  });
+
   it('detects ChatGPT upload failure messaging', async () => {
     document.body.innerHTML = `
       <form data-type="unified-composer">

@@ -184,9 +184,15 @@ export function setFileInputFiles(input: HTMLInputElement, files: File[]): Promi
 export async function setNextTransientFileInputFiles(
   files: File[],
   triggerInputClick: () => Promise<void> | void,
+  options: {
+    awaitDeliveryResult?: boolean;
+  } = {},
 ): Promise<void> {
   const requestId = createDeliveryRequestId();
-  const result = waitForTransientFileInputDeliveryResult(requestId);
+  const shouldAwaitDeliveryResult = options.awaitDeliveryResult ?? true;
+  const result = shouldAwaitDeliveryResult
+    ? waitForTransientFileInputDeliveryResult(requestId)
+    : null;
   window.postMessage({
     source: ASK_EM_BRIDGE_SOURCE,
     type: ASK_EM_TRANSIENT_FILE_INPUT_DELIVERY,
@@ -198,11 +204,15 @@ export async function setNextTransientFileInputFiles(
   try {
     await triggerInputClick();
   } catch (error) {
-    void result.catch(() => undefined);
+    void result?.catch(() => undefined);
     throw error;
   }
 
-  return result;
+  if (!shouldAwaitDeliveryResult) {
+    return;
+  }
+
+  await result;
 }
 
 export function dispatchPasteFiles(target: HTMLElement, files: File[]): void {

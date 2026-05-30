@@ -8,6 +8,7 @@ import type {
 } from '../runtime/protocol';
 import type {
   AttachmentSubmitResolution,
+  ComposerDeliveryPreparation,
   ComposerAttachmentPresence,
   ComposerAttachmentSnapshot,
   ComposerPayload,
@@ -63,6 +64,13 @@ type DomProviderAdapterConfig = {
       findComposer: () => HTMLElement | null;
       findSendButton: () => HTMLElement | null;
       setComposerText: (content: string) => Promise<void>;
+    },
+  ) => Promise<void> | void;
+  prepareForDelivery?: (
+    payload: ComposerDeliveryPreparation,
+    context: {
+      findComposer: () => HTMLElement | null;
+      findSendButton: () => HTMLElement | null;
     },
   ) => Promise<void> | void;
   getComposerAttachmentPresence?: (
@@ -444,6 +452,12 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
       },
       async setComposerText(content) {
         await setComposerText(content);
+      },
+      async prepareForDelivery(payload) {
+        await config.prepareForDelivery?.(payload, {
+          findComposer,
+          findSendButton,
+        });
       },
       async setComposerPayload(payload) {
         if (config.setComposerPayload) {

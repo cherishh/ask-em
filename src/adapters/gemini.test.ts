@@ -55,43 +55,54 @@ describe('Gemini attachment delivery adapter', () => {
   });
 
   it('sets text and injects reconstructed files through synthetic paste', async () => {
-    document.body.innerHTML = `
-      <div class="text-input-field">
-        <rich-textarea>
-          <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true"></div>
-        </rich-textarea>
-        <button aria-label="Send message"></button>
-      </div>
-    `;
-
-    const composer = document.querySelector<HTMLElement>('.ql-editor');
-    let pastedFiles: File[] = [];
-    composer?.addEventListener('paste', (event) => {
-      pastedFiles = Array.from((event as ClipboardEvent).clipboardData?.files ?? []);
-      document.querySelector('.text-input-field')?.insertAdjacentHTML('afterbegin', `
-        <uploader-file-preview class="file-preview-chip">
-          <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
-            <span class="gem-attachment-text">notes.md</span>
-          </gem-attachment>
-        </uploader-file-preview>
-      `);
+    vi.useFakeTimers({
+      toFake: ['Date', 'setTimeout', 'clearTimeout'],
     });
+    try {
+      document.body.innerHTML = `
+        <div class="text-input-field">
+          <rich-textarea>
+            <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true"></div>
+          </rich-textarea>
+          <button aria-label="Send message"></button>
+        </div>
+      `;
 
-    await geminiAdapter.composer?.setComposerPayload?.({
-      text: 'hello',
-      attachments: [
-        {
-          id: 'a1',
-          name: 'notes.md',
-          mime: 'text/markdown',
-          size: 3,
-        },
-      ],
-    });
+      const composer = document.querySelector<HTMLElement>('.ql-editor');
+      let pastedFiles: File[] = [];
+      composer?.addEventListener('paste', (event) => {
+        pastedFiles = Array.from((event as ClipboardEvent).clipboardData?.files ?? []);
+        document.querySelector('.text-input-field')?.insertAdjacentHTML('afterbegin', `
+          <uploader-file-preview class="file-preview-chip">
+            <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+              <span class="gem-attachment-text">notes.md</span>
+            </gem-attachment>
+          </uploader-file-preview>
+        `);
+      });
 
-    expect(composer?.textContent).toBe('hello');
-    expect(pastedFiles[0]).toEqual(expect.any(File));
-    expect(pastedFiles[0]?.name).toBe('notes.md');
+      const delivery = geminiAdapter.composer?.setComposerPayload?.({
+        text: 'hello',
+        attachments: [
+          {
+            id: 'a1',
+            name: 'notes.md',
+            mime: 'text/markdown',
+            size: 3,
+          },
+        ],
+      });
+      await flushMicrotasks();
+      expect(composer?.textContent).not.toContain('hello');
+      await vi.advanceTimersByTimeAsync(5_250);
+      await delivery;
+
+      expect(composer?.textContent).toBe('hello');
+      expect(pastedFiles[0]).toEqual(expect.any(File));
+      expect(pastedFiles[0]?.name).toBe('notes.md');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('waits for attachment-only submit readiness before writing prompt text', async () => {
@@ -137,6 +148,8 @@ describe('Gemini attachment delivery adapter', () => {
 
       sendButton?.removeAttribute('disabled');
       await vi.advanceTimersByTimeAsync(250);
+      expect(composer?.textContent).not.toContain('hello');
+      await vi.advanceTimersByTimeAsync(5_000);
       await delivery;
 
       expect(composer?.textContent).toContain('hello');
@@ -193,6 +206,8 @@ describe('Gemini attachment delivery adapter', () => {
       expect(composer?.textContent).not.toContain('hello');
 
       await vi.advanceTimersByTimeAsync(250);
+      expect(composer?.textContent).not.toContain('hello');
+      await vi.advanceTimersByTimeAsync(5_000);
       await delivery;
 
       expect(composer?.textContent).toContain('hello');
@@ -466,6 +481,132 @@ describe('Gemini attachment delivery adapter', () => {
         capturedCount: 1,
         currentCount: 1,
         submittedCount: 1,
+      }),
+    }));
+    unsubscribe?.();
+  });
+
+  it('captures multiple Gemini transient upload files from one picker event before submit', () => {
+    document.body.innerHTML = `
+      <div class="text-input-field with-file-preview">
+        <div class="attachment-preview-wrapper">
+          <uploader-file-preview class="file-preview-chip">
+            <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+              <span class="gem-attachment-text">deck</span>
+            </gem-attachment>
+          </uploader-file-preview>
+          <uploader-file-preview class="file-preview-chip">
+            <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+              <span class="gem-attachment-text">notes</span>
+            </gem-attachment>
+          </uploader-file-preview>
+        </div>
+        <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true">hello</div>
+        <button aria-label="Send message"></button>
+      </div>
+    `;
+
+    const deck = new File(['abc'], 'deck.pdf', { type: 'application/pdf' });
+    const notes = new File(['def'], 'notes.md', { type: 'text/markdown' });
+    const onSubmit = vi.fn();
+    const unsubscribe = geminiAdapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        source: window,
+        data: {
+          source: 'ask-em',
+          type: 'ASK_EM_TRANSIENT_FILES',
+          files: [deck, notes],
+        },
+      }),
+    );
+    document.querySelector<HTMLButtonElement>('button[aria-label="Send message"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [
+        expect.objectContaining({
+          file: deck,
+          name: 'deck.pdf',
+          mime: 'application/pdf',
+          source: 'transient-file-input',
+        }),
+        expect.objectContaining({
+          file: notes,
+          name: 'notes.md',
+          mime: 'text/markdown',
+          source: 'transient-file-input',
+        }),
+      ],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 2,
+        currentCount: 2,
+        submittedCount: 2,
+      }),
+    }));
+    unsubscribe?.();
+  });
+
+  it('captures multiple Gemini transient upload files from incremental picker events before submit', () => {
+    document.body.innerHTML = `
+      <div class="text-input-field with-file-preview">
+        <div class="attachment-preview-wrapper">
+          <uploader-file-preview class="file-preview-chip">
+            <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+              <span class="gem-attachment-text">first</span>
+            </gem-attachment>
+          </uploader-file-preview>
+          <uploader-file-preview class="file-preview-chip">
+            <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+              <span class="gem-attachment-text">second</span>
+            </gem-attachment>
+          </uploader-file-preview>
+        </div>
+        <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true">hello</div>
+        <button aria-label="Send message"></button>
+      </div>
+    `;
+
+    const first = new File(['abc'], 'first.pdf', { type: 'application/pdf' });
+    const second = new File(['def'], 'second.md', { type: 'text/markdown' });
+    const onSubmit = vi.fn();
+    const unsubscribe = geminiAdapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    for (const file of [first, second]) {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          source: window,
+          data: {
+            source: 'ask-em',
+            type: 'ASK_EM_TRANSIENT_FILES',
+            files: [file],
+          },
+        }),
+      );
+    }
+    document.querySelector<HTMLButtonElement>('button[aria-label="Send message"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [
+        expect.objectContaining({
+          file: first,
+          name: 'first.pdf',
+          mime: 'application/pdf',
+          source: 'transient-file-input',
+        }),
+        expect.objectContaining({
+          file: second,
+          name: 'second.md',
+          mime: 'text/markdown',
+          source: 'transient-file-input',
+        }),
+      ],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 2,
+        currentCount: 2,
+        submittedCount: 2,
       }),
     }));
     unsubscribe?.();

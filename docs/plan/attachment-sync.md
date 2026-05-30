@@ -115,7 +115,7 @@ rollout 顺序按 provider 分开交付，避免一套不稳定 DOM 策略同时
 | ChatGPT | composer-scoped `#upload-files` file input；无 scoped input 时 synthetic paste fallback | `role="group"` file tile / filename key | ChatGPT DOM 版本漂移，input 或 file tile selector 失效时会静默失败 | presence delta 确认后才 submit；失败不发纯文本 |
 | Gemini | synthetic paste；attach-first，附件 ready 后再写文本 | `.text-input-field` 内的 `uploader-file-preview` / `gem-attachment` / `.gem-attachment-text` filename key；长文件名需读 `aria-describedby` tooltip；注入前 baseline + 无文本时 send button enabled 作为 attachment-only ready 信号 | ProseMirror/Angular event 处理可能不吃合成 paste；当前页面无稳定 file input；preview 出现早于 upload 绑定到下一次 submit，不能用固定 delay | attachment-only ready delta 后才写文本并 submit；失败不发纯文本 |
 | DeepSeek | composer-scoped hidden/stable `input[type=file][multiple]` fallback | `.ds-animated-size-item` filename key | hidden input 查找范围过宽会误打页面无关 input；icon buttons 需避开 DeepThink/Search/upload | 只在 composer root 内找 input；找不到 scoped input 就 fail fast，不改 core |
-| Manus | plus tools menu → `Add from local files` → transient input delivery | `[class*="group/attach"]` attachment card / filename key；`+N` 聚合只用 count delta | free plan 一次最多 1 个文件；一次选择 2 个文件会弹 `role="dialog"` modal（`You can upload up to 1 file at once`），所以 capability `maxFiles=1`；transient input 与菜单状态都脆弱，菜单父级与 item 文本相同，必须点 clickable item | 多文件在 capability gate 阶段以 `attachment-limit` 跳过 Manus target；成功、失败、timeout 都清理 pending transient delivery；presence delta 后才 submit |
+| Manus | plus tools menu → `Add from local files` → transient input delivery | `[class*="group/attach"]` attachment card / filename key；图片卡 filename 可能只在 `img[alt]`；`+N` 聚合只用 count delta | free plan 一次最多 1 个文件；一次选择 2 个文件会弹 `role="dialog"` modal（`You can upload up to 1 file at once`），所以 capability `maxFiles=1`；`/app` 会恢复未提交 draft，不保证 clean composer；transient input 与菜单状态都脆弱，菜单父级与 item 文本相同，必须点 clickable item | 多文件在 capability gate 阶段以 `attachment-limit` 跳过 Manus target；new-chat delivery 先经 provider `prepareForDelivery` 点击 `New task` 并确认附件 baseline 为 0；成功、失败、timeout 都清理 pending transient delivery；presence delta 后才 submit |
 
 每家 provider 的 DOM 路径、payload 顺序、presence key、upload error selector 都留在 adapter；delivery core 不引入 provider 分支。
 
@@ -229,7 +229,7 @@ background-owned，`chrome.storage.session` metadata + IndexedDB raw bytes。函
 
 ## Guardrails
 
-- 不记录二进制 payload / base64 / dataURL / 完整 filename。
+- dev debug log 优先准确和可诊断：允许记录 prompt preview / filename key / provider DOM signal 等排查信息；禁止记录大块二进制 payload、base64 chunk、dataURL。
 - base64 只出现在 `ATTACHMENT_APPEND_CHUNK` / `ATTACHMENT_READ_CHUNK`。
 - 不在主协议塞 inline 二进制——ref 间接层是重点。
 - 不写没有 TTL / 没有 release 路径的附件。

@@ -1,0 +1,6 @@
+ask'em attachment fixture
+
+This plain text file is used for provider fan-out smoke tests.
+It should be uploaded as an attachment alongside the prompt.
+
+Useful path: docs/fixtures/askem-spike.txt

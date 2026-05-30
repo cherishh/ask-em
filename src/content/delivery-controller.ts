@@ -14,6 +14,7 @@ import type { ContentSubmitController } from './submit-controller';
 
 const ATTACHMENT_DELIVERY_TIMEOUT_MS = 30_000;
 const ATTACHMENT_DELIVERY_POLL_MS = 250;
+const PROGRAMMATIC_SUBMIT_BUFFER_MS = 10_000;
 
 function countAttachmentPresenceDelta(
   baseline: ComposerAttachmentPresence,
@@ -151,7 +152,10 @@ export function createDeliveryController(
       }
 
       try {
-        submitController.suppressObservedSubmissionsFor(2_500);
+        const submitTimeoutMs = message.attachments.length > 0 ? ATTACHMENT_DELIVERY_TIMEOUT_MS : undefined;
+        submitController.suppressObservedSubmissionsFor(
+          (submitTimeoutMs ?? 2_500) + PROGRAMMATIC_SUBMIT_BUFFER_MS,
+        );
         adapter.composer.suppressAttachmentCaptureFor?.(2_500);
         await dependencies.logDebug({
           level: 'info',
@@ -161,6 +165,13 @@ export function createDeliveryController(
         });
 
         const baselineUrl = adapter.session.getCurrentUrl();
+        await adapter.composer.prepareForDelivery?.({
+          text: message.content,
+          attachments: message.attachments,
+          expectedSessionId: message.expectedSessionId,
+          expectedUrl: message.expectedUrl,
+        });
+
         let attachmentBaseline: ComposerAttachmentPresence | null = null;
         if (message.attachments.length > 0) {
           await dependencies.logDebug({
@@ -210,10 +221,11 @@ export function createDeliveryController(
           detail: `attachments=${message.attachments.length}`,
           workspaceId: message.workspaceId,
         });
+        submitController.suppressObservedSubmissionsFor(
+          (submitTimeoutMs ?? 2_500) + PROGRAMMATIC_SUBMIT_BUFFER_MS,
+        );
         submitController.rememberProgrammaticSubmit(message.content);
-        await adapter.composer.submit({
-          timeoutMs: message.attachments.length > 0 ? ATTACHMENT_DELIVERY_TIMEOUT_MS : undefined,
-        });
+        await adapter.composer.submit({ timeoutMs: submitTimeoutMs });
         await dependencies.logDebug({
           level: 'info',
           message: 'Prompt submit action dispatched',

@@ -48,6 +48,11 @@ export type ComposerPayload = {
   attachments: AttachmentRef[];
 };
 
+export type ComposerDeliveryPreparation = ComposerPayload & {
+  expectedSessionId: string | null;
+  expectedUrl: string | null;
+};
+
 export type ComposerAttachmentPresence = {
   count: number;
   keys?: string[];
@@ -75,6 +80,7 @@ export type AttachmentSubmitResolution = {
 
 export interface ProviderComposerAdapter {
   subscribeToUserSubmissions?(onSubmit: (payload: UserSubmissionPayload) => void): () => void;
+  prepareForDelivery?(payload: ComposerDeliveryPreparation): Promise<void> | void;
   setComposerPayload?(payload: ComposerPayload): Promise<void> | void;
   setComposerText(content: string): Promise<void> | void;
   detectAttachmentUploadError?(): string | null | Promise<string | null>;

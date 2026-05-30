@@ -115,7 +115,7 @@ type UploadCapability = {
 - [ ] TTL 到期必须删除 metadata 和 IndexedDB bytes。
 - [ ] IndexedDB orphan blob（无匹配 metadata）在 startup sweep 删除。
 - [ ] 删除操作 idempotent：force-delete 与任何延迟清理路径并发时，对已删条目不抛错。
-- [ ] 日志只允许 id prefix、mime、bytes、size；禁止 base64、dataURL、完整 filename。
+- [ ] 日志优先准确和可诊断：允许 prompt preview / filename key / provider DOM signal；禁止大块二进制 payload、base64 chunk、dataURL。
 
 ## Source Capture
 
@@ -189,8 +189,8 @@ type UploadCapability = {
 
 ### Phase 0.5（fixtures，非执行 phase）
 
-- [ ] 保留 provider 上传策略表为 smoke-test evidence。
-- [ ] 生成 1×1 PNG fixture（`askem-spike.png`）供后续手测复用。
+- [x] 保留 provider 上传策略表为 smoke-test evidence。
+- [x] 生成 1×1 PNG fixture（`askem-spike.png`）供后续手测复用。
 
 ### Phase 1：Attachment Store 和 GC
 
@@ -285,32 +285,32 @@ type UploadCapability = {
 
 > 5.0 是每家 provider rollout 前/中的 guardrail，不是一次性功能阶段。当前因先有 Claude/ChatGPT 现场页面与日志，5.1 已先落地，并在这里回填已完成的基线项；Gemini/DeepSeek/Manus 仍需各自开工前补齐。
 
-- [ ] 固化通用验收 fixture：
-  - [ ] `askem-spike.png` 单图。
-  - [ ] `.md/.txt` 纯文本文件。
+- [x] 固化通用验收 fixture：
+  - [x] `askem-spike.png` 单图。
+  - [x] `.md/.txt` 纯文本文件。
   - [x] 2 个同批多文件（Claude → ChatGPT 同名 PDF x2 smoke 已通过）。
-- [ ] 每家 provider 开工前先用 Chrome/extension 实测当前 composer DOM，记录：file injection 入口、attachment preview/chip selector、upload error selector、send button enable 条件。
+- [x] 每家 provider 开工前先用 Chrome/extension 实测当前 composer DOM，记录：file injection 入口、attachment preview/chip selector、upload error selector、send button enable 条件。
   - [x] Claude：source snapshot / upload input / PDF preview DOM 已复核（`img[alt]` + `Remove <filename>`，上传后 `input.files` 会清空）。
   - [x] ChatGPT：target composer DOM 已复核（`form[data-type="unified-composer"]` / `#upload-files` / file tile / submit button）。
   - [x] Gemini：target composer DOM 已复核（`.ql-editor[aria-label="Enter a prompt for Gemini"]` / `uploader-file-preview` / `gem-attachment` / `button[aria-label="Send message"]`；长文件名会在 visible chip 截断，完整 filename 在 `aria-describedby` tooltip；当前无稳定 file input）。
   - [x] DeepSeek：target composer DOM 已复核（`textarea[placeholder="Message DeepSeek"]` / composer-scoped hidden `input[type="file"][multiple]` / `.ds-animated-size-item` / `div.ds-icon-button[role="button"][aria-disabled]`）。
-  - [x] Manus：target composer DOM 已复核（`.tiptap.ProseMirror` / plus tools button / `role=dialog` 菜单项 `Add from local files` / transient `<input type="file" multiple>` / `[class*="group/attach"]` attachment card / `+N` aggregate / `bg-[var(--Button-black)]` send button；free plan 一次选 2 个文件会弹 `You can upload up to 1 file at once` modal）。
-- [ ] 每家 provider 的 adapter 测试都覆盖：
+  - [x] Manus：target composer DOM 已复核（`.tiptap.ProseMirror` / plus tools button / `role=dialog` 菜单项 `Add from local files` / transient `<input type="file" multiple>` / `[class*="group/attach"]` attachment card / 图片 filename 可能只在 `img[alt]` / `+N` aggregate / `bg-[var(--Button-black)]` send button；free plan 一次选 2 个文件会弹 `You can upload up to 1 file at once` modal；`/app` 会恢复未提交 draft，不保证 clean composer）。
+- [x] 每家 provider 的 adapter 测试都覆盖：
   - [x] Claude/ChatGPT 当前链路覆盖注入、presence、baseline+delta、同名重复附件和 source snapshot 过滤。
   - [x] Gemini 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
   - [x] Gemini target 已有旧草稿附件时，baseline+delta 不误判。
   - [x] Gemini 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`（通用 controller gate + adapter presence fixture）。
-  - [ ] Gemini 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认。
+  - [x] Gemini 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认。
   - [x] DeepSeek 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
   - [x] DeepSeek target 已有旧草稿附件时，baseline+delta 不误判。
   - [x] DeepSeek 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`（通用 controller gate + adapter fail-fast/old-draft fixture）。
   - [x] DeepSeek 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认（adapter fixture 覆盖多文件/同名 preview 计数；真实 smoke 待手测）。
   - [x] Manus 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key（visible cards 有 keys；`+N` 聚合时保留 count delta）。
-  - [x] Manus target 已有旧草稿附件时，baseline+delta 不误判（adapter fixture 覆盖可见卡 + 聚合 count）。
+  - [x] Manus target `/app` 恢复未提交 draft 时，经 provider `prepareForDelivery` 点击 `New task` 并确认附件 baseline 为 0 后再注入。
   - [x] Manus 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`（通用 controller gate + transient delivery timeout）。
   - [x] Manus free-plan 多文件作为 target 时由 capability gate 拦截为 `attachment-limit`，不进入 transient 注入；adapter 仍能识别 Manus 自身 `up to 1 file` modal 为 `upload failed` 兜底。
 - [ ] 每家 smoke 后复核 `uploadCapability`，若 provider 实际拒绝某类文件，收紧该 provider capability。
-- [ ] 保持 debug log 只记生命周期/bytes/count/id prefix，不记 base64、dataURL、完整 filename。
+- [ ] 保持 debug log 可用于开发排查：不要为隐私牺牲准确性；记录足够定位问题的 prompt preview / filename keys / bytes / count / id prefix。base64/dataURL 仍只应出现在传输层。
 
 #### Phase 5.1：ChatGPT target delivery
 
@@ -393,6 +393,7 @@ type UploadCapability = {
 - [x] 实现 Manus `setComposerPayload`：
   - [x] 明确 payload 顺序：text-first；附件通过 Manus adapter override 注入，不改 delivery core。
   - [x] capability 收紧为 `maxFiles=1`；多文件 fan-out 到 Manus target 时跳过该 target，不触发 Manus 升级 modal。
+  - [x] 实现 Manus `prepareForDelivery`：new-chat target 先进入 clean `New task` surface；已有 session 若 composer 非 clean 则失败，不跳离原 session。
   - [x] 点击 composer-scoped 工具按钮。
   - [x] 选择 `Add from local files`。
   - [x] 复用 Phase 3.5 MAIN-world transient input bridge，把文件注入 transient input。
@@ -429,7 +430,7 @@ type UploadCapability = {
 - [ ] indicator/popup 展示 `attachment not supported` / `attachment limit exceeded`（presentation helper 已在 Phase 2 就绪，这里接线）。
 - [ ] target 上传失败展示 `upload failed`。
 - [ ] 不增加新 uploading 状态。
-- [ ] debug logs 不含 payload（grep 测试）。
+- [ ] debug logs 不含大块二进制 payload / base64 chunk / dataURL；prompt preview 和 filename key 允许用于开发排查。
 
 验收：
 - [ ] 不支持附件时 popup 能看到 `attachment not supported`；超 target 数量上限时能看到 `attachment limit exceeded`。
@@ -441,7 +442,7 @@ type UploadCapability = {
 - [ ] 测试 background restart mid-delivery，TTL 能清理 orphan。
 - [ ] 权限审计：确认不需要新增 `host_permissions`，且**确认未引入 `alarms`**。
 - [x] 扩展现有 `chrome.tabs.onRemoved` handler：source tab 关闭时只清该 `ownerTabId` 下 `status=writing` 且未 bind 的 staging 条目，提前腾预算；不清 ready 条目，避免 USER_SUBMIT→bind 窗口内误删 fan-out 附件。
-- [ ] 补充 lifecycle/pitfall 文档（含「never log payload」「never assume source upload finished before capture」「base64 仅限传输消息」）。
+- [ ] 补充 lifecycle/pitfall 文档（含「logs must stay diagnostic」「never assume source upload finished before capture」「base64 仅限传输消息」）。
 
 验收：
 - [ ] restart/orphan dry-run 后 store 为空。
@@ -449,7 +450,7 @@ type UploadCapability = {
 
 ## Guardrails
 
-- [ ] 不记录二进制 payload、base64、dataURL、完整 filename。
+- [ ] debug log 优先准确和可诊断；不记录大块二进制 payload、base64 chunk、dataURL。
 - [ ] **base64 只出现在 `ATTACHMENT_APPEND_CHUNK`/`ATTACHMENT_READ_CHUNK`**；不进主协议、storage metadata、log。
 - [ ] 不在主 runtime message 内塞 inline 二进制。
 - [ ] 不写入没有 TTL 的附件。

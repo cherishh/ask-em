@@ -131,6 +131,14 @@ function getExpectedAttachmentElements(
   );
 }
 
+function getGenericAttachmentElementRoot(element: HTMLElement): HTMLElement {
+  return (
+    element.closest<HTMLElement>(
+      '[role="group"][aria-label], [class*="group/file-tile" i], [data-testid*="file-preview" i], [data-testid*="attachment" i], [data-testid*="image" i]',
+    ) ?? element
+  );
+}
+
 function getGenericAttachmentElements(container: ParentNode): HTMLElement[] {
   if (!(container instanceof Element || container instanceof Document)) {
     return [];
@@ -139,17 +147,37 @@ function getGenericAttachmentElements(container: ParentNode): HTMLElement[] {
   const selectors = [
     '[role="group"][aria-label]',
     'button[aria-label^="Remove file" i]',
+    'button[aria-label*="remove" i][aria-label*="attachment" i]',
     '[class*="group/file-tile" i]',
     '[data-testid*="file-preview" i]',
     '[data-testid*="attachment" i]',
+    '[data-testid*="image" i]',
+    'img[src^="blob:"]',
+    'img[alt*="uploaded" i]',
+    'img[alt*="attachment" i]',
   ];
   const candidates = selectors.flatMap((selector) => Array.from(container.querySelectorAll<HTMLElement>(selector)))
     .filter((element, index, elements) => elements.indexOf(element) === index)
     .filter(isVisible)
     .filter((element) => {
       const text = getElementAccessibleText(element).toLowerCase();
-      return text.includes('.') || text.includes('remove file');
-    });
+      const tagName = element.tagName.toLowerCase();
+      const className = typeof element.className === 'string' ? element.className.toLowerCase() : '';
+      const testId = element.getAttribute('data-testid')?.toLowerCase() ?? '';
+      return (
+        text.includes('.') ||
+        text.includes('remove file') ||
+        text.includes('uploaded') ||
+        text.includes('attachment') ||
+        className.includes('file-tile') ||
+        testId.includes('file') ||
+        testId.includes('attachment') ||
+        testId.includes('image') ||
+        (tagName === 'img' && element instanceof HTMLImageElement && element.src.startsWith('blob:'))
+      );
+    })
+    .map(getGenericAttachmentElementRoot)
+    .filter((element, index, elements) => elements.indexOf(element) === index);
 
   return candidates.filter(
     (candidate) => !candidates.some((other) => other !== candidate && candidate.contains(other)),
@@ -267,6 +295,14 @@ export const chatgptAdapter = createDomProviderAdapter({
       return {
         count: elements.length,
         items: elements.map(getElementAccessibleText).filter(Boolean),
+      };
+    }
+
+    const genericElements = getGenericAttachmentElements(container);
+    if (genericElements.length > 0) {
+      return {
+        count: genericElements.length,
+        items: [],
       };
     }
 

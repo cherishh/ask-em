@@ -68,10 +68,11 @@ describe('content delivery controller attachment flow', () => {
   it('confirms attachment presence before submit', async () => {
     const adapter = createAdapter();
     const sendResponse = vi.fn();
-    const controller = createDeliveryController(adapter, createState() as any, {
+    const submitControls = {
       suppressObservedSubmissionsFor: vi.fn(),
       rememberProgrammaticSubmit: vi.fn(),
-    }, {
+    };
+    const controller = createDeliveryController(adapter, createState() as any, submitControls, {
       reportPresence: vi.fn(),
       resetIndicatorPosition: vi.fn(),
       logDebug: vi.fn(),
@@ -94,6 +95,62 @@ describe('content delivery controller attachment flow', () => {
       expect(adapter.composer?.submit).toHaveBeenCalledWith({ timeoutMs: 30_000 });
       expect(sendResponse).toHaveBeenCalledWith({ ok: true, accepted: true, confirmed: true });
     });
+    expect(submitControls.suppressObservedSubmissionsFor).toHaveBeenCalledWith(40_000);
+    expect(submitControls.suppressObservedSubmissionsFor).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets providers prepare the delivery surface before taking attachment baseline', async () => {
+    const calls: string[] = [];
+    let presenceCalls = 0;
+    const attachment = { id: 'a1', name: 'a.png', mime: 'image/png', size: 1 };
+    const adapter = createAdapter({
+      prepareForDelivery: vi.fn(() => {
+        calls.push('prepare');
+      }),
+      getComposerAttachmentPresence: vi.fn(async () => {
+        calls.push('presence');
+        presenceCalls += 1;
+        return { count: presenceCalls === 1 ? 0 : 1 };
+      }),
+      setComposerPayload: vi.fn(() => {
+        calls.push('payload');
+      }),
+      submit: vi.fn(() => {
+        calls.push('submit');
+      }),
+    });
+    const sendResponse = vi.fn();
+    const controller = createDeliveryController(adapter, createState() as any, {
+      suppressObservedSubmissionsFor: vi.fn(),
+      rememberProgrammaticSubmit: vi.fn(),
+    }, {
+      reportPresence: vi.fn(),
+      resetIndicatorPosition: vi.fn(),
+      logDebug: vi.fn(),
+    });
+
+    controller.handleRuntimeMessage({
+      type: 'DELIVER_PROMPT',
+      workspaceId: 'w1',
+      provider: 'claude',
+      content: 'hello',
+      attachments: [attachment],
+      expectedSessionId: 'c-1',
+      expectedUrl: 'https://claude.ai/chat/c-1',
+      timestamp: 1,
+    }, sendResponse);
+    await flushMicrotasks();
+
+    await waitForAssertion(() => {
+      expect(adapter.composer?.submit).toHaveBeenCalledWith({ timeoutMs: 30_000 });
+    });
+    expect(adapter.composer?.prepareForDelivery).toHaveBeenCalledWith({
+      text: 'hello',
+      attachments: [attachment],
+      expectedSessionId: 'c-1',
+      expectedUrl: 'https://claude.ai/chat/c-1',
+    });
+    expect(calls.slice(0, 3)).toEqual(['prepare', 'presence', 'payload']);
   });
 
   it('uses count delta as a fallback when attachment keys are not unique', async () => {

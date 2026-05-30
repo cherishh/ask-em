@@ -77,6 +77,18 @@ function getElementAccessibleText(element: HTMLElement): string {
   );
 }
 
+function getManusAttachmentCardKey(element: HTMLElement): string {
+  return normalizeWhitespace(
+    [
+      getElementAccessibleText(element),
+      ...Array.from(element.querySelectorAll<HTMLImageElement>('img[alt]'))
+        .map((image) => image.alt),
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+}
+
 function getManusAttachmentCards(container: ParentNode): HTMLElement[] {
   if (!(container instanceof Element || container instanceof Document)) {
     return [];
@@ -117,13 +129,102 @@ function getManusAggregateAttachmentCount(
 
 function getManusAttachmentPresence(container: ParentNode): { count: number; items?: string[] } {
   const cards = getManusAttachmentCards(container);
-  const visibleItems = cards.map(getElementAccessibleText).filter(Boolean);
-  const count = visibleItems.length + getManusAggregateAttachmentCount(container, cards);
+  const visibleItems = cards.map(getManusAttachmentCardKey).filter(Boolean);
+  const count = cards.length + getManusAggregateAttachmentCount(container, cards);
 
   return {
     count,
     items: visibleItems.length === count ? visibleItems : undefined,
   };
+}
+
+function findManusUploadLimitDialog(): HTMLElement | null {
+  return Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"], [aria-modal="true"]'))
+    .filter(isVisible)
+    .find((element) => {
+      const text = getElementAccessibleText(element).toLowerCase();
+      return text.includes('up to 1 file') || text.includes('unlimited uploads');
+    }) ?? null;
+}
+
+function findClickableWithin(container: HTMLElement, text: string): HTMLElement | null {
+  const normalized = normalizeWhitespace(text).toLowerCase();
+
+  return Array.from(container.querySelectorAll<HTMLElement>('button, [role="button"], [class*="cursor-pointer"]'))
+    .filter(isVisible)
+    .find((element) => getElementAccessibleText(element).toLowerCase() === normalized) ?? null;
+}
+
+function dismissManusUploadLimitDialog(): boolean {
+  const dialog = findManusUploadLimitDialog();
+  if (!dialog) {
+    return false;
+  }
+
+  const cancelButton = findClickableWithin(dialog, 'Cancel');
+  if (cancelButton) {
+    triggerPointerClick(cancelButton);
+    return true;
+  }
+
+  const closeButton = Array.from(dialog.querySelectorAll<HTMLElement>('[class*="cursor-pointer"]'))
+    .filter(isVisible)
+    .find((element) => element.querySelector('svg.lucide-x'));
+  if (closeButton) {
+    triggerPointerClick(closeButton);
+    return true;
+  }
+
+  return false;
+}
+
+function findManusNewTaskButton(): HTMLElement | null {
+  return Array.from(document.querySelectorAll<HTMLElement>('button, [role="button"], [class*="clickable"]'))
+    .filter(isVisible)
+    .find((element) =>
+      getElementAccessibleText(element).toLowerCase() === 'new task' &&
+      Boolean(element.querySelector('svg.lucide-square-pen')),
+    ) ?? null;
+}
+
+async function prepareManusBlankDeliverySurface(input: {
+  expectedSessionId: string | null;
+  findComposer: () => HTMLElement | null;
+}): Promise<void> {
+  dismissManusUploadLimitDialog();
+  const dialogClosed = await waitFor(() => findManusUploadLimitDialog() ? null : true, 1_000, 50);
+
+  const getCurrentAttachmentCount = () => {
+    const container = findManusComposerRoot(input.findComposer());
+    return getManusAttachmentPresence(container).count;
+  };
+
+  if (getCurrentAttachmentCount() === 0 && dialogClosed) {
+    return;
+  }
+
+  if (input.expectedSessionId) {
+    throw new Error('delivery surface not clean');
+  }
+
+  if (!dialogClosed) {
+    throw new Error('delivery surface not clean');
+  }
+
+  const newTaskButton = await waitFor(findManusNewTaskButton, 3_000, 100);
+  if (!newTaskButton) {
+    throw new Error('delivery surface not clean');
+  }
+
+  triggerPointerClick(newTaskButton);
+  const isClean = await waitFor(() => {
+    dismissManusUploadLimitDialog();
+    return getCurrentAttachmentCount() === 0 && !findManusUploadLimitDialog() ? true : null;
+  }, 5_000, 100);
+
+  if (!isClean) {
+    throw new Error('delivery surface not clean');
+  }
 }
 
 function findManusToolButton(container: ParentNode): HTMLElement | null {
@@ -156,7 +257,7 @@ function findManusAddLocalFilesItem(): HTMLElement | null {
 async function clickManusAddLocalFiles(container: ParentNode): Promise<void> {
   let menuItem = findManusAddLocalFilesItem();
   if (!menuItem) {
-    const toolButton = findManusToolButton(container);
+    const toolButton = await waitFor(() => findManusToolButton(container), 5_000, 100);
     if (!toolButton) {
       throw new Error('upload failed');
     }
@@ -257,6 +358,12 @@ export const manusAdapter = createDomProviderAdapter({
     return buttons.at(-1) ?? null;
   },
   errorKeywords: ['something went wrong', 'failed to load', 'try again'],
+  async prepareForDelivery(payload, context) {
+    await prepareManusBlankDeliverySurface({
+      expectedSessionId: payload.expectedSessionId,
+      findComposer: context.findComposer,
+    });
+  },
   async setComposerPayload(payload, context) {
     await context.setComposerText(payload.text);
 
@@ -268,7 +375,12 @@ export const manusAdapter = createDomProviderAdapter({
     const container = findManusComposerRoot(composer);
     const files = await readAttachmentFiles(payload.attachments);
 
-    await setNextTransientFileInputFiles(files, () => clickManusAddLocalFiles(container));
+    await setNextTransientFileInputFiles(files, () => clickManusAddLocalFiles(container), {
+      // Manus can accept the file and render the attachment card while the MAIN-world
+      // delivery ack is lost during app route/state churn. Let the shared presence gate
+      // verify the actual page state instead of blocking the provider adapter here.
+      awaitDeliveryResult: false,
+    });
   },
   getComposerAttachmentPresence({ findComposer }) {
     const container = findManusComposerRoot(findComposer());

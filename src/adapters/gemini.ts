@@ -5,6 +5,7 @@ import { PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef } from '../runtime/pro
 
 const GEMINI_ATTACHMENT_READY_TIMEOUT_MS = 30_000;
 const GEMINI_ATTACHMENT_READY_POLL_MS = 250;
+const GEMINI_ATTACHMENT_READY_STABLE_MS = 5_000;
 
 export function isGeminiLoginRequiredPage(input: {
   pathname: string;
@@ -173,6 +174,7 @@ async function waitForGeminiAttachmentOnlySubmitReady(
 ): Promise<void> {
   const deadline = Date.now() + GEMINI_ATTACHMENT_READY_TIMEOUT_MS;
   const expectedCount = baselineCount + expectedAttachments.length;
+  let readySince: number | null = null;
 
   while (Date.now() <= deadline) {
     const uploadError = detectGeminiUploadErrorText();
@@ -182,8 +184,14 @@ async function waitForGeminiAttachmentOnlySubmitReady(
 
     const container = findGeminiComposerRoot(context.findComposer(), context.findSendButton());
     const items = getGeminiAttachmentItems(container, expectedAttachments);
-    if (items.length >= expectedCount && isGeminiSendButtonEnabled(context.findSendButton())) {
-      return;
+    const isReady = items.length >= expectedCount && isGeminiSendButtonEnabled(context.findSendButton());
+    if (!isReady) {
+      readySince = null;
+    } else {
+      readySince ??= Date.now();
+      if (Date.now() - readySince >= GEMINI_ATTACHMENT_READY_STABLE_MS) {
+        return;
+      }
     }
 
     await sleep(GEMINI_ATTACHMENT_READY_POLL_MS);
