@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { classifyDeliveryIssue } from './delivery-issues';
+import { makeLocalState, makeWorkspace } from '../test/builders';
+import { applyDeliveryResultsToWorkspaceIssues, classifyDeliveryIssue } from './delivery-issues';
 
 describe('classifyDeliveryIssue', () => {
   it('maps login-required failures to needs-login', () => {
@@ -58,5 +59,36 @@ describe('classifyDeliveryIssue', () => {
         reason: 'manus attachment count not supported',
       }),
     ).toBe('attachment-limit');
+  });
+
+  it('maps target upload failures to upload-failed', () => {
+    expect(
+      classifyDeliveryIssue({
+        provider: 'gemini',
+        ok: false,
+        reason: 'upload failed: attachment presence timeout expected=1; baseline=0; current=0',
+      }),
+    ).toBe('upload-failed');
+  });
+
+  it('persists upload failures as upload-failed workspace issues', () => {
+    const state = makeLocalState({
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          enabledProviders: ['claude', 'gemini'],
+        }),
+      },
+    });
+
+    const next = applyDeliveryResultsToWorkspaceIssues(state, 'w1', [
+      {
+        provider: 'gemini',
+        ok: false,
+        reason: 'upload failed',
+      },
+    ]);
+
+    expect(next.workspaces.w1.memberIssues?.gemini).toBe('upload-failed');
   });
 });

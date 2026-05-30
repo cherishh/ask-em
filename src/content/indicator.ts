@@ -51,6 +51,7 @@ function isWarningIssue(issue: WorkspaceIssue | null | undefined) {
     issue === 'needs-login' ||
     issue === 'loading' ||
     issue === 'delivery-failed' ||
+    issue === 'upload-failed' ||
     issue === 'error-page' ||
     issue === 'attachment-limit' ||
     issue === 'unsupported-attachment'

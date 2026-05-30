@@ -48,7 +48,7 @@
 | TTL | `ATTACHMENT_MAX_AGE_MS = 10 min` | |
 | chunk | `ATTACHMENT_CHUNK_BYTES ~256KB` | raw 计，base64 后 ~1.33× |
 
-超数量 / 超单文件 / 超总预算 → 跳过附件 fan-out + indicator 提示，**不阻断源 provider 原生发送**。单文件在 25MB 内但某 provider 自身拒绝（大小/格式）→ 原生失败 → `delivery-failed` / `upload failed`。
+超数量 / 超单文件 / 超总预算 → 跳过附件 fan-out + indicator 提示，**不阻断源 provider 原生发送**。单文件在 25MB 内但某 provider 自身拒绝（大小/格式）→ 原生失败 → `upload-failed` / `upload failed`。
 
 ### 3. 生命周期：submitId 作用域，不做 per-delivery 引用计数
 
@@ -105,7 +105,7 @@ adapter 必须能完全 override payload 顺序。当前已现场验证的 targe
 
 **submit 前 baseline+delta 正向确认**：很多 provider 只要有文本 send button 就 enable，注入静默失败时会把附件丢成纯文本却上报成功——这是 silent data loss。`detectAttachmentUploadError` 只测"上传出错"，测不到"上传没发生"，所以需要正向确认。adapter 暴露 `getComposerAttachmentPresence()`（count 或 preview-key 集合）；delivery controller 注入前快照 baseline、注入后比 **delta** 是否等于本次 refs。只看绝对 count 会被 target 已有草稿/旧 preview 误判（baseline=1 + 注入 2 但只落 1 → count=2 假通过）。filename/preview-key 精确匹配为 per-adapter 可选强化。
 
-附件场景把 send button 等待窗口延长到约 30s，期间轮询 `detectAttachmentUploadError()`。explicit error 与 timeout 都映射 `delivery-failed`，文案 `upload failed`。
+附件场景把 send button 等待窗口延长到约 30s，期间轮询 `detectAttachmentUploadError()`。explicit error 与 timeout 都映射 `upload-failed`，文案 `upload failed`。
 
 rollout 顺序按 provider 分开交付，避免一套不稳定 DOM 策略同时污染多家：
 
@@ -171,9 +171,9 @@ export type CapturedAttachment = {
 };
 
 export type WorkspaceIssue =
-  | 'needs-login' | 'loading' | 'delivery-failed' | 'error-page'
+  | 'needs-login' | 'loading' | 'delivery-failed' | 'upload-failed' | 'error-page'
   | 'attachment-limit'
-  | 'unsupported-attachment'; // new
+  | 'unsupported-attachment';
 ```
 
 > 注意：`AttachmentRef` **不含 sha256**——v1 无消费者（不做 dedupe，指纹用 id，同进程 IndexedDB 完整性风险低）。
@@ -204,11 +204,11 @@ background-owned，`chrome.storage.session` metadata + IndexedDB raw bytes。函
 3. **mixed 附件部分不支持** → 该 target 整单 `unsupported-attachment`，不发部分。
 4. **数量超过 target 上限** → 该 target 整单 `attachment-limit`，不发前 N 个，也不发纯文本。
 5. 超总预算 / 超单文件 25MB / 超 20 数量 → 写 store 前跳过附件 fan-out + 提示，不阻断原生发送。
-6. 单文件在限内但 provider 原生拒绝 → `detectAttachmentUploadError` / timeout → `delivery-failed`，文案 `upload failed`。
+6. 单文件在限内但 provider 原生拒绝 → `detectAttachmentUploadError` / timeout → `upload-failed`，文案 `upload failed`。
 7. delivery 抛错/超时 **或 `handleUserSubmit` 早退**（无 workspace / provider disabled / sync paused）→ outer finally 仍按 submitId 删除，store 不漏。写入失败/取消 → `ATTACHMENT_ABORT` 即时释放；source tab 关闭只提前清 `status=writing` 且未 bind 的 staging 条目，ready 条目交给 submit lifecycle / TTL，避免 USER_SUBMIT→bind 窗口误删。
 8. 文本紧随图片 submit → 上一批附件在 fan-out 完成时已删（release 绑 deliver 完成，不绑下次 submit）。
 9. 程序注入反射成用户输入 → target 的 suppression 必须在**任何**注入前开启（synthetic paste / stable input change / transient input change）。
-10. **注入静默失败** → `getComposerAttachmentPresence()` 的 baseline+delta 确认不足 → 不发送、`delivery-failed`，杜绝"附件丢成纯文本却报成功"。
+10. **注入静默失败** → `getComposerAttachmentPresence()` 的 baseline+delta 确认不足 → 不发送、`upload-failed`，杜绝"附件丢成纯文本却报成功"。
 11. 指纹碰撞 → attachmentIds 进指纹。
 12. **用户删附件（submit-time 为准）**：capture buffer 只缓存 `File` bytes 来源；发送前一刻读取 source composer DOM 的 attachment card/preview 作为当前附件真相源，过滤 captured files。无法确认当前附件或无法唯一匹配（例如同名重复文件只剩部分 preview）→ 本次跳过附件 fan-out，并 toast 提示用户；不同步旧 buffer。仅影响 ask'em fan-out，不挡原生发送。
 13. 源上传未完成用户已回车 → capture 在 paste/drop/change 时拿到 raw File，不依赖源 provider 上传完成。

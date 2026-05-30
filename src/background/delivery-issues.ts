@@ -20,6 +20,10 @@ export function classifyDeliveryIssue(result: ProviderDeliveryResult): Workspace
     return 'unsupported-attachment';
   }
 
+  if (normalizedReason.includes('upload failed')) {
+    return 'upload-failed';
+  }
+
   if (normalizedReason.includes('login required')) {
     return 'needs-login';
   }

@@ -61,6 +61,7 @@ export type WorkspaceIssue =
   | 'needs-login'
   | 'loading'
   | 'delivery-failed'
+  | 'upload-failed'
   | 'error-page'
   | 'attachment-limit'
   | 'unsupported-attachment';

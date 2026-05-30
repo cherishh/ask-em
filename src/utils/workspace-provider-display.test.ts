@@ -69,6 +69,22 @@ describe('workspace provider display', () => {
     });
   });
 
+  it('surfaces upload failures as needs attention', () => {
+    expect(
+      getWorkspaceProviderDisplay({
+        memberState: 'ready',
+        memberIssue: 'upload-failed',
+        enabled: true,
+        globalSyncEnabled: true,
+        hasMember: true,
+      }),
+    ).toEqual({
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Upload failed',
+    });
+  });
+
   it('surfaces provider error pages as needs attention', () => {
     expect(
       getWorkspaceProviderDisplay({

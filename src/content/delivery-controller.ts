@@ -16,6 +16,11 @@ const ATTACHMENT_DELIVERY_TIMEOUT_MS = 30_000;
 const ATTACHMENT_DELIVERY_POLL_MS = 250;
 const PROGRAMMATIC_SUBMIT_BUFFER_MS = 10_000;
 
+function getDeliveryWarningLabel(error: unknown): string {
+  const reason = error instanceof Error ? error.message : String(error);
+  return reason.toLowerCase().includes('upload failed') ? 'upload failed' : 'Delivery failed';
+}
+
 function countAttachmentPresenceDelta(
   baseline: ComposerAttachmentPresence,
   current: ComposerAttachmentPresence,
@@ -289,7 +294,7 @@ export function createDeliveryController(
           detail: `${error instanceof Error ? error.message : String(error)}; attachments=${message.attachments.length}`,
           workspaceId: message.workspaceId,
         });
-        state.showCurrentWarning('Delivery failed');
+        state.showCurrentWarning(getDeliveryWarningLabel(error));
         sendResponse({
           ok: false,
           error: error instanceof Error ? error.message : String(error),

@@ -227,11 +227,55 @@ describe('content delivery controller attachment flow', () => {
 
     await waitForAssertion(() => {
       expect(adapter.composer?.submit).not.toHaveBeenCalled();
-      expect(state.showCurrentWarning).toHaveBeenCalledWith('Delivery failed');
+      expect(state.showCurrentWarning).toHaveBeenCalledWith('upload failed');
       expect(sendResponse).toHaveBeenCalledWith({
         ok: false,
         error: 'upload failed',
       });
     });
+  });
+
+  it('does not submit pure text when attachment presence never appears', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const adapter = createAdapter({
+        getComposerAttachmentPresence: vi.fn().mockResolvedValue({ count: 0 }),
+        detectAttachmentUploadError: vi.fn(() => null),
+      });
+      const sendResponse = vi.fn();
+      const state = createState();
+      const controller = createDeliveryController(adapter, state as any, {
+        suppressObservedSubmissionsFor: vi.fn(),
+        rememberProgrammaticSubmit: vi.fn(),
+      }, {
+        reportPresence: vi.fn(),
+        resetIndicatorPosition: vi.fn(),
+        logDebug: vi.fn(),
+      });
+
+      controller.handleRuntimeMessage({
+        type: 'DELIVER_PROMPT',
+        workspaceId: 'w1',
+        provider: 'claude',
+        content: 'hello',
+        attachments: [{ id: 'a1', name: 'a.png', mime: 'image/png', size: 1 }],
+        expectedSessionId: 'c-1',
+        expectedUrl: 'https://claude.ai/chat/c-1',
+        timestamp: 1,
+      }, sendResponse);
+
+      await vi.advanceTimersByTimeAsync(31_000);
+
+      expect(adapter.composer?.setComposerPayload).toHaveBeenCalled();
+      expect(adapter.composer?.submit).not.toHaveBeenCalled();
+      expect(state.showCurrentWarning).toHaveBeenCalledWith('upload failed');
+      expect(sendResponse).toHaveBeenCalledWith({
+        ok: false,
+        error: expect.stringContaining('attachment presence timeout'),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

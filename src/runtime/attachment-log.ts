@@ -1,5 +1,6 @@
 type AttachmentLogRef = {
   id: string;
+  name?: string;
   mime?: string;
   size: number;
   source?: string;
@@ -21,7 +22,8 @@ export function formatAttachmentSummary(refs: readonly AttachmentLogRef[]): stri
   const items = refs
     .map((ref) => {
       const source = ref.source ? `:${ref.source}` : '';
-      return `${shortAttachmentId(ref.id)}:${ref.mime || 'unknown'}:${ref.size}b${source}`;
+      const name = ref.name ? `:${ref.name}` : '';
+      return `${shortAttachmentId(ref.id)}${name}:${ref.mime || 'unknown'}:${ref.size}b${source}`;
     })
     .join(', ');
 

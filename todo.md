@@ -34,7 +34,7 @@
   - **单文件 ≤ `25 MB`（`ATTACHMENT_MAX_FILE_BYTES`，新增）**。超过则跳过附件 fan-out + 提示 `attachment too large`，不阻断原生发送。
   - **总 in-flight raw budget = `50 MB`（`ATTACHMENT_SESSION_BUDGET_BYTES`，从 100MB 下调；可调旋钮）**。理由：base64 wire 膨胀 ~33% + 每个 target 重复搬运（×N）放大瞬时内存/CPU，不是落盘膨胀。
   - provider 自身更低的数量/格式限制由 capability gate 收紧。
-- 单文件在 25MB 以内、但某 provider 自己拒绝（大小/格式）→ 原生上传失败 → 统一映射 `delivery-failed`，文案 `upload failed`。
+- 单文件在 25MB 以内、但某 provider 自己拒绝（大小/格式）→ 原生上传失败 → 统一映射 `upload-failed`，文案 `upload failed`。
 - **生命周期以 submitId 作用域，不做 per-delivery 引用计数 [B2]**（详见「生命周期硬约束」）。
 
 ## 二进制传输契约 [P1-a]（新增，执行前必须先定）
@@ -60,7 +60,7 @@
   - `source: 'paste' | 'drop' | 'file-input' | 'transient-file-input'`
 - [ ] `UserSubmitMessage` 增加 `attachments: AttachmentRef[]`（text-only 为空数组）+ `submitId`（content 过 dedupe 后铸的唯一 handle，贯穿 staging create、bind、release [R2-P1-2]）。
 - [ ] `DeliverPromptMessage` 增加 `attachments: AttachmentRef[]`，text-only 时为空数组。
-- [ ] `WorkspaceIssue` 增加 `unsupported-attachment` / `attachment-limit`。
+- [ ] `WorkspaceIssue` 增加 `unsupported-attachment` / `attachment-limit` / `upload-failed`。
 - [ ] `ProviderAdapter` 增加 `uploadCapability?: UploadCapability`。
 - [ ] `ProviderComposerAdapter` 增加 `setComposerPayload?({ text, attachments })`。
 - [ ] `ProviderComposerAdapter` 增加 `detectAttachmentUploadError?()`（先 TODO stub，smoke test 补 selector）。
@@ -141,7 +141,7 @@ type UploadCapability = {
   - 写入文本。
   - 有附件：从 background `ATTACHMENT_READ_CHUNK` 读 base64 chunk，增量重建 `File`。
   - synthetic paste 注入附件（或 provider override 的路径）。
-  - **submit 前用 baseline+delta 正向确认 [A1 + R2-P1-4]**：注入前 `getComposerAttachmentPresence()` 快照 baseline，注入后确认 **delta** 等于本次 refs（数量，可选 filename/preview-key 匹配）。delta 不足 → 不发送，映射 `delivery-failed`。仅看绝对 count 会把 target 已有的草稿/旧 preview 误判为注入成功；仅靠 send button enable 更不足以证明附件已附上。
+  - **submit 前用 baseline+delta 正向确认 [A1 + R2-P1-4]**：注入前 `getComposerAttachmentPresence()` 快照 baseline，注入后确认 **delta** 等于本次 refs（数量，可选 filename/preview-key 匹配）。delta 不足 → 不发送，映射 `upload-failed`。仅看绝对 count 会把 target 已有的草稿/旧 preview 误判为注入成功；仅靠 send button enable 更不足以证明附件已附上。
   - 附件场景把 send button 等待窗口延长到约 30 秒。
   - 等待期间轮询 `detectAttachmentUploadError()`。
 - [ ] Provider override 可替换完整 payload 顺序，不允许 delivery code 硬编码 text-first。
@@ -152,7 +152,7 @@ type UploadCapability = {
 - [ ] Gemini override：synthetic paste。
 - [ ] DeepSeek override：隐藏 file input fallback。
 - [ ] Manus override：点击工具按钮，选择 `Add from local files`，捕获 transient input，注入文件。
-- [ ] explicit upload error 和 timeout 都返回 `delivery-failed`，文案统一 `upload failed`。
+- [x] explicit upload error 和 timeout 都返回 `upload-failed`，文案统一 `upload failed`。
 - [ ] **delivery 释放在 `handleUserSubmit` 的 outer finally 里按 submitId 删除 [B2 + R2-P1-3]**，不在单个 delivery、也不在 fan-out 内层 finally。
 
 ## Capability Gate
@@ -165,7 +165,7 @@ type UploadCapability = {
 ## UI 和 Issue
 
 - [ ] **`unsupported-attachment` / `attachment-limit` presentation helper 与 Phase 2 capability gate 同批完成**（不拖到 Phase 6），否则 background 已产 issue、UI 解释不了。展示短语如 `attachment not supported` / `attachment limit exceeded`。
-- [ ] target attachment upload rejection 使用现有 `delivery-failed`，展示 `upload failed`。
+- [x] target attachment upload rejection 使用 `upload-failed`，展示 `upload failed`。
 - [ ] 不增加新的 uploading phase，继续复用现有 syncing/failure 状态。
 - [ ] debug log CSV 测试中 grep，确保没有 base64 或 dataURL。
 
@@ -273,7 +273,7 @@ type UploadCapability = {
 
 验收：
 - [x] 一个已支持附件能 fan-out 到 Claude target 并发送。
-- [x] **注入失败（mock 不接附件的 DOM）时 target 不发纯文本、上报 `delivery-failed` [A1]**。
+- [x] **注入失败（mock 不接附件的 DOM）时 target 不发纯文本、上报 `upload-failed` [A1]**。
 - [x] `USER_SUBMIT` 发出时对应 ref 已是 `ready` [A2]。
 - [x] fan-out 后 store 无残留；人为制造 delivery failure 后 store 仍 drain。
 
@@ -299,15 +299,15 @@ type UploadCapability = {
   - [x] Claude/ChatGPT 当前链路覆盖注入、presence、baseline+delta、同名重复附件和 source snapshot 过滤。
   - [x] Gemini 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
   - [x] Gemini target 已有旧草稿附件时，baseline+delta 不误判。
-  - [x] Gemini 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`（通用 controller gate + adapter presence fixture）。
+  - [x] Gemini 注入失败或 presence delta 不足时，不点击 send，返回 `upload-failed`（通用 controller gate + adapter presence fixture）。
   - [x] Gemini 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认。
   - [x] DeepSeek 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
   - [x] DeepSeek target 已有旧草稿附件时，baseline+delta 不误判。
-  - [x] DeepSeek 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`（通用 controller gate + adapter fail-fast/old-draft fixture）。
+  - [x] DeepSeek 注入失败或 presence delta 不足时，不点击 send，返回 `upload-failed`（通用 controller gate + adapter fail-fast/old-draft fixture）。
   - [x] DeepSeek 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认（adapter fixture 覆盖多文件/同名 preview 计数；真实 smoke 待手测）。
   - [x] Manus 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key（visible cards 有 keys；`+N` 聚合时保留 count delta）。
   - [x] Manus target `/app` 恢复未提交 draft 时，经 provider `prepareForDelivery` 点击 `New task` 并确认附件 baseline 为 0 后再注入。
-  - [x] Manus 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`（通用 controller gate + transient delivery timeout）。
+  - [x] Manus 注入失败或 presence delta 不足时，不点击 send，返回 `upload-failed`（通用 controller gate + transient delivery timeout）。
   - [x] Manus free-plan 多文件作为 target 时由 capability gate 拦截为 `attachment-limit`，不进入 transient 注入；adapter 仍能识别 Manus 自身 `up to 1 file` modal 为 `upload failed` 兜底。
 - [ ] 每家 smoke 后复核 `uploadCapability`，若 provider 实际拒绝某类文件，收紧该 provider capability。
 - [ ] 保持 debug log 可用于开发排查：不要为隐私牺牲准确性；记录足够定位问题的 prompt preview / filename keys / bytes / count / id prefix。base64/dataURL 仍只应出现在传输层。
@@ -420,33 +420,33 @@ type UploadCapability = {
 #### Phase 5.5：Provider delivery 收口
 
 - [ ] 5 个 provider（含 Claude）作为 target 都能收到 fanned-out 已支持附件。
-- [ ] 任一 provider 不支持某格式/数量时，只标记该 provider，不影响其他 provider。
-- [ ] 任一 provider attachment injection 静默失败时，不发送纯文本，标记 `delivery-failed`。
+- [x] 任一 provider 不支持某格式/数量时，只标记该 provider，不影响其他 provider。
+- [x] 任一 provider attachment injection 静默失败时，不发送纯文本，标记 `upload-failed`。
 - [x] 每家 target 的日志序列可用于排查：delivery started → payload injected → attachment presence confirmed → submit dispatched / delivery failed。
-- [ ] `pnpm compile`、`pnpm test`、`pnpm build` 通过。
+- [x] `pnpm compile`、`pnpm test`、`pnpm build` 通过。
 
 ### Phase 6：UI Surfacing
 
-- [ ] indicator/popup 展示 `attachment not supported` / `attachment limit exceeded`（presentation helper 已在 Phase 2 就绪，这里接线）。
-- [ ] target 上传失败展示 `upload failed`。
-- [ ] 不增加新 uploading 状态。
-- [ ] debug logs 不含大块二进制 payload / base64 chunk / dataURL；prompt preview 和 filename key 允许用于开发排查。
+- [x] indicator/popup 展示 `attachment not supported` / `attachment limit exceeded`（presentation helper 已在 Phase 2 就绪，这里接线）。
+- [x] target 上传失败展示 `upload failed`。
+- [x] 不增加新 uploading 状态。
+- [x] debug logs 不含大块二进制 payload / base64 chunk / dataURL；prompt preview 和 filename key 允许用于开发排查。
 
 验收：
-- [ ] 不支持附件时 popup 能看到 `attachment not supported`；超 target 数量上限时能看到 `attachment limit exceeded`。
-- [ ] target 上传失败时能看到 `upload failed`。
-- [ ] log grep 无 base64/dataURL。
+- [x] 不支持附件时 popup 能看到 `attachment not supported`；超 target 数量上限时能看到 `attachment limit exceeded`。
+- [x] target 上传失败时能看到 `upload failed`。
+- [x] log grep 无 base64/dataURL。
 
 ### Phase 7：Hardening
 
 - [ ] 测试 background restart mid-delivery，TTL 能清理 orphan。
-- [ ] 权限审计：确认不需要新增 `host_permissions`，且**确认未引入 `alarms`**。
+- [x] 权限审计：确认不需要新增 `host_permissions`，且**确认未引入 `alarms`**。
 - [x] 扩展现有 `chrome.tabs.onRemoved` handler：source tab 关闭时只清该 `ownerTabId` 下 `status=writing` 且未 bind 的 staging 条目，提前腾预算；不清 ready 条目，避免 USER_SUBMIT→bind 窗口内误删 fan-out 附件。
 - [ ] 补充 lifecycle/pitfall 文档（含「logs must stay diagnostic」「never assume source upload finished before capture」「base64 仅限传输消息」）。
 
 验收：
 - [ ] restart/orphan dry-run 后 store 为空。
-- [ ] 所有测试通过。
+- [x] 所有测试通过。
 
 ## Guardrails
 
