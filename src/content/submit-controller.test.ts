@@ -42,6 +42,7 @@ function createState() {
     setSyncing: vi.fn(),
     applySubmitResponse: vi.fn(),
     showCurrentWarning: vi.fn(),
+    showToast: vi.fn(),
   };
 }
 
@@ -200,6 +201,44 @@ describe('submit controller attachment staging', () => {
       attachments: [],
     });
     expect(state.showCurrentWarning).toHaveBeenCalledWith('attachment sync skipped');
+  });
+
+  it('shows a toast when ambiguous source attachments are skipped before staging', async () => {
+    const sendMessage = vi.fn(async (_message: unknown) => ({ ok: true }));
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const state = createState();
+    const controller = createSubmitController(createAdapter(), state as any, {
+      reportPresence: vi.fn(),
+      logDebug: vi.fn(),
+    });
+
+    await controller.reportUserSubmit({
+      text: 'hello',
+      attachments: [],
+      attachmentResolution: {
+        attachments: [],
+        capturedCount: 2,
+        currentCount: 1,
+        submittedCount: 0,
+        reason: 'ambiguous-current-attachments',
+      },
+    });
+
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage.mock.calls[0]?.[0]).toMatchObject({
+      type: 'USER_SUBMIT',
+      attachments: [],
+    });
+    expect(state.showCurrentWarning).toHaveBeenCalledWith('attachment sync skipped');
+    expect(state.showToast).toHaveBeenCalledWith(
+      'Attachment sync skipped: duplicate filenames are ambiguous.',
+      'warning',
+    );
   });
 
   it('rejects oversized attachments before reading file bytes', async () => {

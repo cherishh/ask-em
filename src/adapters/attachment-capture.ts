@@ -86,8 +86,22 @@ export function normalizeCapturedFiles(
   });
 }
 
+function isFileLike(value: unknown): value is File {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<File>;
+  return (
+    typeof candidate.name === 'string' &&
+    typeof candidate.type === 'string' &&
+    typeof candidate.size === 'number' &&
+    typeof candidate.arrayBuffer === 'function'
+  );
+}
+
 export function getFilesFromFileList(files: FileList | File[] | null | undefined): File[] {
-  return Array.from(files ?? []).filter((file): file is File => file instanceof File);
+  return Array.from(files ?? []).filter(isFileLike);
 }
 
 export function getFilesFromDataTransfer(dataTransfer: DataTransfer | null | undefined): File[] {
@@ -103,11 +117,26 @@ export function getFilesFromDataTransfer(dataTransfer: DataTransfer | null | und
   return Array.from(dataTransfer.items ?? [])
     .filter((item) => item.kind === 'file')
     .map((item) => item.getAsFile())
-    .filter((file): file is File => file instanceof File);
+    .filter(isFileLike);
 }
 
 function compactAttachmentText(value: string): string {
   return value.replace(/\s+/g, '').toLowerCase();
+}
+
+function hasDuplicateCapturedAttachmentNames(attachments: CapturedAttachment[]): boolean {
+  const counts = new Map<string, number>();
+
+  for (const attachment of attachments) {
+    const compactName = compactAttachmentText(attachment.name);
+    if (!compactName) {
+      continue;
+    }
+
+    counts.set(compactName, (counts.get(compactName) ?? 0) + 1);
+  }
+
+  return Array.from(counts.values()).some((count) => count > 1);
 }
 
 function findCapturedAttachmentForSnapshotItem(
@@ -187,6 +216,16 @@ export class ComposerAttachmentCaptureBuffer {
         currentCount,
         submittedCount: 0,
         reason: 'no-current-attachments',
+      };
+    }
+
+    if (hasDuplicateCapturedAttachmentNames(captured) && currentCount !== captured.length) {
+      return {
+        attachments: [],
+        capturedCount: captured.length,
+        currentCount,
+        submittedCount: 0,
+        reason: 'ambiguous-current-attachments',
       };
     }
 

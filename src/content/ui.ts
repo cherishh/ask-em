@@ -62,6 +62,7 @@ type DragState = {
 const DRAG_THRESHOLD_PX = 6;
 const FALLBACK_PILL_WIDTH = 260;
 const FALLBACK_PILL_HEIGHT = 44;
+const TOAST_VISIBLE_MS = 10_000;
 
 function matchesShortcut(event: KeyboardEvent, binding: ShortcutBinding): boolean {
   const apple = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
@@ -131,6 +132,17 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     shell.appendChild(panel);
   }
 
+  let toast = shell.querySelector('.ask-em-toast') as HTMLDivElement | null;
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'ask-em-toast';
+    toast.dataset.visible = 'false';
+    toast.dataset.tone = 'neutral';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    shell.appendChild(toast);
+  }
+
   let mount = document.getElementById(mountId) as HTMLButtonElement | null;
   if (!mount) {
     mount = document.createElement('button');
@@ -175,6 +187,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   let currentPlacement = getDefaultIndicatorPlacement();
   let dragState: DragState | null = null;
   let suppressClickUntil = 0;
+  let toastTimer: number | null = null;
 
   const getViewportSize = () => ({
     width: window.innerWidth,
@@ -268,6 +281,24 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     if (syncLabel) {
       syncLabel.textContent = text;
     }
+  };
+
+  const hideToast = () => {
+    toast.dataset.visible = 'false';
+  };
+
+  const showToast = (message: string, tone: 'neutral' | 'warning' = 'neutral') => {
+    if (toastTimer !== null) {
+      window.clearTimeout(toastTimer);
+    }
+
+    toast.textContent = message;
+    toast.dataset.tone = tone;
+    toast.dataset.visible = 'true';
+    toastTimer = window.setTimeout(() => {
+      hideToast();
+      toastTimer = null;
+    }, TOAST_VISIBLE_MS);
   };
 
   const setPanelVisible = (visible: boolean) => {
@@ -653,6 +684,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     setAlertLevel(level: IndicatorAlertLevel) {
       mount.dataset.alertLevel = level;
     },
+    showToast,
     setContext(nextContext: UiContext) {
       context.workspaceId = nextContext.workspaceId;
       context.providerEnabled = nextContext.providerEnabled;
@@ -680,6 +712,9 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       await resetPosition();
     },
     destroy() {
+      if (toastTimer !== null) {
+        window.clearTimeout(toastTimer);
+      }
       mount.removeEventListener('click', handleMountClick);
       mount.removeEventListener('mousemove', handleMountMouseMove);
       mount.removeEventListener('mouseleave', handleMountMouseLeave);

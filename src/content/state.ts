@@ -48,6 +48,7 @@ export function createContentState(
     setState(state: 'idle' | 'blocked' | 'syncing' | 'listening', label: string): void;
     setSyncStatus(label: string, tone?: 'neutral' | 'success' | 'warning'): void;
     setAlertLevel(level: IndicatorAlertLevel): void;
+    showToast?(message: string, tone?: 'neutral' | 'warning'): void;
   },
 ) {
   const viewRuntime = createInitialViewRuntime();
@@ -163,6 +164,10 @@ export function createContentState(
     ui.setAlertLevel(presentation.alertLevel);
   };
 
+  const showToast = (message: string, tone: 'neutral' | 'warning' = 'neutral') => {
+    ui.showToast?.(message, tone);
+  };
+
   const rememberProgrammaticSubmit = (content: string) => {
     rememberProgrammaticSubmitInRuntime(submitRuntime, content);
   };
@@ -196,6 +201,7 @@ export function createContentState(
     setProviderEnabled,
     setSyncing,
     showCurrentWarning,
+    showToast,
     suppressObservedSubmissions(durationMs: number, now = Date.now()) {
       suppressSubmitRuntime(submitRuntime, durationMs, now);
     },

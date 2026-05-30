@@ -316,7 +316,17 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
       subscribeToUserSubmissions(onSubmit) {
         const attachmentBuffer = new ComposerAttachmentCaptureBuffer();
         const buildUserSubmissionPayload = (text: string) => {
-          const capturedAttachments = attachmentBuffer.getAttachmentsForSubmit();
+          let capturedAttachments = attachmentBuffer.getAttachmentsForSubmit();
+          if (capturedAttachments.length === 0) {
+            const lateFiles = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
+              .filter(isFileInputForComposer)
+              .flatMap((input) => getFilesFromFileList(input.files));
+            if (lateFiles.length > 0) {
+              attachmentBuffer.addFiles(lateFiles, 'file-input');
+              capturedAttachments = attachmentBuffer.getAttachmentsForSubmit();
+            }
+          }
+
           const attachmentResolution: AttachmentSubmitResolution = attachmentBuffer.resolveAttachmentsForSubmit(
             capturedAttachments.length > 0 ? getComposerAttachmentSnapshot(capturedAttachments) : {
               count: 0,

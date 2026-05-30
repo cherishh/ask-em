@@ -237,11 +237,13 @@ type UploadCapability = {
 ### Phase 3：Source Capture（paste / drop / 稳定 input）
 
 - [x] paste/drop/稳定 file input 捕获 + provider-specific scoping。
+- [x] file extraction 不依赖 `instanceof File`；跨 isolated/main world 的 File-like 对象用 duck-typing 接受。
 - [x] capture-time 稳定 id 的 per-tab buffer。
 - [x] **dedupe gate 先于 store 写入 [A3]**；fingerprint 含 attachment ids。
 - [x] buffer → store 的 chunked base64 write；`USER_SUBMIT` 等 finalize 再发 [A2]。
 - [x] **过 dedupe 后铸 `submitId`，贯穿 staging create + USER_SUBMIT [R2-P1-2]**；失败/取消时发 `ATTACHMENT_ABORT(submitId)` [R2-P2-5]。
 - [x] submit-time source snapshot 过滤 captured files；删除/移除后以发送前一刻 DOM 为准，不再维护删除 shadow state。
+- [x] submit-time fallback：若 capture buffer 为空，发送前从 provider-scoped `input[type=file]` 读取当前 `files`，再交给 source snapshot 确认；无当前 preview 时仍 fail-closed，不同步 stale input。
 - [x] 超数量/超单文件/超预算跳过 fan-out + 提示，不阻断原生发送。
 - [x] submit-runtime suppression 覆盖 synthetic paste / file-input change。
 
@@ -273,19 +275,148 @@ type UploadCapability = {
 - [x] `USER_SUBMIT` 发出时对应 ref 已是 `ready` [A2]。
 - [x] fan-out 后 store 无残留；人为制造 delivery failure 后 store 仍 drain。
 
-### Phase 5：扩展到其他 Provider
+### Phase 5：Per-provider Target Delivery
 
-- [ ] ChatGPT synthetic paste。
-- [ ] Gemini synthetic paste。
-- [ ] DeepSeek hidden file input fallback。
-- [ ] Manus menu-triggered transient input fallback（依赖 Phase 3.5）。
-- [ ] 每个 adapter 启动正确 suppression + `getComposerAttachmentPresence()`。
-- [ ] 每个 adapter 留 `detectAttachmentUploadError()` TODO，smoke test 后补 selector。
-- [ ] 按 smoke test 修正 capability。
+> 原则：delivery core 只负责读取 refs、重建 `File`、baseline+delta gate、等待/错误映射和 submit 调度；DOM 路径、payload 顺序、presence key、upload error selector 全部留在 provider adapter。
 
-验收：
-- [ ] 5 个 provider 作为 target 都能收到 fanned-out 已支持附件。
-- [ ] 某 provider 不支持某格式/数量时只标记该 provider，不影响其他 provider。
+#### Phase 5.0：Delivery rollout 基线
+
+> 5.0 是每家 provider rollout 前/中的 guardrail，不是一次性功能阶段。当前因先有 Claude/ChatGPT 现场页面与日志，5.1 已先落地，并在这里回填已完成的基线项；Gemini/DeepSeek/Manus 仍需各自开工前补齐。
+
+- [ ] 固化通用验收 fixture：
+  - [ ] `askem-spike.png` 单图。
+  - [ ] `.md/.txt` 纯文本文件。
+  - [x] 2 个同批多文件（Claude → ChatGPT 同名 PDF x2 smoke 已通过）。
+- [ ] 每家 provider 开工前先用 Chrome/extension 实测当前 composer DOM，记录：file injection 入口、attachment preview/chip selector、upload error selector、send button enable 条件。
+  - [x] Claude：source snapshot / upload input / PDF preview DOM 已复核（`img[alt]` + `Remove <filename>`，上传后 `input.files` 会清空）。
+  - [x] ChatGPT：target composer DOM 已复核（`form[data-type="unified-composer"]` / `#upload-files` / file tile / submit button）。
+  - [ ] Gemini。
+  - [ ] DeepSeek。
+  - [ ] Manus。
+- [ ] 每家 provider 的 adapter 测试都覆盖：
+  - [x] Claude/ChatGPT 当前链路覆盖注入、presence、baseline+delta、同名重复附件和 source snapshot 过滤。
+  - [ ] Gemini 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
+  - [ ] Gemini target 已有旧草稿附件时，baseline+delta 不误判。
+  - [ ] Gemini 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`。
+  - [ ] Gemini 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认。
+  - [ ] DeepSeek 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
+  - [ ] DeepSeek target 已有旧草稿附件时，baseline+delta 不误判。
+  - [ ] DeepSeek 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`。
+  - [ ] DeepSeek 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认。
+  - [ ] Manus 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
+  - [ ] Manus target 已有旧草稿附件时，baseline+delta 不误判。
+  - [ ] Manus 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`。
+  - [ ] Manus 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认。
+- [ ] 每家 smoke 后复核 `uploadCapability`，若 provider 实际拒绝某类文件，收紧该 provider capability。
+- [ ] 保持 debug log 只记生命周期/bytes/count/id prefix，不记 base64、dataURL、完整 filename。
+
+#### Phase 5.1：ChatGPT target delivery
+
+- [x] 实测 ChatGPT 当前 composer DOM：`form[data-type="unified-composer"]` / `#prompt-textarea` / `#upload-files` / `role="group"` file tile / `#composer-submit-button`。
+- [x] 实现 ChatGPT `setComposerPayload`：
+  - [x] 默认 text-first。
+  - [x] 优先 composer-scoped `#upload-files` file input 注入；找不到 scoped input 时再 synthetic paste fallback。
+  - [x] 注入逻辑在 ChatGPT adapter 内，不改 delivery core。
+  - [x] suppression 由 delivery controller 在写文本和注入附件前开启。
+- [x] 实现 ChatGPT `getComposerAttachmentPresence(expected)`：
+  - [x] count delta。
+  - [x] 能取到 filename/preview text 时返回 keys。
+  - [x] 同名重复文件无法唯一确认时 fail-closed，避免错配，并 toast 提示本次附件 fan-out 跳过。
+- [x] 实现或明确保留 ChatGPT `detectAttachmentUploadError()`：
+  - [x] alert / aria-live / toast / error 容器里的 upload failed / unsupported / too large。
+  - [ ] 真实 upload rejection smoke 后补更精确 selector（如果当前 selector 漏报则保留 30s timeout 兜底）。
+- [x] 测试：
+  - [x] adapter DOM fixture 覆盖 file input injection path 和 synthetic paste fallback。
+  - [x] presence baseline+delta 测试覆盖已有旧附件。
+  - [x] Claude source snapshot 兼容当前 PDF preview DOM（`img[alt]` + `Remove <filename>`），避免 Claude → ChatGPT 时 `captured=1; current=0` 把附件过滤为 0。
+  - [ ] delivery-controller 负向测试覆盖 ChatGPT presence 不足不 submit（通用 controller 已覆盖，若发现 ChatGPT 特有条件再补）。
+- [ ] 手测：
+  - [ ] Claude/任一 source → ChatGPT target：单图。
+  - [ ] Claude/任一 source → ChatGPT target：`.md/.txt`。
+  - [x] Claude/任一 source → ChatGPT target：多文件（同名 PDF x2）。
+
+#### Phase 5.2：Gemini target delivery
+
+- [ ] 实测 Gemini 当前 composer DOM：`.ql-editor`、附件 chip/preview、upload error、send button。
+- [ ] 实现 Gemini `setComposerPayload`：
+  - [ ] 默认 text-first。
+  - [ ] 优先 synthetic paste 注入附件。
+  - [ ] 若 Gemini 只接受 file picker/input，改为 Gemini provider override，不改 delivery core。
+  - [ ] suppression 覆盖文本写入和附件注入。
+- [ ] 实现 Gemini `getComposerAttachmentPresence(expected)`：
+  - [ ] count delta。
+  - [ ] filename/preview key 可用时返回 keys。
+  - [ ] 旧草稿附件不参与新增确认。
+- [ ] 实现或明确保留 Gemini `detectAttachmentUploadError()`：
+  - [ ] unsupported file / upload failed / retry / toast。
+  - [ ] 无稳定 selector 时靠 timeout，但记录 TODO evidence。
+- [ ] 测试：
+  - [ ] adapter DOM fixture 覆盖 payload injection path。
+  - [ ] presence baseline+delta 测试覆盖已有旧附件。
+  - [ ] delivery-controller 负向测试覆盖 Gemini presence 不足不 submit。
+- [ ] 手测：
+  - [ ] Claude/任一 source → Gemini target：单图。
+  - [ ] Claude/任一 source → Gemini target：`.md/.txt`。
+  - [ ] Claude/任一 source → Gemini target：多文件。
+
+#### Phase 5.3：DeepSeek target delivery
+
+- [ ] 实测 DeepSeek 当前 composer DOM：`textarea[placeholder="Message DeepSeek"]`、隐藏/稳定 file input、附件 chip、upload error、send button。
+- [ ] 实现 DeepSeek `setComposerPayload`：
+  - [ ] 默认 text-first。
+  - [ ] 使用 provider-local hidden/stable file input fallback。
+  - [ ] 找不到 composer-scoped input 时 fail fast，不尝试全局乱选 input。
+  - [ ] suppression 覆盖 `input/change`。
+- [ ] 实现 DeepSeek `getComposerAttachmentPresence(expected)`：
+  - [ ] count delta。
+  - [ ] 可用 filename/preview key 时精确匹配。
+  - [ ] 同名重复文件无法唯一确认时 fail-closed。
+- [ ] 实现或明确保留 DeepSeek `detectAttachmentUploadError()`：
+  - [ ] upload failed / unsupported / toast / retry。
+  - [ ] 无稳定 selector 时靠 timeout，并记录 TODO evidence。
+- [ ] 测试：
+  - [ ] adapter DOM fixture 覆盖 hidden input 注入。
+  - [ ] presence baseline+delta 测试覆盖已有旧附件。
+  - [ ] delivery-controller 负向测试覆盖 DeepSeek presence 不足不 submit。
+- [ ] 手测：
+  - [ ] Claude/任一 source → DeepSeek target：单图。
+  - [ ] Claude/任一 source → DeepSeek target：`.md/.txt`。
+  - [ ] Claude/任一 source → DeepSeek target：多文件。
+
+#### Phase 5.4：Manus target delivery
+
+- [ ] 实测 Manus 当前 composer DOM：`.tiptap.ProseMirror`、工具按钮、`Add from local files` 菜单项、transient input、附件 chip、upload error、send button。
+- [ ] 实现 Manus `setComposerPayload`：
+  - [ ] 明确 payload 顺序：若实测需要 attach-first，就在 Manus adapter override，不改 delivery core。
+  - [ ] 点击 composer-scoped 工具按钮。
+  - [ ] 选择 `Add from local files`。
+  - [ ] 复用 Phase 3.5 MAIN-world transient input bridge，把文件注入 transient input。
+  - [ ] 任一步找不到目标时关闭菜单/清理 hook 后 fail fast。
+  - [ ] suppression 覆盖 menu-triggered transient input 的 `input/change`。
+- [ ] 实现 Manus `getComposerAttachmentPresence(expected)`：
+  - [ ] count delta。
+  - [ ] 可用 filename/preview key 时精确匹配。
+  - [ ] 同名重复文件无法唯一确认时 fail-closed。
+- [ ] 实现或明确保留 Manus `detectAttachmentUploadError()`：
+  - [ ] upload failed / unsupported / retry / toast。
+  - [ ] 无稳定 selector 时靠 timeout，并记录 TODO evidence。
+- [ ] 测试：
+  - [ ] adapter DOM fixture 覆盖菜单触发路径。
+  - [ ] transient hook teardown 测试覆盖成功、失败、timeout。
+  - [ ] presence baseline+delta 测试覆盖已有旧附件。
+  - [ ] delivery-controller 负向测试覆盖 Manus presence 不足不 submit。
+- [ ] 手测：
+  - [ ] Claude/任一 source → Manus target：单图。
+  - [ ] Claude/任一 source → Manus target：`.md/.txt`。
+  - [ ] Claude/任一 source → Manus target：多文件。
+
+#### Phase 5.5：Provider delivery 收口
+
+- [ ] 5 个 provider（含 Claude）作为 target 都能收到 fanned-out 已支持附件。
+- [ ] 任一 provider 不支持某格式/数量时，只标记该 provider，不影响其他 provider。
+- [ ] 任一 provider attachment injection 静默失败时，不发送纯文本，标记 `delivery-failed`。
+- [ ] 每家 target 的日志序列可用于排查：delivery started → payload injected → attachment presence confirmed → submit dispatched / delivery failed。
+- [ ] `pnpm compile`、`pnpm test`、`pnpm build` 通过。
 
 ### Phase 6：UI Surfacing
 

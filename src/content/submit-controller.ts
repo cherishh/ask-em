@@ -207,6 +207,9 @@ export function createSubmitController(
       payload.attachmentResolution.reason !== 'no-current-attachments'
     ) {
       state.showCurrentWarning('attachment sync skipped');
+      if (payload.attachmentResolution.reason === 'ambiguous-current-attachments') {
+        state.showToast('Attachment sync skipped: duplicate filenames are ambiguous.', 'warning');
+      }
       await dependencies.logDebug({
         level: 'warn',
         message: 'Skipped source attachments before staging',

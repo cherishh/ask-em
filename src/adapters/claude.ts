@@ -65,6 +65,20 @@ function findClaudeFileInput(container: ParentNode, attachments: AttachmentRef[]
   );
 }
 
+function isClaudeUploadInput(input: HTMLInputElement): boolean {
+  // Claude clears input.files after its own upload starts. Source capture must
+  // catch this input's change event while the File objects are still available.
+  return (
+    input.type === 'file' &&
+    !input.disabled &&
+    (
+      input.matches('input[data-testid="file-upload"]') ||
+      input.matches('input[type="file"][aria-label*="upload" i]') ||
+      input.accept.trim().length > 0
+    )
+  );
+}
+
 function findClaudeComposerRoot(composer: HTMLElement | null): ParentNode {
   let current: HTMLElement | null = composer;
   let sendButtonRoot: HTMLElement | null = null;
@@ -72,7 +86,7 @@ function findClaudeComposerRoot(composer: HTMLElement | null): ParentNode {
   while (current) {
     if (
       current.querySelector('input[data-testid="file-upload"], input[type="file"][aria-label*="upload" i]') ||
-      current.querySelector('[data-testid="file-thumbnail"]')
+      current.querySelector('[data-testid="file-thumbnail"], button[aria-label^="remove " i]')
     ) {
       return current;
     }
@@ -92,7 +106,19 @@ function getElementAccessibleText(element: HTMLElement): string {
     [
       element.getAttribute('aria-label'),
       element.getAttribute('title'),
+      element.getAttribute('alt'),
       element.innerText || element.textContent,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+}
+
+function getElementTreeAccessibleText(element: HTMLElement): string {
+  return normalizeWhitespace(
+    [
+      getElementAccessibleText(element),
+      ...Array.from(element.querySelectorAll<HTMLElement>('*')).map(getElementAccessibleText),
     ]
       .filter(Boolean)
       .join(' '),
@@ -103,25 +129,47 @@ function compactAttachmentText(value: string): string {
   return normalizeWhitespace(value).replace(/\s+/g, '').toLowerCase();
 }
 
-function getExpectedAttachmentKeys(container: ParentNode, expectedAttachments: AttachmentRef[] | undefined): string[] {
-  if (!expectedAttachments || expectedAttachments.length === 0 || !(container instanceof Element || container instanceof Document)) {
+function getClaudeAttachmentItems(container: ParentNode, expectedAttachments?: AttachmentRef[]): string[] {
+  if (!(container instanceof Element || container instanceof Document)) {
     return [];
   }
 
-  const candidates = Array.from(container.querySelectorAll<HTMLElement>('*'))
-    .filter(isVisible)
-    .filter((element) => {
-      const compactText = compactAttachmentText(getElementAccessibleText(element));
-      return expectedAttachments.some((attachment) => {
-        const compactName = compactAttachmentText(attachment.name);
-        return compactName.length > 0 && compactText.includes(compactName);
-      });
-    });
-
-  return candidates
-    .filter((candidate) => !candidates.some((other) => other !== candidate && candidate.contains(other)))
-    .map(getElementAccessibleText)
+  const expectedNames = (expectedAttachments ?? [])
+    .map((attachment) => compactAttachmentText(attachment.name))
     .filter(Boolean);
+  const matchesExpected = (text: string) => (
+    expectedNames.length === 0 ||
+    expectedNames.some((name) => compactAttachmentText(text).includes(name))
+  );
+
+  const fileThumbnailItems = Array.from(container.querySelectorAll<HTMLElement>('[data-testid="file-thumbnail"]'))
+    .filter(isVisible)
+    .map(getElementTreeAccessibleText)
+    .filter(Boolean)
+    .filter(matchesExpected);
+  if (fileThumbnailItems.length > 0) {
+    return fileThumbnailItems;
+  }
+
+  // Claude document/PDF cards often expose the filename through per-file remove
+  // buttons. Counting buttons preserves same-name duplicates better than a set
+  // of filename keys.
+  const removeButtonItems = Array.from(container.querySelectorAll<HTMLElement>('button[aria-label^="Remove " i]'))
+    .filter(isVisible)
+    .map(getElementAccessibleText)
+    .filter(Boolean)
+    .filter(matchesExpected);
+  if (removeButtonItems.length > 0) {
+    return removeButtonItems;
+  }
+
+  // Fallback for current Claude file cards where the only stable filename is
+  // the thumbnail img alt text; this is not image-only logic.
+  return Array.from(container.querySelectorAll<HTMLElement>('img[alt]'))
+    .filter(isVisible)
+    .map(getElementAccessibleText)
+    .filter(Boolean)
+    .filter(matchesExpected);
 }
 
 function findClaudeSendButton(findComposer: () => HTMLElement | null): HTMLElement | null {
@@ -145,10 +193,7 @@ function findClaudeSendButton(findComposer: () => HTMLElement | null): HTMLEleme
 }
 
 function getClaudeFileThumbnailItems(container: ParentNode): string[] {
-  return Array.from(container.querySelectorAll<HTMLElement>('[data-testid="file-thumbnail"]'))
-    .filter(isVisible)
-    .map(getElementAccessibleText)
-    .filter(Boolean);
+  return getClaudeAttachmentItems(container);
 }
 
 export const claudeAdapter = createDomProviderAdapter({
@@ -205,23 +250,42 @@ export const claudeAdapter = createDomProviderAdapter({
       .map((element) => element.getAttribute('aria-label') ?? element.textContent ?? '')
       .map((value) => value.trim())
       .filter(Boolean);
-    const expectedKeys = getExpectedAttachmentKeys(container, expectedAttachments);
-    const keys = Array.from(new Set([...controlKeys, ...expectedKeys]));
+    const expectedKeys = getClaudeAttachmentItems(container, expectedAttachments);
+    const keys = expectedKeys.length > 0 ? expectedKeys : Array.from(new Set([...controlKeys, ...fileThumbnailItems]));
 
     return {
-      count: Math.max(fileThumbnailItems.length, removeButtons.length, expectedKeys.length),
+      count: expectedKeys.length > 0
+        ? expectedKeys.length
+        : Math.max(fileThumbnailItems.length, removeButtons.length),
       keys,
     };
   },
-  getComposerAttachmentSnapshot({ findComposer }) {
+  getComposerAttachmentSnapshot({ findComposer }, capturedAttachments) {
     const composer = findComposer();
     const container = findClaudeComposerRoot(composer);
     const fileThumbnailItems = getClaudeFileThumbnailItems(container);
+    const expectedKeys = getClaudeAttachmentItems(container, capturedAttachments);
+    const items = expectedKeys.length > 0 ? expectedKeys : fileThumbnailItems;
 
     return {
-      count: fileThumbnailItems.length,
-      items: fileThumbnailItems,
+      count: items.length,
+      items,
     };
+  },
+  isFileInputForComposer(input, { composer, sendButton }) {
+    if (!isClaudeUploadInput(input)) {
+      return false;
+    }
+
+    // Claude's upload input can be hidden outside the immediate editor subtree.
+    // If the active page has a Claude composer/send button, treat this upload
+    // input as composer-scoped instead of relying only on root.contains(input).
+    const root = findClaudeComposerRoot(composer);
+    return (
+      (root instanceof Node && root.contains(input)) ||
+      Boolean(composer) ||
+      Boolean(sendButton)
+    );
   },
   detectAttachmentUploadError() {
     const text = document.body?.innerText?.toLowerCase() ?? '';

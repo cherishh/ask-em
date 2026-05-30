@@ -29,6 +29,26 @@ function createDeliveryRequestId(): string {
   );
 }
 
+function createDataTransferWithFiles(files: File[]): DataTransfer {
+  if (typeof DataTransfer === 'function') {
+    const dataTransfer = new DataTransfer();
+    for (const file of files) {
+      dataTransfer.items.add(file);
+    }
+
+    return dataTransfer;
+  }
+
+  return {
+    files,
+    items: files.map((file) => ({
+      kind: 'file',
+      type: file.type,
+      getAsFile: () => file,
+    })),
+  } as unknown as DataTransfer;
+}
+
 function getPostMessageTargetOrigin(): string {
   return window.location.origin && window.location.origin !== 'null' ? window.location.origin : '*';
 }
@@ -119,4 +139,32 @@ export function setFileInputFiles(input: HTMLInputElement, files: File[]): Promi
   return result.finally(() => {
     input.removeAttribute(ASK_EM_FILE_INPUT_TOKEN_ATTRIBUTE);
   });
+}
+
+export function dispatchPasteFiles(target: HTMLElement, files: File[]): void {
+  const clipboardData = createDataTransferWithFiles(files);
+  let event: Event;
+
+  if (typeof ClipboardEvent === 'function') {
+    event = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData,
+    });
+  } else {
+    event = new Event('paste', {
+      bubbles: true,
+      cancelable: true,
+    });
+  }
+
+  if (!(event as ClipboardEvent).clipboardData) {
+    Object.defineProperty(event, 'clipboardData', {
+      configurable: true,
+      value: clipboardData,
+    });
+  }
+
+  target.focus();
+  target.dispatchEvent(event);
 }

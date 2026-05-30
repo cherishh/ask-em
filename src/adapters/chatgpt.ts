@@ -1,6 +1,7 @@
-import { getVisibleButtonTexts, getVisibleHeadingTexts } from './dom';
+import { getVisibleButtonTexts, getVisibleHeadingTexts, isVisible, normalizeWhitespace } from './dom';
 import { createDomProviderAdapter } from './factory';
-import { PROVIDER_UPLOAD_CAPABILITIES } from '../runtime/protocol';
+import { dispatchPasteFiles, readAttachmentFiles, setFileInputFiles } from './attachment-delivery';
+import { getAttachmentExtension, PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef } from '../runtime/protocol';
 
 export function isChatgptLoginRequiredPage(input: {
   pathname: string;
@@ -23,6 +24,164 @@ export function isChatgptLoginRequiredPage(input: {
     buttonTexts.includes('continue with microsoft') ||
     buttonTexts.includes('continue with apple')
   );
+}
+
+function fileInputAcceptsAttachments(input: HTMLInputElement, attachments: AttachmentRef[]): boolean {
+  const accept = input.getAttribute('accept')?.trim().toLowerCase();
+  if (!accept) {
+    return true;
+  }
+
+  const tokens = accept.split(',').map((token) => token.trim()).filter(Boolean);
+  if (tokens.length === 0) {
+    return true;
+  }
+
+  return attachments.every((attachment) => {
+    const mime = attachment.mime.trim().toLowerCase();
+    const extension = getAttachmentExtension(attachment.name);
+
+    return tokens.some((token) => {
+      if (extension && token === `.${extension}`) {
+        return true;
+      }
+
+      if (mime && token === mime) {
+        return true;
+      }
+
+      return token.endsWith('/*') && mime.startsWith(`${token.slice(0, -1)}`);
+    });
+  });
+}
+
+function findChatgptComposerRoot(
+  composer: HTMLElement | null,
+  sendButton: HTMLElement | null,
+): ParentNode {
+  return (
+    composer?.closest('form[data-type="unified-composer"]') ??
+    composer?.closest('form') ??
+    sendButton?.closest('form') ??
+    composer?.closest('[data-composer-surface="true"]') ??
+    composer?.parentElement?.parentElement?.parentElement ??
+    document
+  );
+}
+
+function findChatgptFileInput(container: ParentNode, attachments: AttachmentRef[]): HTMLInputElement | null {
+  const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
+    .filter((input) => !input.disabled);
+  const scopedInputs = inputs.filter((input) => container instanceof Node && container.contains(input));
+  const preferredScopedInputs = scopedInputs.filter((input) => fileInputAcceptsAttachments(input, attachments));
+
+  return (
+    preferredScopedInputs.find((input) => input.multiple || attachments.length <= 1) ??
+    preferredScopedInputs[0] ??
+    scopedInputs.find((input) => !input.getAttribute('accept')) ??
+    scopedInputs[0] ??
+    null
+  );
+}
+
+function getElementAccessibleText(element: HTMLElement): string {
+  return normalizeWhitespace(
+    [
+      element.getAttribute('aria-label'),
+      element.getAttribute('title'),
+      element.innerText || element.textContent,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+}
+
+function compactAttachmentText(value: string): string {
+  return normalizeWhitespace(value).replace(/\s+/g, '').toLowerCase();
+}
+
+function getExpectedAttachmentElements(
+  container: ParentNode,
+  expectedAttachments: AttachmentRef[] | undefined,
+): HTMLElement[] {
+  if (!expectedAttachments || expectedAttachments.length === 0 || !(container instanceof Element || container instanceof Document)) {
+    return [];
+  }
+
+  const compactNames = expectedAttachments
+    .map((attachment) => compactAttachmentText(attachment.name))
+    .filter(Boolean);
+  if (compactNames.length === 0) {
+    return [];
+  }
+
+  const candidates = Array.from(container.querySelectorAll<HTMLElement>('*'))
+    .filter(isVisible)
+    .filter((element) => {
+      const compactText = compactAttachmentText(getElementAccessibleText(element));
+      return compactNames.some((name) => compactText.includes(name));
+    })
+    .map((element) => (
+      element.closest<HTMLElement>('[role="group"][aria-label], [class*="group/file-tile" i]') ?? element
+    ))
+    .filter((element, index, elements) => elements.indexOf(element) === index);
+
+  return candidates.filter(
+    (candidate) => !candidates.some((other) => other !== candidate && candidate.contains(other)),
+  );
+}
+
+function getGenericAttachmentElements(container: ParentNode): HTMLElement[] {
+  if (!(container instanceof Element || container instanceof Document)) {
+    return [];
+  }
+
+  const selectors = [
+    '[role="group"][aria-label]',
+    'button[aria-label^="Remove file" i]',
+    '[class*="group/file-tile" i]',
+    '[data-testid*="file-preview" i]',
+    '[data-testid*="attachment" i]',
+  ];
+  const candidates = selectors.flatMap((selector) => Array.from(container.querySelectorAll<HTMLElement>(selector)))
+    .filter((element, index, elements) => elements.indexOf(element) === index)
+    .filter(isVisible)
+    .filter((element) => {
+      const text = getElementAccessibleText(element).toLowerCase();
+      return text.includes('.') || text.includes('remove file');
+    });
+
+  return candidates.filter(
+    (candidate) => !candidates.some((other) => other !== candidate && candidate.contains(other)),
+  );
+}
+
+function detectChatgptUploadErrorText(): string | null {
+  const errorSelectors = [
+    '[role="alert"]',
+    '[aria-live]',
+    '[data-testid*="toast" i]',
+    '[class*="toast" i]',
+    '[class*="error" i]',
+  ];
+  const visibleTexts = errorSelectors
+    .flatMap((selector) => Array.from(document.querySelectorAll<HTMLElement>(selector)))
+    .filter(isVisible)
+    .map(getElementAccessibleText)
+    .join(' ')
+    .toLowerCase();
+  const uploadErrorPatterns = [
+    'upload failed',
+    'failed to upload',
+    'could not upload',
+    "couldn't upload",
+    'unsupported file',
+    'file too large',
+    'something went wrong uploading',
+    'error uploading',
+  ];
+
+  return uploadErrorPatterns.some((pattern) => visibleTexts.includes(pattern)) ? 'upload failed' : null;
 }
 
 export const chatgptAdapter = createDomProviderAdapter({
@@ -59,9 +218,72 @@ export const chatgptAdapter = createDomProviderAdapter({
     '#composer-submit-button',
     'button[data-testid="send-button"]',
     'button[data-testid="composer-send-button"]',
+    'button[aria-label="Send prompt"]',
     'form[aria-label="Chat with ChatGPT"] button[class*="composer-submit-button"]',
   ],
   errorKeywords: ['unable to load conversation', 'conversation not found'],
+  async setComposerPayload(payload, context) {
+    await context.setComposerText(payload.text);
+
+    if (payload.attachments.length === 0) {
+      return;
+    }
+
+    const composer = context.findComposer();
+    const root = findChatgptComposerRoot(composer, context.findSendButton());
+    const fileInput = findChatgptFileInput(root, payload.attachments);
+    const files = await readAttachmentFiles(payload.attachments);
+
+    if (fileInput) {
+      await setFileInputFiles(fileInput, files);
+      return;
+    }
+
+    if (!composer) {
+      throw new Error('upload failed');
+    }
+
+    dispatchPasteFiles(composer, files);
+  },
+  getComposerAttachmentPresence({ findComposer, findSendButton }, expectedAttachments) {
+    const container = findChatgptComposerRoot(findComposer(), findSendButton());
+    const expectedElements = getExpectedAttachmentElements(container, expectedAttachments);
+    const genericElements = expectedAttachments && expectedAttachments.length > 0
+      ? []
+      : getGenericAttachmentElements(container);
+    const elements = expectedElements.length > 0 ? expectedElements : genericElements;
+    const keys = Array.from(new Set(elements.map(getElementAccessibleText).filter(Boolean)));
+
+    return {
+      count: elements.length,
+      keys,
+    };
+  },
+  getComposerAttachmentSnapshot({ findComposer, findSendButton }, capturedAttachments) {
+    const container = findChatgptComposerRoot(findComposer(), findSendButton());
+    const elements = getExpectedAttachmentElements(container, capturedAttachments);
+
+    if (elements.length > 0) {
+      return {
+        count: elements.length,
+        items: elements.map(getElementAccessibleText).filter(Boolean),
+      };
+    }
+
+    const scopedFileInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
+      .filter((input) => container instanceof Node && container.contains(input));
+    if (scopedFileInputs.length > 0 && capturedAttachments.every((attachment) => attachment.source === 'file-input')) {
+      return {
+        count: 0,
+        items: [],
+      };
+    }
+
+    return null;
+  },
+  detectAttachmentUploadError() {
+    return detectChatgptUploadErrorText();
+  },
   submitWaitMs: 200,
   submitTimeoutMs: 2_500,
 });

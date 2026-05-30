@@ -153,6 +153,161 @@ describe('Claude attachment delivery adapter', () => {
     });
   });
 
+  it('reads submit-time source attachment snapshots from current Claude PDF preview controls', () => {
+    document.body.innerHTML = `
+      <fieldset>
+        <input data-testid="file-upload" aria-label="Upload files" type="file" />
+        <div>
+          <img alt="1780068008519_The_Murders_near_Mapleton_An_Anthony_Bathurst_Mystery_-_Flynn__Brian_4__1__LMH7ch.pdf" />
+          <button
+            type="button"
+            aria-label="Remove 1780068008519_The_Murders_near_Mapleton_An_Anthony_Bathurst_Mystery_-_Flynn__Brian_4__1__LMH7ch.pdf"
+          ></button>
+        </div>
+        <div data-testid="chat-input" contenteditable="true"></div>
+      </fieldset>
+    `;
+
+    expect(claudeAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: 'The_Murders_near_Mapleton_An_Anthony_Bathurst_Mystery_-_Flynn__Brian_4__1__LMH7ch.pdf',
+        mime: 'application/pdf',
+        size: 3,
+        source: 'paste',
+        file: new File(['abc'], 'The_Murders_near_Mapleton_An_Anthony_Bathurst_Mystery_-_Flynn__Brian_4__1__LMH7ch.pdf', {
+          type: 'application/pdf',
+        }),
+      },
+    ])).toMatchObject({
+      count: 1,
+      items: [expect.stringContaining('The_Murders_near_Mapleton')],
+    });
+  });
+
+  it('does not reuse one Claude preview for duplicate captured filenames', () => {
+    document.body.innerHTML = `
+      <fieldset>
+        <input data-testid="file-upload" aria-label="Upload files" type="file" />
+        <div>
+          <img alt="report.pdf" />
+          <button type="button" aria-label="Remove report.pdf"></button>
+        </div>
+        <div data-testid="chat-input" contenteditable="true"></div>
+      </fieldset>
+    `;
+
+    expect(claudeAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: 'report.pdf',
+        mime: 'application/pdf',
+        size: 3,
+        source: 'paste',
+        file: new File(['abc'], 'report.pdf', { type: 'application/pdf' }),
+      },
+      {
+        id: 'a2',
+        name: 'report.pdf',
+        mime: 'application/pdf',
+        size: 3,
+        source: 'paste',
+        file: new File(['def'], 'report.pdf', { type: 'application/pdf' }),
+      },
+    ])).toMatchObject({
+      count: 1,
+      items: [expect.stringContaining('report.pdf')],
+    });
+  });
+
+  it('counts duplicate Claude preview controls as separate current attachments', () => {
+    document.body.innerHTML = `
+      <fieldset>
+        <input data-testid="file-upload" aria-label="Upload files" type="file" />
+        <div>
+          <button type="button" aria-label="Remove report.pdf"></button>
+          <button type="button" aria-label="Remove report.pdf"></button>
+        </div>
+        <div data-testid="chat-input" contenteditable="true"></div>
+      </fieldset>
+    `;
+
+    expect(claudeAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: 'report.pdf',
+        mime: 'application/pdf',
+        size: 3,
+        source: 'file-input',
+        file: new File(['abc'], 'report.pdf', { type: 'application/pdf' }),
+      },
+      {
+        id: 'a2',
+        name: 'report.pdf',
+        mime: 'application/pdf',
+        size: 3,
+        source: 'file-input',
+        file: new File(['def'], 'report.pdf', { type: 'application/pdf' }),
+      },
+    ])).toMatchObject({
+      count: 2,
+      items: ['Remove report.pdf', 'Remove report.pdf'],
+    });
+  });
+
+  it('captures detached Claude upload input files and confirms duplicate previews at submit time', () => {
+    document.body.innerHTML = `
+      <input id="upload" data-testid="file-upload" aria-label="Upload files" type="file" multiple />
+      <fieldset>
+        <div>
+          <button type="button" aria-label="Remove report.pdf"></button>
+          <button type="button" aria-label="Remove report.pdf"></button>
+        </div>
+        <div data-testid="chat-input" contenteditable="true">summarize</div>
+        <button type="button" aria-label="Send message"></button>
+      </fieldset>
+    `;
+
+    const input = document.getElementById('upload') as HTMLInputElement;
+    const files = [
+      new File(['abc'], 'report.pdf', { type: 'application/pdf' }),
+      new File(['def'], 'report.pdf', { type: 'application/pdf' }),
+    ];
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: files,
+    });
+
+    const onSubmit = vi.fn();
+    const unsubscribe = claudeAdapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector<HTMLButtonElement>('button[aria-label="Send message"]')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'summarize',
+      attachments: [
+        expect.objectContaining({
+          file: files[0],
+          name: 'report.pdf',
+          source: 'file-input',
+        }),
+        expect.objectContaining({
+          file: files[1],
+          name: 'report.pdf',
+          source: 'file-input',
+        }),
+      ],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 2,
+        currentCount: 2,
+        submittedCount: 2,
+      }),
+    }));
+    unsubscribe?.();
+  });
+
   it('returns an empty source snapshot after Claude file cards are removed', () => {
     document.body.innerHTML = `
       <fieldset>
