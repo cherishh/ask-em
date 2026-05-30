@@ -13,10 +13,7 @@ export function classifyDeliveryIssue(result: ProviderDeliveryResult): Workspace
     return 'attachment-limit';
   }
 
-  if (
-    normalizedReason.includes('attachment not supported') ||
-    normalizedReason.includes('attachment type not supported')
-  ) {
+  if (normalizedReason.includes('attachment not supported')) {
     return 'unsupported-attachment';
   }
 

@@ -2,6 +2,12 @@ import type { Provider, WorkspaceIssue } from '../runtime/protocol';
 import type { LocalState, PageState } from '../runtime/types';
 import { clearWorkspaceProviderIssue, setWorkspaceProviderIssue } from '../runtime/workspace';
 
+const PRESENCE_ISSUES: WorkspaceIssue[] = ['needs-login', 'loading', 'error-page'];
+
+function isPresenceIssue(issue: WorkspaceIssue | null | undefined): boolean {
+  return Boolean(issue && PRESENCE_ISSUES.includes(issue));
+}
+
 export function getWorkspaceIssueForPageState(pageState: PageState): WorkspaceIssue | null {
   if (pageState === 'ready') {
     return null;
@@ -32,8 +38,16 @@ export function applyPresenceWorkspaceIssue(
   shouldPersist: boolean;
 } {
   const issue = getWorkspaceIssueForPageState(pageState);
+  const existingIssue = localState.workspaces[workspaceId]?.memberIssues?.[provider] ?? null;
 
   if (issue === null) {
+    if (!isPresenceIssue(existingIssue)) {
+      return {
+        localState,
+        shouldPersist: false,
+      };
+    }
+
     return {
       localState: clearWorkspaceProviderIssue(localState, workspaceId, provider),
       shouldPersist: true,

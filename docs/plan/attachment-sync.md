@@ -10,7 +10,7 @@
 
 ## Non-Goals
 
-- v1 不硬编码 image-only。source / store / protocol 走通用 `File`，实际放行类型由每个 provider 的 `uploadCapability` 决定（图片 + 已验证的 PDF/DOCX 等文档）。
+- v1 不硬编码 image-only，也不维护 file type allowlist/blacklist。source / store / protocol 走通用 `File`，具体类型是否可上传交给目标 provider 原生判断；ask'em 只负责传输、安全预算、数量边界和失败状态展示。
 - 不重写用户当纯文本粘贴的远程 URL；只有 `DataTransfer.files` 真正产出附件。
 - 不复用 provider 服务端已存文件句柄；每个 target 各自上传。
 - 不劫持 provider 自己的 XHR 上传。
@@ -124,22 +124,13 @@ rollout 顺序按 provider 分开交付，避免一套不稳定 DOM 策略同时
 ```ts
 type UploadCapability = {
   maxFiles: number;
-  allowImages?: boolean;
-  allowPlainText?: boolean;
-  documentMimes?: string[];
-  documentExtensions?: string[];
-  blockedMimes?: string[];
-  blockedMimePrefixes?: string[];
-  blockedExtensions?: string[];
 } | null; // null = 不支持附件
 ```
 
-- source 侧读取附件 bytes 时做轻量 text sniff，并在 `AttachmentRef.isPlainText` 里记录“实际看起来是文本”。
-- 判定：先按 MIME/extension blacklist 拒绝音视频、压缩包、可执行、字体等；再允许图片、常见文档、`isPlainText === true`、或明确的文本 MIME/extension。
-- `isPlainText === false` 且不属于图片/常见文档/文本 MIME-extension → `unsupported-attachment`。
+- ask'em 不维护 MIME/extension allowlist 或 blacklist，不做 plain-text sniff，不尝试预测 provider 的文件类型策略。
+- 文件类型是否可上传交给目标 provider 原生路径决定；provider 拒绝、超 provider 自身大小/格式等都经 `detectAttachmentUploadError()` / timeout 映射为 `upload-failed`，展示 `upload failed`。
 - count 超 `min(ATTACHMENT_MAX_COUNT, maxFiles)` → `attachment-limit`。
-- **mixed all-or-nothing**：一次 submit 多附件中只要有一个该 target 不接受，整单失败 `unsupported-attachment`，不静默只发部分。
-- gate 在 background delivery 步骤；不支持只标记该 provider，不影响 fan-out 其他 provider，不重试。
+- gate 在 background delivery 步骤只处理 ask'em 可确定的 support/count 边界；不支持附件只标记该 provider，不影响 fan-out 其他 provider，不重试。
 - `unsupported-attachment` / `attachment-limit` 的 presentation helper 与 gate **同批**完成（否则 issue 已产、UI 解释不了）。
 
 ### 9. Fingerprint with attachments
@@ -200,8 +191,8 @@ background-owned，`chrome.storage.session` metadata + IndexedDB raw bytes。函
 ### Must handle
 
 1. provider 无 `uploadCapability` → `unsupported-attachment`，跳过，不重试。
-2. blacklist 命中，或无法证明是图片/常见文档/实际文本 → `unsupported-attachment`，不做格式转换。
-3. **mixed 附件部分不支持** → 该 target 整单 `unsupported-attachment`，不发部分。
+2. 文件类型不做 ask'em 预判；provider 原生拒绝 → `upload-failed` / `upload failed`。
+3. mixed file types 不做 background all-or-nothing；是否接受由 provider 原生上传决定。
 4. **数量超过 target 上限** → 该 target 整单 `attachment-limit`，不发前 N 个，也不发纯文本。
 5. 超总预算 / 超单文件 25MB / 超 20 数量 → 写 store 前跳过附件 fan-out + 提示，不阻断原生发送。
 6. 单文件在限内但 provider 原生拒绝 → `detectAttachmentUploadError` / timeout → `upload-failed`，文案 `upload failed`。
@@ -226,6 +217,15 @@ background-owned，`chrome.storage.session` metadata + IndexedDB raw bytes。函
 
 - 远程 `<img>` URL（`text/uri-list` 无 `files`）当 text-only。
 - 跨 provider 格式转换、客户端压缩。
+
+## Lifecycle / Pitfalls
+
+- Logs are development diagnostics. They should keep prompt previews, filenames, id prefixes, byte counts, provider DOM signals, and failure reasons when useful for debugging. Do not replace useful facts with privacy placeholders. The hard boundary is large binary content: no base64 chunks, data URLs, or raw payload bytes in debug logs.
+- Never assume the source provider has finished its own upload just because a `File` was captured earlier. Capture buffer entries are byte sources only; submit-time provider DOM snapshots are the current truth. If the current source attachments cannot be confirmed or uniquely matched, skip attachment fan-out and let the source provider send natively.
+- Base64 is a transport-only encoding. It may appear in `ATTACHMENT_APPEND_CHUNK` and `ATTACHMENT_READ_CHUNK` messages, then gets decoded back to raw `Blob` bytes in IndexedDB or reconstructed `File` parts in content. It must not enter `USER_SUBMIT`, `DELIVER_PROMPT`, storage metadata, or debug logs.
+- Attachment lifetime is scoped to `submitId`. Background binds staged attachments to the workspace, fans out to targets, and releases all bytes in the outer `handleUserSubmit` finally path. Per-delivery reference counting is intentionally avoided because one target finishing does not mean the other targets are done reading the shared bytes.
+- Service-worker restart does not attempt to resume an in-flight attachment delivery. Startup sweep deletes expired metadata and orphan IndexedDB blobs; create-time sweep keeps the reserved-byte budget from being pinned by old entries.
+- Provider DOM complexity belongs in adapters. Core delivery should stay limited to ref reading, `File` reconstruction, baseline/delta presence gating, upload-error mapping, submit dispatch, and lifecycle cleanup.
 
 ## Guardrails
 

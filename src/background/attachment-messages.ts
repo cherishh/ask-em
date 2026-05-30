@@ -60,9 +60,6 @@ export async function handleAttachmentMessage(
           mime: message.mime,
           size: message.size,
         };
-        if (typeof message.isPlainText === 'boolean') {
-          inputRef.isPlainText = message.isPlainText;
-        }
 
         const ref = await createAttachment({
           submitId: message.submitId,

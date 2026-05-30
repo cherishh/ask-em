@@ -64,6 +64,28 @@ function createAdapter(overrides: Partial<NonNullable<ProviderAdapter['composer'
   };
 }
 
+function createNewChatAdapter(overrides: Partial<NonNullable<ProviderAdapter['composer']>> = {}): ProviderAdapter {
+  const adapter = createAdapter(overrides);
+
+  return {
+    ...adapter,
+    session: {
+      ...adapter.session,
+      getStatus: () => ({
+        provider: 'claude',
+        currentUrl: 'https://claude.ai/new',
+        sessionId: null,
+        pageKind: 'new-chat',
+        pageState: 'ready',
+      }),
+      getCurrentUrl: () => 'https://claude.ai/new',
+      waitForSessionRefUpdate: vi.fn(async () => {
+        throw new Error('Timed out waiting for session ref update');
+      }),
+    },
+  };
+}
+
 describe('content delivery controller attachment flow', () => {
   it('confirms attachment presence before submit', async () => {
     const adapter = createAdapter();
@@ -277,5 +299,50 @@ describe('content delivery controller attachment flow', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('reports upload failed when a provider exposes an upload error after submit dispatch', async () => {
+    const detectAttachmentUploadError = vi.fn()
+      .mockReturnValueOnce(null)
+      .mockReturnValueOnce('upload failed');
+    const adapter = createNewChatAdapter({
+      getComposerAttachmentPresence: vi.fn()
+        .mockResolvedValueOnce({ count: 0, keys: [] })
+        .mockResolvedValueOnce({ count: 1, keys: ['a.png'] }),
+      detectAttachmentUploadError,
+    });
+    const sendResponse = vi.fn();
+    const state = createState();
+    const controller = createDeliveryController(adapter, state as any, {
+      suppressObservedSubmissionsFor: vi.fn(),
+      rememberProgrammaticSubmit: vi.fn(),
+    }, {
+      reportPresence: vi.fn(),
+      resetIndicatorPosition: vi.fn(),
+      logDebug: vi.fn(),
+    });
+
+    controller.handleRuntimeMessage({
+      type: 'DELIVER_PROMPT',
+      workspaceId: 'w1',
+      provider: 'claude',
+      content: 'hello',
+      attachments: [{ id: 'a1', name: 'a.png', mime: 'image/png', size: 1 }],
+      expectedSessionId: null,
+      expectedUrl: 'https://claude.ai/new',
+      timestamp: 1,
+    }, sendResponse);
+    await flushMicrotasks();
+
+    await waitForAssertion(() => {
+      expect(adapter.composer?.submit).toHaveBeenCalledWith({ timeoutMs: 30_000 });
+      expect(state.showCurrentWarning).toHaveBeenCalledWith('upload failed');
+      expect(sendResponse).toHaveBeenCalledWith({
+        ok: false,
+        accepted: true,
+        confirmed: false,
+        error: 'upload failed',
+      });
+    });
   });
 });

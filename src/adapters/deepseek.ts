@@ -1,7 +1,8 @@
 import { getVisibleButtonTexts, getVisibleInputDescriptors, isElementWithin, isVisible, normalizeWhitespace } from './dom';
 import { createDomProviderAdapter } from './factory';
 import { readAttachmentFiles, setFileInputFiles } from './attachment-delivery';
-import { getAttachmentExtension, PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef } from '../runtime/protocol';
+import { fileInputAcceptsAttachments, preferFileInputForAttachmentCount } from './file-input';
+import { PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef } from '../runtime/protocol';
 
 export function isDeepseekLoginRequiredPage(input: {
   pathname: string;
@@ -40,35 +41,6 @@ export function isDeepseekLoginRequiredPage(input: {
   return hasLoginCtas && credentialInputs.length >= 2;
 }
 
-function fileInputAcceptsAttachments(input: HTMLInputElement, attachments: AttachmentRef[]): boolean {
-  const accept = input.getAttribute('accept')?.trim().toLowerCase();
-  if (!accept) {
-    return true;
-  }
-
-  const tokens = accept.split(',').map((token) => token.trim()).filter(Boolean);
-  if (tokens.length === 0) {
-    return true;
-  }
-
-  return attachments.every((attachment) => {
-    const mime = attachment.mime.trim().toLowerCase();
-    const extension = getAttachmentExtension(attachment.name);
-
-    return tokens.some((token) => {
-      if (extension && token === `.${extension}`) {
-        return true;
-      }
-
-      if (mime && token === mime) {
-        return true;
-      }
-
-      return token.endsWith('/*') && mime.startsWith(`${token.slice(0, -1)}`);
-    });
-  });
-}
-
 function findDeepseekComposerRoot(
   composer: HTMLElement | null,
   sendButton: HTMLElement | null,
@@ -90,11 +62,9 @@ function findDeepseekFileInput(container: ParentNode, attachments: AttachmentRef
   const unrestrictedScopedInputs = scopedInputs.filter((input) => !input.getAttribute('accept'));
 
   return (
-    preferredScopedInputs.find((input) => input.multiple || attachments.length <= 1) ??
-    preferredScopedInputs[0] ??
-    unrestrictedScopedInputs.find((input) => input.multiple || attachments.length <= 1) ??
-    unrestrictedScopedInputs[0] ??
-    null
+    preferFileInputForAttachmentCount(preferredScopedInputs, attachments.length) ??
+    preferFileInputForAttachmentCount(unrestrictedScopedInputs, attachments.length) ??
+    preferFileInputForAttachmentCount(scopedInputs, attachments.length)
   );
 }
 
@@ -125,6 +95,42 @@ function compactAttachmentText(value: string): string {
   return normalizeWhitespace(value).replace(/\s+/g, '').toLowerCase();
 }
 
+const DEEPSEEK_UPLOAD_ERROR_PATTERNS = [
+  'unsupported file format',
+  'unsupported file',
+  'file type is not supported',
+  'upload failed',
+  'failed to upload',
+  'could not upload',
+  "couldn't upload",
+  'error uploading',
+  'file too large',
+  'remove failed files',
+  'failed files',
+];
+
+function isDeepseekUploadFailureText(text: string): boolean {
+  const normalizedText = text.toLowerCase();
+  return DEEPSEEK_UPLOAD_ERROR_PATTERNS.some((pattern) => normalizedText.includes(pattern));
+}
+
+function isDeepseekAttachmentReadyText(text: string, expectedName: string): boolean {
+  if (isDeepseekUploadFailureText(text)) {
+    return false;
+  }
+
+  // TODO(deepseek): Revisit this with a live upload-state capture. Manual zip testing showed
+  // DeepSeek can expose a filename chip before the final rejection state, so this ready signal
+  // must stay conservative and may need a stronger provider-specific success marker.
+  const compactText = compactAttachmentText(text);
+  const compactExpectedName = compactAttachmentText(expectedName);
+  const textWithoutExpectedName = compactText.split(compactExpectedName).join('');
+
+  return compactExpectedName.length > 0 &&
+    compactText.includes(compactExpectedName) &&
+    textWithoutExpectedName.length > 0;
+}
+
 function getDeepseekAttachmentItems(container: ParentNode, expectedAttachments?: AttachmentRef[]): string[] {
   if (!(container instanceof Element || container instanceof Document)) {
     return [];
@@ -133,6 +139,8 @@ function getDeepseekAttachmentItems(container: ParentNode, expectedAttachments?:
   const candidates = Array.from(container.querySelectorAll<HTMLElement>('.ds-animated-size-item'))
     .filter(isVisible)
     .map(getElementTreeAccessibleText)
+    // DeepSeek keeps rejected files in the composer as red chips; they block submit and must not satisfy delivery presence.
+    .filter((text) => !isDeepseekUploadFailureText(text))
     .filter(Boolean);
   const expectedNames = (expectedAttachments ?? []).map((attachment) => ({
     name: attachment.name,
@@ -152,7 +160,8 @@ function getDeepseekAttachmentItems(container: ParentNode, expectedAttachments?:
       }
 
       const compactCandidate = compactAttachmentText(candidate);
-      return expectedName.full.length > 0 && compactCandidate.includes(expectedName.full);
+      return compactCandidate.includes(expectedName.full) &&
+        isDeepseekAttachmentReadyText(candidate, expectedName.name);
     });
 
     if (matchedIndex >= 0) {
@@ -172,24 +181,15 @@ function detectDeepseekUploadErrorText(): string | null {
     '[class*="error" i]',
     '[class*="notification" i]',
   ];
-  const visibleTexts = errorSelectors
-    .flatMap((selector) => Array.from(document.querySelectorAll<HTMLElement>(selector)))
+  const visibleTexts = [
+    ...errorSelectors.flatMap((selector) => Array.from(document.querySelectorAll<HTMLElement>(selector))),
+    ...Array.from(document.querySelectorAll<HTMLElement>('.ds-animated-size-item')),
+  ]
     .filter(isVisible)
-    .map(getElementAccessibleText)
-    .join(' ')
-    .toLowerCase();
-  const uploadErrorPatterns = [
-    'upload failed',
-    'failed to upload',
-    'could not upload',
-    "couldn't upload",
-    'unsupported file',
-    'file type is not supported',
-    'file too large',
-    'error uploading',
-  ];
+    .map(getElementTreeAccessibleText)
+    .filter(Boolean);
 
-  return uploadErrorPatterns.some((pattern) => visibleTexts.includes(pattern)) ? 'upload failed' : null;
+  return visibleTexts.some(isDeepseekUploadFailureText) ? 'upload failed' : null;
 }
 
 export const deepseekAdapter = createDomProviderAdapter({

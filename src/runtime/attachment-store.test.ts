@@ -384,6 +384,47 @@ describe('attachment store', () => {
     expect(indexedDb.data.has('a1')).toBe(false);
   });
 
+  it('startup sweep drains restart-abandoned metadata and orphan blobs after TTL', async () => {
+    const store = await import('./attachment-store');
+
+    await store.createAttachment({
+      submitId: 'writing-submit',
+      ref: makeRef({ id: 'writing-a', size: 4 }),
+      ownerTabId: 9,
+      now: 0,
+    });
+    await store.appendAttachmentChunk({
+      submitId: 'writing-submit',
+      attachmentId: 'writing-a',
+      offset: 0,
+      chunkBase64: bytesToBase64(new Uint8Array([1, 2])),
+    });
+    await store.createAttachment({
+      submitId: 'ready-submit',
+      ref: makeRef({ id: 'ready-a', size: 0 }),
+      ownerTabId: 9,
+      now: 0,
+    });
+    await store.finalizeAttachment({ submitId: 'ready-submit', attachmentId: 'ready-a' });
+    indexedDb.data.set('orphan-a', new Blob([new Uint8Array([9])]));
+
+    await expect(store.readAttachmentChunk({
+      attachmentId: 'writing-a',
+      offset: 0,
+      maxBytes: 1,
+    })).rejects.toThrow('Attachment is not ready');
+
+    await expect(store.startupSweepAttachments(ATTACHMENT_MAX_AGE_MS)).resolves.toEqual({
+      expired: 2,
+      orphaned: 1,
+    });
+
+    expect(await store.getAttachmentMetadata('writing-a')).toBeNull();
+    expect(await store.getAttachmentMetadata('ready-a')).toBeNull();
+    expect(indexedDb.data.size).toBe(0);
+    expect(await store.getReservedAttachmentBytes()).toBe(0);
+  });
+
   it('clears only writing attachments for owner tab close and persistent storage reset', async () => {
     const store = await import('./attachment-store');
 

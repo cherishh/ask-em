@@ -179,7 +179,7 @@ describe('DeepSeek attachment delivery adapter', () => {
     });
   });
 
-  it('does not use a scoped DeepSeek file input whose accept list rejects the attachment', async () => {
+  it('uses a scoped DeepSeek file input even when accept does not match', async () => {
     document.body.innerHTML = `
       <div class="_77cefa5">
         <div class="_020ab5b">
@@ -190,7 +190,7 @@ describe('DeepSeek attachment delivery adapter', () => {
       </div>
     `;
 
-    await expect(deepseekAdapter.composer?.setComposerPayload?.({
+    await deepseekAdapter.composer?.setComposerPayload?.({
       text: 'hello',
       attachments: [
         {
@@ -200,7 +200,10 @@ describe('DeepSeek attachment delivery adapter', () => {
           size: 3,
         },
       ],
-    })).rejects.toThrow('upload failed');
+    });
+
+    const input = document.getElementById('upload-files') as HTMLInputElement;
+    expect(input.files?.[0]?.name).toBe('sample.pdf');
   });
 
   it('matches duplicate DeepSeek preview cards as separate current attachments', () => {
@@ -239,6 +242,58 @@ describe('DeepSeek attachment delivery adapter', () => {
     document.body.insertAdjacentHTML('beforeend', '<div role="alert">Failed to upload sample.pdf</div>');
 
     await expect(Promise.resolve(deepseekAdapter.composer?.detectAttachmentUploadError?.())).resolves.toBe('upload failed');
+  });
+
+  it('does not count DeepSeek failed attachment chips as delivered attachments', async () => {
+    renderDeepseekComposer(`
+      <div class="b40079d7 _6f68655">
+        <div class="ds-animated-size-item">
+          <div class="_76cd190 _0004e59">
+            <div class="_7e13492">bf-0925.zip</div>
+            <div class="_5119742">Unsupported file format</div>
+          </div>
+        </div>
+      </div>
+    `);
+    const attachments = [
+      {
+        id: 'a1',
+        name: 'bf-0925.zip',
+        mime: 'application/zip',
+        size: 750_943,
+      },
+    ];
+
+    await expect(Promise.resolve(deepseekAdapter.composer?.getComposerAttachmentPresence?.(attachments))).resolves.toEqual({
+      count: 0,
+      keys: [],
+    });
+    await expect(Promise.resolve(deepseekAdapter.composer?.detectAttachmentUploadError?.())).resolves.toBe('upload failed');
+  });
+
+  it('does not count DeepSeek filename-only pending chips as delivered attachments', async () => {
+    renderDeepseekComposer(`
+      <div class="b40079d7 _6f68655">
+        <div class="ds-animated-size-item">
+          <div class="_76cd190 _0004e59">
+            <div class="_7e13492">bf-0925.zip</div>
+          </div>
+        </div>
+      </div>
+    `);
+
+    await expect(Promise.resolve(deepseekAdapter.composer?.getComposerAttachmentPresence?.([
+      {
+        id: 'a1',
+        name: 'bf-0925.zip',
+        mime: 'application/zip',
+        size: 750_943,
+      },
+    ]))).resolves.toEqual({
+      count: 0,
+      keys: [],
+    });
+    await expect(Promise.resolve(deepseekAdapter.composer?.detectAttachmentUploadError?.())).resolves.toBeNull();
   });
 
   it('clicks the DeepSeek send icon without hitting DeepThink, Search, or upload', async () => {

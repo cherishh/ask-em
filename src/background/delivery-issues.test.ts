@@ -41,12 +41,12 @@ describe('classifyDeliveryIssue', () => {
     ).toBe('loading');
   });
 
-  it('maps attachment type failures to unsupported-attachment', () => {
+  it('maps providers without attachment support to unsupported-attachment', () => {
     expect(
       classifyDeliveryIssue({
         provider: 'chatgpt',
         ok: false,
-        reason: 'chatgpt attachment type not supported',
+        reason: 'chatgpt attachment not supported',
       }),
     ).toBe('unsupported-attachment');
   });
@@ -91,4 +91,5 @@ describe('classifyDeliveryIssue', () => {
 
     expect(next.workspaces.w1.memberIssues?.gemini).toBe('upload-failed');
   });
+
 });

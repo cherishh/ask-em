@@ -5,10 +5,7 @@ import {
   type AttachmentRef,
   type CapturedAttachment,
 } from '../runtime/protocol';
-import { isProbablyPlainTextBytes } from '../runtime/attachment-text';
 import { sendRuntimeMessage } from './routing';
-
-const TEXT_SNIFF_BYTES = 64 * 1024;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -24,11 +21,6 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 async function readFileBytes(file: File, start: number, end: number): Promise<Uint8Array> {
   return new Uint8Array(await file.slice(start, end).arrayBuffer());
-}
-
-async function isProbablyPlainTextFile(file: File): Promise<boolean> {
-  const sample = await readFileBytes(file, 0, Math.min(file.size, TEXT_SNIFF_BYTES));
-  return isProbablyPlainTextBytes(sample);
 }
 
 async function createAttachment(submitId: string, ref: AttachmentRef): Promise<void> {
@@ -117,7 +109,6 @@ export async function stageSubmitAttachments(
         name: attachment.name,
         mime: attachment.mime,
         size: attachment.size,
-        isPlainText: await isProbablyPlainTextFile(attachment.file),
       };
 
       await createAttachment(submitId, ref);

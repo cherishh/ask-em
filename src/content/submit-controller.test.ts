@@ -111,7 +111,9 @@ describe('submit controller attachment staging', () => {
     ]);
     expect(sendMessage.mock.calls[0]?.[0]).toMatchObject({
       type: 'ATTACHMENT_CREATE',
-      isPlainText: true,
+      name: 'sample.pdf',
+      mime: 'application/pdf',
+      size: 3,
     });
     expect(arrayBufferSpy).not.toHaveBeenCalled();
     expect(sendMessage.mock.calls.at(-1)?.[0]).toMatchObject({

@@ -31,6 +31,7 @@ export function makeWorkspace(overrides: Partial<Workspace> & Pick<Workspace, 'i
     updatedAt: overrides.updatedAt ?? overrides.createdAt ?? 1,
     label: overrides.label,
     pendingSource: overrides.pendingSource,
+    memberIssues: overrides.memberIssues,
   };
 }
 

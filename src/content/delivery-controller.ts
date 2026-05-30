@@ -1,5 +1,6 @@
 import type { ProviderAdapter } from '../adapters/types';
 import type { ComposerAttachmentPresence } from '../adapters/types';
+import { countAttachmentPresenceDelta } from '../adapters/attachment-presence';
 import type {
   AttachmentRef,
   DeliverPromptMessage,
@@ -21,21 +22,6 @@ function getDeliveryWarningLabel(error: unknown): string {
   return reason.toLowerCase().includes('upload failed') ? 'upload failed' : 'Delivery failed';
 }
 
-function countAttachmentPresenceDelta(
-  baseline: ComposerAttachmentPresence,
-  current: ComposerAttachmentPresence,
-): number {
-  const countDelta = current.count - baseline.count;
-
-  if (baseline.keys && current.keys) {
-    const baselineKeys = new Set(baseline.keys);
-    const keyDelta = current.keys.filter((key) => !baselineKeys.has(key)).length;
-    return Math.max(countDelta, keyDelta);
-  }
-
-  return countDelta;
-}
-
 async function waitForAttachmentPresence(
   composer: NonNullable<ProviderAdapter['composer']>,
   expectedAttachments: AttachmentRef[],
@@ -52,7 +38,7 @@ async function waitForAttachmentPresence(
   while (Date.now() <= deadline) {
     const uploadError = await composer.detectAttachmentUploadError?.();
     if (uploadError) {
-      throw new Error('upload failed');
+      throw new Error(uploadError);
     }
 
     const current = await composer.getComposerAttachmentPresence(expectedAttachments);
@@ -267,14 +253,17 @@ export function createDeliveryController(
               },
             });
           } catch (error) {
-            const reason = error instanceof Error ? error.message : String(error);
+            const uploadError = message.attachments.length > 0
+              ? await adapter.composer.detectAttachmentUploadError?.()
+              : null;
+            const reason = uploadError ?? (error instanceof Error ? error.message : String(error));
             await dependencies.logDebug({
               level: 'warn',
               message: 'Expected session ref update was not observed',
               detail: reason,
               workspaceId: message.workspaceId,
             });
-            state.showCurrentWarning('Delivery failed');
+            state.showCurrentWarning(getDeliveryWarningLabel(new Error(reason)));
             sendResponse({
               ok: false,
               accepted: true,

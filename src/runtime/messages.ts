@@ -59,7 +59,6 @@ export type AttachmentCreateMessage = {
   name: string;
   mime: string;
   size: number;
-  isPlainText?: boolean;
 };
 
 export type AttachmentAppendChunkMessage = {

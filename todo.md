@@ -11,8 +11,7 @@
 
 ## 不做
 
-- v1 不硬编码为 image-only。source/store/protocol 支持通用 `File` 附件，实际 fan-out 类型由每个 provider 的 `uploadCapability` 决定。
-- v1 不走窄 allowlist：允许图片、常见文档，以及 source 侧 byte sniff 判定为实际纯文本的代码/配置/日志等；明确 blacklist 音视频、压缩包、可执行、字体等二进制/媒体类型。
+- v1 不硬编码为 image-only，也不维护 file type allowlist/blacklist。source/store/protocol 支持通用 `File` 附件，具体类型是否可上传交给目标 provider 原生判断；ask'em 只传递失败状态给用户。
 - 不处理纯文本里的远程文件/图片 URL。
 - 不复用某 provider 已上传成功的服务端文件句柄；每个 target provider 各自上传一次。
 - 不劫持 provider 自己的 XHR 上传。
@@ -33,7 +32,7 @@
   - 每次 submit 最多 `20 files`（`ATTACHMENT_MAX_COUNT`）。
   - **单文件 ≤ `25 MB`（`ATTACHMENT_MAX_FILE_BYTES`，新增）**。超过则跳过附件 fan-out + 提示 `attachment too large`，不阻断原生发送。
   - **总 in-flight raw budget = `50 MB`（`ATTACHMENT_SESSION_BUDGET_BYTES`，从 100MB 下调；可调旋钮）**。理由：base64 wire 膨胀 ~33% + 每个 target 重复搬运（×N）放大瞬时内存/CPU，不是落盘膨胀。
-  - provider 自身更低的数量/格式限制由 capability gate 收紧。
+  - provider 自身更低的数量限制由 capability gate 收紧；格式限制不在 ask'em 侧预判。
 - 单文件在 25MB 以内、但某 provider 自己拒绝（大小/格式）→ 原生上传失败 → 统一映射 `upload-failed`，文案 `upload failed`。
 - **生命周期以 submitId 作用域，不做 per-delivery 引用计数 [B2]**（详见「生命周期硬约束」）。
 
@@ -70,13 +69,6 @@
 ```ts
 type UploadCapability = {
   maxFiles: number;
-  allowImages?: boolean;
-  allowPlainText?: boolean;
-  documentMimes?: string[];
-  documentExtensions?: string[];
-  blockedMimes?: string[];
-  blockedMimePrefixes?: string[];
-  blockedExtensions?: string[];
 } | null;
 ```
 
@@ -146,7 +138,7 @@ type UploadCapability = {
   - 等待期间轮询 `detectAttachmentUploadError()`。
 - [ ] Provider override 可替换完整 payload 顺序，不允许 delivery code 硬编码 text-first。
 - [ ] suppression 必须覆盖：synthetic paste、stable file input `input/change`、transient input `input/change`，且在注入**之前**开启。
-- [ ] **mixed 附件 all-or-nothing [P2-a]**：一次 submit 的多个附件里只要有一个不被某 target 的 capability 接受，该 target 整单失败为 `unsupported-attachment`，不静默只发部分文件。
+- [ ] **mixed 附件 all-or-nothing [P2-a]**：只对数量/不支持附件这类 ask'em 可确定的能力失败生效；文件类型由 provider 原生上传决定，不在 background 预判。
 - [ ] Claude override：稳定 file input fallback。
 - [ ] ChatGPT override：synthetic paste。
 - [ ] Gemini override：synthetic paste。
@@ -157,8 +149,8 @@ type UploadCapability = {
 
 ## Capability Gate
 
-- [ ] gate 逻辑：source 侧 `isPlainText` byte sniff + background blacklist；先拒绝音视频/压缩包/可执行/字体等，再允许图片、常见文档、实际文本或明确文本 MIME/extension。
-- [ ] 不能证明是图片/常见文档/实际文本，或 blacklist 命中 → 判 `unsupported-attachment`。
+- [ ] gate 逻辑：只判断 ask'em 自身预算/数量边界，以及 provider 是否支持附件；不判断 MIME/extension/type。
+- [ ] 文件类型由目标 provider 原生上传路径决定；provider 拒绝时映射 `upload-failed` 并展示 `upload failed`。
 - [ ] count 超 `min(ATTACHMENT_MAX_COUNT, capability.maxFiles)` → `attachment-limit`。
 - [ ] capability 为 `null` 的 provider → `unsupported-attachment`，跳过该 provider，不重试，不影响其他 provider。
 
@@ -175,7 +167,7 @@ type UploadCapability = {
 
 ### Phase 0：协议和类型脚手架
 
-- [x] 添加 `AttachmentRef`（无 sha256，含 `isPlainText?`）、`CapturedAttachment`、`UploadCapability`（blacklist + image/text/document policy）。
+- [x] 添加 `AttachmentRef`（无 sha256，不含 file-type policy metadata）、`CapturedAttachment`、`UploadCapability`（count-only policy）。
 - [x] 定义附件传输消息类型（`ATTACHMENT_CREATE/APPEND_CHUNK/FINALIZE/READ_CHUNK/ABORT`）。
 - [x] 消息协议增加 `attachments: []` 默认值。
 - [x] `WorkspaceIssue` 增加 `unsupported-attachment`。
@@ -217,16 +209,16 @@ type UploadCapability = {
 
 ### Phase 2：Capability Gate + Presentation
 
-- [x] 为 Claude / ChatGPT / Gemini / DeepSeek / Manus 声明 blacklist + image/text/document/count capability。
-- [x] background delivery 增加 capability gate（blacklist、图片、常见文档、actual plain text、count gate）。
-- [x] mixed 附件 all-or-nothing → `unsupported-attachment` [P2-a]。
+- [x] 为 Claude / ChatGPT / Gemini / DeepSeek / Manus 声明 count-only capability。
+- [x] background delivery 增加 count/support-only capability gate；文件类型交给 provider 原生上传决定。
+- [x] ask'em 不对 mixed file types 做 all-or-nothing 预判；provider 原生拒绝时映射 `upload-failed`。
 - [x] target 附件数量超 provider 上限 → `attachment-limit`，跳过该 target，不拆分、不发纯文本。
 - [x] 不支持时返回 `unsupported-attachment`，不影响其他 provider。
 - [x] **presentation helper 支持 `unsupported-attachment` / `attachment-limit`（同批）**。
 
 验收：
 - [x] text-only 行为不变。
-- [x] synthetic attachment payload 的 capability gate 测试通过（含 mixed all-or-nothing、actual plain text、blacklist、extension 兜底、空-空→unsupported）。
+- [x] synthetic attachment payload 的 capability gate 测试通过（含任意 file type 放行、count overage、provider 不支持附件）。
 - [x] presentation helper 测试覆盖 `unsupported-attachment` / `attachment-limit`。
 
 ### Phase 2.5：Source-capture Spike（执行前 spike）
@@ -309,7 +301,7 @@ type UploadCapability = {
   - [x] Manus target `/app` 恢复未提交 draft 时，经 provider `prepareForDelivery` 点击 `New task` 并确认附件 baseline 为 0 后再注入。
   - [x] Manus 注入失败或 presence delta 不足时，不点击 send，返回 `upload-failed`（通用 controller gate + transient delivery timeout）。
   - [x] Manus free-plan 多文件作为 target 时由 capability gate 拦截为 `attachment-limit`，不进入 transient 注入；adapter 仍能识别 Manus 自身 `up to 1 file` modal 为 `upload failed` 兜底。
-- [ ] 每家 smoke 后复核 `uploadCapability`，若 provider 实际拒绝某类文件，收紧该 provider capability。
+- [x] 每家 smoke 后复核 `uploadCapability`：capability 只保留 provider 数量上限；实际文件类型拒绝不收紧 capability，交给 provider 原生上传并映射 `upload-failed`。
 - [ ] 保持 debug log 可用于开发排查：不要为隐私牺牲准确性；记录足够定位问题的 prompt preview / filename keys / bytes / count / id prefix。base64/dataURL 仍只应出现在传输层。
 
 #### Phase 5.1：ChatGPT target delivery
@@ -332,9 +324,9 @@ type UploadCapability = {
   - [x] presence baseline+delta 测试覆盖已有旧附件。
   - [x] Claude source snapshot 兼容当前 PDF preview DOM（`img[alt]` + `Remove <filename>`），避免 Claude → ChatGPT 时 `captured=1; current=0` 把附件过滤为 0。
   - [ ] delivery-controller 负向测试覆盖 ChatGPT presence 不足不 submit（通用 controller 已覆盖，若发现 ChatGPT 特有条件再补）。
-- [ ] 手测：
-  - [ ] Claude/任一 source → ChatGPT target：单图。
-  - [ ] Claude/任一 source → ChatGPT target：`.md/.txt`。
+- [x] 手测：
+  - [x] Claude/任一 source → ChatGPT target：单图。
+  - [x] Claude/任一 source → ChatGPT target：`.md/.txt`。
   - [x] Claude/任一 source → ChatGPT target：多文件（同名 PDF x2）。
 
 #### Phase 5.2：Gemini target delivery
@@ -358,10 +350,10 @@ type UploadCapability = {
   - [x] presence baseline+delta 测试覆盖已有旧附件。
   - [x] delivery-controller 负向测试覆盖 Gemini presence 不足不 submit（通用 controller 已覆盖，Gemini adapter fixture 覆盖 count/key）。
   - [x] Gemini adapter 测试覆盖 attachment-only ready 前不写文本、旧草稿同名附件不提前放行，以及 upload error 时 fail closed。
-- [ ] 手测：
-  - [ ] Claude/任一 source → Gemini target：单图。
-  - [ ] Claude/任一 source → Gemini target：`.md/.txt`。
-  - [ ] Claude/任一 source → Gemini target：多文件。
+- [x] 手测：
+  - [x] Claude/任一 source → Gemini target：单图。
+  - [x] Claude/任一 source → Gemini target：`.md/.txt`。
+  - [x] Claude/任一 source → Gemini target：多文件。
 
 #### Phase 5.3：DeepSeek target delivery
 
@@ -382,10 +374,10 @@ type UploadCapability = {
   - [x] adapter DOM fixture 覆盖 hidden input 注入。
   - [x] presence baseline+delta 测试覆盖已有旧附件。
   - [x] delivery-controller 负向测试覆盖 DeepSeek presence 不足不 submit（通用 controller gate 已覆盖，DeepSeek adapter fixture 提供 count/key 负样本）。
-- [ ] 手测：
-  - [ ] Claude/任一 source → DeepSeek target：单图。
-  - [ ] Claude/任一 source → DeepSeek target：`.md/.txt`。
-  - [ ] Claude/任一 source → DeepSeek target：多文件。
+- [x] 手测：
+  - [x] Claude/任一 source → DeepSeek target：单图。
+  - [x] Claude/任一 source → DeepSeek target：`.md/.txt`。
+  - [x] Claude/任一 source → DeepSeek target：多文件。
 
 #### Phase 5.4：Manus target delivery
 
@@ -412,14 +404,14 @@ type UploadCapability = {
   - [x] transient hook teardown 测试覆盖成功、失败、timeout。
   - [x] presence baseline+delta 测试覆盖已有旧附件。
   - [x] delivery-controller 负向测试覆盖 Manus presence 不足不 submit（通用 controller gate 已覆盖，Manus adapter fixture 提供 count/key 负样本）。
-- [ ] 手测：
-  - [ ] Claude/任一 source → Manus target：单图。
-  - [ ] Claude/任一 source → Manus target：`.md/.txt`。
-  - [ ] Claude/任一 source → Manus target：多文件应跳过 Manus target 并展示 `attachment limit exceeded` / toast，其他 provider 不受影响。
+- [x] 手测：
+  - [x] Claude/任一 source → Manus target：单图。
+  - [x] Claude/任一 source → Manus target：`.md/.txt`。
+  - [x] Claude/任一 source → Manus target：多文件应跳过 Manus target 并展示 `attachment limit exceeded` / toast，其他 provider 不受影响。
 
 #### Phase 5.5：Provider delivery 收口
 
-- [ ] 5 个 provider（含 Claude）作为 target 都能收到 fanned-out 已支持附件。
+- [x] 5 个 provider（含 Claude）作为 target 都能收到 fanned-out 已支持附件。
 - [x] 任一 provider 不支持某格式/数量时，只标记该 provider，不影响其他 provider。
 - [x] 任一 provider attachment injection 静默失败时，不发送纯文本，标记 `upload-failed`。
 - [x] 每家 target 的日志序列可用于排查：delivery started → payload injected → attachment presence confirmed → submit dispatched / delivery failed。
@@ -439,27 +431,27 @@ type UploadCapability = {
 
 ### Phase 7：Hardening
 
-- [ ] 测试 background restart mid-delivery，TTL 能清理 orphan。
+- [x] 测试 background restart mid-delivery，TTL 能清理 orphan。
 - [x] 权限审计：确认不需要新增 `host_permissions`，且**确认未引入 `alarms`**。
 - [x] 扩展现有 `chrome.tabs.onRemoved` handler：source tab 关闭时只清该 `ownerTabId` 下 `status=writing` 且未 bind 的 staging 条目，提前腾预算；不清 ready 条目，避免 USER_SUBMIT→bind 窗口内误删 fan-out 附件。
-- [ ] 补充 lifecycle/pitfall 文档（含「logs must stay diagnostic」「never assume source upload finished before capture」「base64 仅限传输消息」）。
+- [x] 补充 lifecycle/pitfall 文档（含「logs must stay diagnostic」「never assume source upload finished before capture」「base64 仅限传输消息」）。
 
 验收：
-- [ ] restart/orphan dry-run 后 store 为空。
+- [x] restart/orphan dry-run 后 store 为空。
 - [x] 所有测试通过。
 
 ## Guardrails
 
-- [ ] debug log 优先准确和可诊断；不记录大块二进制 payload、base64 chunk、dataURL。
-- [ ] **base64 只出现在 `ATTACHMENT_APPEND_CHUNK`/`ATTACHMENT_READ_CHUNK`**；不进主协议、storage metadata、log。
-- [ ] 不在主 runtime message 内塞 inline 二进制。
-- [ ] 不写入没有 TTL 的附件。
-- [ ] 不写入没有 release 路径的附件（release = `handleUserSubmit` outer finally 按 submitId 删除，覆盖**所有**早退/成功/失败路径 [R2-P1-3] + ABORT 即时释放 + TTL 兜底）。
-- [ ] 不静默把附件 submit 成纯文本：target submit 前必须通过 `getComposerAttachmentPresence()` 做 baseline+delta 确认 [A1]。
-- [ ] 不阻止源 provider 原生发送。
-- [ ] 不引入 `chrome.alarms` 或其他新权限。
+- [x] debug log 优先准确和可诊断；不记录大块二进制 payload、base64 chunk、dataURL。
+- [x] **base64 只出现在 `ATTACHMENT_APPEND_CHUNK`/`ATTACHMENT_READ_CHUNK`**；不进主协议、storage metadata、log。
+- [x] 不在主 runtime message 内塞 inline 二进制。
+- [x] 不写入没有 TTL 的附件。
+- [x] 不写入没有 release 路径的附件（release = `handleUserSubmit` outer finally 按 submitId 删除，覆盖**所有**早退/成功/失败路径 [R2-P1-3] + ABORT 即时释放 + TTL 兜底）。
+- [x] 不静默把附件 submit 成纯文本：target submit 前必须通过 `getComposerAttachmentPresence()` 做 baseline+delta 确认 [A1]。
+- [x] 不阻止源 provider 原生发送。
+- [x] 不引入 `chrome.alarms` 或其他新权限。
 
 ## Deferred Architecture Cleanup（当前 TODO 全部完成后再评估）
 
-- [ ] 抽公共 file input helper：复用 `accept` 解析、extension/MIME 匹配、`multiple` 选择等纯函数；provider-specific root/selector 继续留在各 adapter。
-- [ ] 封装 `ComposerAttachmentPresence` delta/key 语义：集中 `count + keys` 的 baseline/delta 计算、duplicate filename/聚合卡片约束和测试，避免 adapter 误用 keys。
+- [x] 抽公共 file input helper：复用 `accept` 解析、extension/MIME 匹配、`multiple` 选择等纯函数；provider-specific root/selector 继续留在各 adapter。
+- [x] 封装 `ComposerAttachmentPresence` delta/key 语义：集中 `count + keys` 的 baseline/delta 计算、duplicate filename/聚合卡片约束和测试，避免 adapter 误用 keys。

@@ -1,7 +1,8 @@
 import { getVisibleButtonTexts, isVisible, normalizeWhitespace } from './dom';
 import { createDomProviderAdapter } from './factory';
 import { readAttachmentFiles, setFileInputFiles } from './attachment-delivery';
-import { getAttachmentExtension, PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef } from '../runtime/protocol';
+import { fileInputAcceptsAttachments, preferFileInputForAttachmentCount } from './file-input';
+import { PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef } from '../runtime/protocol';
 
 export function isClaudeLoginRequiredPage(input: {
   pathname: string;
@@ -22,46 +23,18 @@ export function isClaudeLoginRequiredPage(input: {
   );
 }
 
-function fileInputAcceptsAttachments(input: HTMLInputElement, attachments: AttachmentRef[]): boolean {
-  const accept = input.getAttribute('accept')?.trim().toLowerCase();
-  if (!accept) {
-    return true;
-  }
-
-  const tokens = accept.split(',').map((token) => token.trim()).filter(Boolean);
-  if (tokens.length === 0) {
-    return true;
-  }
-
-  return attachments.every((attachment) => {
-    const mime = attachment.mime.trim().toLowerCase();
-    const extension = getAttachmentExtension(attachment.name);
-
-    return tokens.some((token) => {
-      if (extension && token === `.${extension}`) {
-        return true;
-      }
-
-      if (mime && token === mime) {
-        return true;
-      }
-
-      return token.endsWith('/*') && mime.startsWith(`${token.slice(0, -1)}`);
-    });
-  });
-}
-
 function findClaudeFileInput(container: ParentNode, attachments: AttachmentRef[]): HTMLInputElement | null {
   const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
     .filter((input) => !input.disabled);
+  const scopedInputs = inputs.filter((input) => container instanceof Node && container.contains(input));
   const preferredInputs = inputs.filter((input) => fileInputAcceptsAttachments(input, attachments));
+  const preferredScopedInputs = scopedInputs.filter((input) => fileInputAcceptsAttachments(input, attachments));
 
   return (
-    preferredInputs.find((input) => container instanceof Node && container.contains(input)) ??
-    inputs.find((input) => container instanceof Node && container.contains(input)) ??
-    preferredInputs[0] ??
-    inputs[0] ??
-    null
+    preferFileInputForAttachmentCount(preferredScopedInputs, attachments.length) ??
+    preferFileInputForAttachmentCount(scopedInputs, attachments.length) ??
+    preferFileInputForAttachmentCount(preferredInputs, attachments.length) ??
+    preferFileInputForAttachmentCount(inputs, attachments.length)
   );
 }
 
