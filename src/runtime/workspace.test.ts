@@ -25,9 +25,11 @@ import {
   getDefaultEnabledProviderList,
   getDefaultFanOutEnabledProviderList,
   getDefaultFanOutTargetProviderList,
+  getVisibleWorkspaceProviders,
   getWorkspacesOrdered,
   lookupWorkspaceBySession,
   rebuildWorkspaceIndex,
+  setWorkspaceEnabledProviders,
   setWorkspaceProviderEnabled,
   setWorkspaceProviderIssue,
 } from './workspace';
@@ -271,6 +273,7 @@ describe('workspace state', () => {
     const state: LocalState = {
       globalSyncEnabled: true,
       autoSyncNewChatsEnabled: true,
+      pauseAfterFirstFanOutEnabled: true,
       debugLoggingEnabled: false,
       showDiagnostics: false,
       closeTabsOnDeleteSet: false,
@@ -372,6 +375,32 @@ describe('workspace state', () => {
 
     expect(state.workspaces.w1.enabledProviders).toEqual(['gemini', 'claude']);
     expect(state.workspaces.w1.members.gemini).toBeDefined();
+  });
+
+  it('can pause every provider in a workspace without hiding bound members', () => {
+    const state = createPendingWorkspace(createEmptyState(), {
+      sourceProvider: 'gemini',
+      sourceUrl: 'https://gemini.google.com/app',
+      workspaceId: 'w1',
+      enabledProviders: ['gemini', 'chatgpt', 'claude'],
+    });
+
+    const nextState = setWorkspaceEnabledProviders(state, 'w1', []);
+
+    expect(nextState.workspaces.w1.enabledProviders).toEqual([]);
+    expect(nextState.workspaces.w1.members.gemini).toBeDefined();
+  });
+
+  it('keeps providers with persisted issues visible even when sync is paused', () => {
+    const workspace = makeWorkspace({
+      id: 'w1',
+      enabledProviders: [],
+      memberIssues: {
+        chatgpt: 'delivery-failed',
+      },
+    });
+
+    expect(getVisibleWorkspaceProviders(workspace)).toContain('chatgpt');
   });
 
   it('can set and clear a persisted provider issue', () => {

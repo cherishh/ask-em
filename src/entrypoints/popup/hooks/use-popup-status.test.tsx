@@ -395,4 +395,49 @@ describe('usePopupStatus', () => {
     });
     hook.unmount();
   });
+
+  it('toggles pause after first fan-out through the runtime', async () => {
+    const initialStatus = {
+      type: 'STATUS_RESPONSE',
+      workspaces: [],
+      globalSyncEnabled: true,
+      autoSyncNewChatsEnabled: true,
+      pauseAfterFirstFanOutEnabled: true,
+      defaultEnabledProviders: {
+        claude: true,
+        chatgpt: true,
+        gemini: true,
+        deepseek: false,
+        manus: false,
+      },
+      defaultFanOutProviders: null,
+      shortcuts: undefined,
+      debugLoggingEnabled: true,
+      showDiagnostics: false,
+      closeTabsOnDeleteSet: false,
+      workspaceLimit: 3,
+      recentLogs: [],
+    };
+    popupRuntimeMocks.requestStatus.mockResolvedValue(initialStatus);
+
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const hook = renderHookHarness(() => usePopupStatus());
+    await flushMicrotasks();
+
+    await act(async () => {
+      await hook.current.togglePauseAfterFirstFanOut();
+    });
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'SET_PAUSE_AFTER_FIRST_FAN_OUT_ENABLED',
+      enabled: false,
+    });
+    hook.unmount();
+  });
 });

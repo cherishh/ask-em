@@ -39,6 +39,7 @@ export default function App() {
     toggleEnabledProvider,
     toggleDefaultFanOutProvider,
     toggleGlobalSync,
+    togglePauseAfterFirstFanOut,
     toggleCloseTabsOnDeleteSet,
     toggleShowDiagnostics,
     updateShortcut,
@@ -186,6 +187,7 @@ export default function App() {
             showDiagnostics={status?.showDiagnostics ?? false}
             onOpenRequestModal={openRequestModal}
             onToggleEnabledProvider={(provider) => void toggleEnabledProvider(provider)}
+            onTogglePauseAfterFirstFanOut={() => void togglePauseAfterFirstFanOut()}
             onToggleCloseTabsOnDeleteSet={() => void toggleCloseTabsOnDeleteSet()}
             onResetIndicatorPositions={() => void resetIndicatorPositions()}
             onSetRecordingShortcutId={setRecordingShortcutId}

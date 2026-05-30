@@ -11,7 +11,7 @@ import {
 } from '../runtime/storage';
 import { bindAttachments, releaseSubmitAttachments } from '../runtime/attachment-store';
 import { formatAttachmentSummary, shortSubmitId } from '../runtime/attachment-log';
-import { type WorkspaceLookupResult } from '../runtime/workspace';
+import { setWorkspaceEnabledProviders, type WorkspaceLookupResult } from '../runtime/workspace';
 import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
 import {
   persistSourceSubmitContext,
@@ -93,9 +93,11 @@ export async function handleUserSubmit(
     let {
       localState,
       workspaceLookup,
+      createdWorkspace,
     }: {
       localState: LocalState;
       workspaceLookup: WorkspaceLookupResult;
+      createdWorkspace: boolean;
     } = await prepareSubmitWorkspaceContext({
       tabId,
       message,
@@ -195,14 +197,27 @@ export async function handleUserSubmit(
       deliveryResults,
     );
 
-    const finalLocalState = await getLocalState();
+    let finalLocalState = await getLocalState();
+    if (createdWorkspace && finalLocalState.pauseAfterFirstFanOutEnabled) {
+      finalLocalState = await updateLocalState((currentState) =>
+        setWorkspaceEnabledProviders(currentState, workspaceLookup.workspaceId, []),
+      );
+      await logDebug({
+        level: 'info',
+        scope: 'background',
+        provider: message.provider,
+        workspaceId: workspaceLookup.workspaceId,
+        message: 'Paused workspace after first fan-out',
+      });
+    }
+
     const finalWorkspace =
       finalLocalState.workspaces[workspaceLookup.workspaceId] ?? localState.workspaces[workspaceLookup.workspaceId] ?? workspaceLookup.workspace;
 
     return buildUserSubmitResult({
       synced: true,
       workspaceId: workspaceLookup.workspaceId,
-      providerEnabled: true,
+      providerEnabled: finalWorkspace.enabledProviders.includes(message.provider),
       globalSyncEnabled: true,
       canStartNewSet: canStartNewSet(finalLocalState),
       deliveryResults,

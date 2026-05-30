@@ -21,6 +21,7 @@ type PrepareSubmitWorkspaceContextResult = {
   localState: LocalState;
   sessionState: SessionState;
   workspaceLookup: WorkspaceLookupResult;
+  createdWorkspace: boolean;
 };
 
 export async function prepareSubmitWorkspaceContext({
@@ -30,6 +31,7 @@ export async function prepareSubmitWorkspaceContext({
 }: PrepareSubmitWorkspaceContextInput): Promise<PrepareSubmitWorkspaceContextResult> {
   const refreshedState = await refreshPendingState();
   let { localState } = refreshedState;
+  let createdWorkspace = false;
   const reconciled = tabId
     ? await reconcileClaimedTabContext({
         localState,
@@ -63,6 +65,7 @@ export async function prepareSubmitWorkspaceContext({
         localState,
         sessionState: reconciled.sessionState,
         workspaceLookup: null,
+        createdWorkspace: false,
       };
     }
 
@@ -76,6 +79,7 @@ export async function prepareSubmitWorkspaceContext({
 
     const workspace = getWorkspacesOrdered(localState)[0];
     workspaceLookup = workspace ? { workspaceId: workspace.id, workspace } : null;
+    createdWorkspace = Boolean(workspaceLookup);
     await setLocalState(localState);
     await logDebug({
       level: 'info',
@@ -91,6 +95,7 @@ export async function prepareSubmitWorkspaceContext({
     localState,
     sessionState: reconciled.sessionState,
     workspaceLookup,
+    createdWorkspace,
   };
 }
 

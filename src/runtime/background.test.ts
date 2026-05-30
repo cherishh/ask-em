@@ -747,7 +747,7 @@ describe('background submit routing', () => {
     storageMocks.getSessionState.mockResolvedValue(makeSessionState());
 
     const { handleUserSubmit } = await import('../entrypoints/background');
-    await handleUserSubmit(
+    const result = await handleUserSubmit(
       makeSubmitMessage({
         provider: 'claude',
         currentUrl: 'https://claude.ai/new',
@@ -765,6 +765,32 @@ describe('background submit routing', () => {
 
     expect(createdWorkspace?.enabledProviders).toEqual(['claude', 'chatgpt']);
     expect(createdState?.defaultFanOutProviders).toEqual(['chatgpt']);
+    expect(result.providerEnabled).toBe(false);
+    expect(result.workspaceSummary?.workspace.enabledProviders).toEqual([]);
+  });
+
+  it('keeps a newly-created workspace enabled after first fan-out when configured', async () => {
+    storageMocks.getLocalState.mockResolvedValue(makeLocalState({
+      pauseAfterFirstFanOutEnabled: false,
+      defaultEnabledProviders: createDefaultEnabledProviders(['claude', 'chatgpt', 'gemini']),
+      defaultFanOutProviders: ['chatgpt'],
+    }));
+    storageMocks.getSessionState.mockResolvedValue(makeSessionState());
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    const result = await handleUserSubmit(
+      makeSubmitMessage({
+        provider: 'claude',
+        currentUrl: 'https://claude.ai/new',
+        sessionId: null,
+        pageKind: 'new-chat',
+        content: 'first run',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(result.providerEnabled).toBe(true);
+    expect(result.workspaceSummary?.workspace.enabledProviders).toEqual(['claude', 'chatgpt']);
   });
 
   it('does not create a source-only workspace when there are no fan-out targets', async () => {

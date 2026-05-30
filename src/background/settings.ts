@@ -240,6 +240,24 @@ export async function handleSetAutoSyncNewChatsEnabled(
   return { ok: true };
 }
 
+export async function handleSetPauseAfterFirstFanOutEnabled(
+  message: Extract<RuntimeMessage, { type: 'SET_PAUSE_AFTER_FIRST_FAN_OUT_ENABLED' }>,
+) {
+  const localState = await getLocalState();
+  await setLocalState({
+    ...localState,
+    pauseAfterFirstFanOutEnabled: message.enabled,
+  });
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    message: message.enabled
+      ? 'Pause after first fan-out enabled'
+      : 'Pause after first fan-out disabled',
+  });
+  return { ok: true };
+}
+
 export async function handleSetDebugLoggingEnabled(
   message: Extract<RuntimeMessage, { type: 'SET_DEBUG_LOGGING_ENABLED' }>,
 ) {

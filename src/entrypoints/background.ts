@@ -28,6 +28,7 @@ import {
   handleSetDefaultEnabledProviders,
   handleSetDefaultFanOutProviders,
   handleSetGlobalSyncEnabled,
+  handleSetPauseAfterFirstFanOutEnabled,
   handleSetShowDiagnostics,
   handleResetIndicatorPositions,
   handleSetShortcuts,
@@ -61,6 +62,7 @@ export {
   handleSetDefaultEnabledProviders,
   handleSetDefaultFanOutProviders,
   handleSetGlobalSyncEnabled,
+  handleSetPauseAfterFirstFanOutEnabled,
   handleSetShowDiagnostics,
   handleResetIndicatorPositions,
   handleSetShortcuts,
@@ -173,6 +175,9 @@ export default defineBackground(() => {
           return;
         case 'SET_AUTO_SYNC_NEW_CHATS_ENABLED':
           sendResponse(await handleSetAutoSyncNewChatsEnabled(message));
+          return;
+        case 'SET_PAUSE_AFTER_FIRST_FAN_OUT_ENABLED':
+          sendResponse(await handleSetPauseAfterFirstFanOutEnabled(message));
           return;
         case 'SET_CLOSE_TABS_ON_DELETE_SET':
           sendResponse(await handleSetCloseTabsOnDeleteSet(message));

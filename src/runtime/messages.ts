@@ -141,6 +141,7 @@ export type StatusResponseMessage = {
   type: 'STATUS_RESPONSE';
   globalSyncEnabled: boolean;
   autoSyncNewChatsEnabled: boolean;
+  pauseAfterFirstFanOutEnabled: boolean;
   debugLoggingEnabled: boolean;
   showDiagnostics: boolean;
   closeTabsOnDeleteSet: boolean;
@@ -230,6 +231,11 @@ export type SetAutoSyncNewChatsEnabledMessage = {
   enabled: boolean;
 };
 
+export type SetPauseAfterFirstFanOutEnabledMessage = {
+  type: 'SET_PAUSE_AFTER_FIRST_FAN_OUT_ENABLED';
+  enabled: boolean;
+};
+
 export type SetShortcutsMessage = {
   type: 'SET_SHORTCUTS';
   shortcuts: ShortcutConfig;
@@ -290,6 +296,7 @@ export type RuntimeMessage =
   | SetDefaultFanOutProvidersMessage
   | SetWorkspaceProviderEnabledMessage
   | SetAutoSyncNewChatsEnabledMessage
+  | SetPauseAfterFirstFanOutEnabledMessage
   | SetGlobalSyncEnabledMessage
   | SetShowDiagnosticsMessage
   | SetCloseTabsOnDeleteSetMessage

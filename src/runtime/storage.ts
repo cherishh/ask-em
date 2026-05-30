@@ -14,6 +14,7 @@ import { rebuildWorkspaceIndex } from './workspace';
 export const DEFAULT_LOCAL_STATE: LocalState = {
   globalSyncEnabled: true,
   autoSyncNewChatsEnabled: true,
+  pauseAfterFirstFanOutEnabled: true,
   debugLoggingEnabled: true,
   showDiagnostics: false,
   closeTabsOnDeleteSet: false,
@@ -94,6 +95,13 @@ function normalizeLocalState(state: LocalState): LocalState {
         stateWithoutLegacyFirstFanOut.defaultFanOutProviders === undefined
           ? firstFanOutProviders ?? null
           : stateWithoutLegacyFirstFanOut.defaultFanOutProviders,
+    };
+  }
+
+  if (normalized.pauseAfterFirstFanOutEnabled === undefined) {
+    normalized = {
+      ...normalized,
+      pauseAfterFirstFanOutEnabled: true,
     };
   }
 

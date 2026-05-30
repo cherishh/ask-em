@@ -86,6 +86,7 @@ export type ClaimedTab = {
 export type LocalState = {
   globalSyncEnabled: boolean;
   autoSyncNewChatsEnabled: boolean;
+  pauseAfterFirstFanOutEnabled: boolean;
   debugLoggingEnabled: boolean;
   showDiagnostics: boolean;
   closeTabsOnDeleteSet: boolean;

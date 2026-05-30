@@ -52,6 +52,7 @@ export function AdvancedView(props: {
   showDiagnostics: boolean;
   onOpenRequestModal: () => void;
   onToggleEnabledProvider: (provider: Provider) => void;
+  onTogglePauseAfterFirstFanOut: () => void;
   onToggleCloseTabsOnDeleteSet: () => void;
   onResetIndicatorPositions: () => void;
   onSetRecordingShortcutId: (id: ShortcutId | null) => void;
@@ -131,6 +132,33 @@ export function AdvancedView(props: {
               {enabledProvidersExpanded ? 'Show fewer' : `Show ${ALL_PROVIDERS.length - ENABLED_PROVIDER_COLLAPSED_LIMIT} more`}
             </button>
           ) : null}
+        </div>
+
+        <div className="askem-us-divider" />
+
+        <div className="askem-us-group">
+          <div className="askem-us-toggle-row">
+            <div>
+              <span className="askem-us-row-title">Pause after first fan-out</span>
+              <span className="askem-us-row-sub">
+                {props.status?.pauseAfterFirstFanOutEnabled ?? true
+                  ? 'Follow-up prompts stay local unless you re-enable the set.'
+                  : 'Follow-up prompts keep syncing until you pause the set.'}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="askem-us-switch"
+              data-enabled={String(props.status?.pauseAfterFirstFanOutEnabled ?? true)}
+              onClick={props.onTogglePauseAfterFirstFanOut}
+              disabled={props.loading}
+              aria-label={
+                props.status?.pauseAfterFirstFanOutEnabled ?? true
+                  ? 'Disable pausing after first fan-out'
+                  : 'Enable pausing after first fan-out'
+              }
+            />
+          </div>
         </div>
 
         <div className="askem-us-divider" />

@@ -299,6 +299,34 @@ export function setWorkspaceProviderEnabled(
   };
 }
 
+export function setWorkspaceEnabledProviders(
+  state: LocalState,
+  workspaceId: string,
+  enabledProviders: Provider[],
+): LocalState {
+  const workspace = state.workspaces[workspaceId];
+
+  if (!workspace) {
+    return state;
+  }
+
+  const normalizedEnabledProviders = ALL_PROVIDERS.filter((provider) =>
+    enabledProviders.includes(provider),
+  );
+
+  return {
+    ...state,
+    workspaces: {
+      ...state.workspaces,
+      [workspaceId]: {
+        ...workspace,
+        enabledProviders: normalizedEnabledProviders,
+        updatedAt: Date.now(),
+      },
+    },
+  };
+}
+
 export function setWorkspaceProviderIssue(
   state: LocalState,
   workspaceId: string,
@@ -422,6 +450,7 @@ export function getVisibleWorkspaceProviders(workspace: Workspace): Provider[] {
   const visibleProviders = new Set<Provider>([
     ...workspace.enabledProviders,
     ...(Object.keys(workspace.members) as Provider[]),
+    ...(Object.keys(workspace.memberIssues ?? {}) as Provider[]),
     ...(workspace.pendingSource ? [workspace.pendingSource] : []),
   ]);
 

@@ -186,6 +186,14 @@ export function usePopupStatus() {
     }, { silentRefresh: true });
   }, [sendRuntimeMessage, status?.globalSyncEnabled]);
 
+  const togglePauseAfterFirstFanOut = useCallback(async () => {
+    const nextEnabled = !(status?.pauseAfterFirstFanOutEnabled ?? true);
+    await sendRuntimeMessage({
+      type: 'SET_PAUSE_AFTER_FIRST_FAN_OUT_ENABLED',
+      enabled: nextEnabled,
+    }, { silentRefresh: true });
+  }, [sendRuntimeMessage, status?.pauseAfterFirstFanOutEnabled]);
+
   const toggleCloseTabsOnDeleteSet = useCallback(async () => {
     const nextEnabled = !status?.closeTabsOnDeleteSet;
     await sendRuntimeMessage({
@@ -235,6 +243,7 @@ export function usePopupStatus() {
     toggleEnabledProvider,
     toggleDefaultFanOutProvider,
     toggleGlobalSync,
+    togglePauseAfterFirstFanOut,
     toggleCloseTabsOnDeleteSet,
     toggleShowDiagnostics,
     updateShortcut,

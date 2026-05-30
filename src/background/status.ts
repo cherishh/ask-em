@@ -55,6 +55,7 @@ export async function handleGetStatus(): Promise<StatusResponseMessage> {
     type: 'STATUS_RESPONSE',
     globalSyncEnabled: localState.globalSyncEnabled,
     autoSyncNewChatsEnabled: localState.autoSyncNewChatsEnabled,
+    pauseAfterFirstFanOutEnabled: localState.pauseAfterFirstFanOutEnabled,
     debugLoggingEnabled: localState.debugLoggingEnabled,
     showDiagnostics: localState.showDiagnostics,
     closeTabsOnDeleteSet: localState.closeTabsOnDeleteSet ?? false,
