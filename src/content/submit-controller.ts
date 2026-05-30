@@ -1,17 +1,13 @@
 import type { ProviderAdapter, UserSubmissionPayload } from '../adapters/types';
 import {
-  ATTACHMENT_CHUNK_BYTES,
-  ATTACHMENT_MAX_COUNT,
-  ATTACHMENT_MAX_FILE_BYTES,
   type AttachmentRef,
-  type CapturedAttachment,
   type Provider,
   type ProviderDeliveryResult,
   PROVIDER_UPLOAD_CAPABILITIES,
 } from '../runtime/protocol';
 import { formatAttachmentSummary, shortSubmitId } from '../runtime/attachment-log';
-import { isProbablyPlainTextBytes } from '../runtime/attachment-text';
 import { buildUserSubmitMessage, createSubmitId, sendRuntimeMessage } from './routing';
+import { stageSubmitAttachments } from './attachment-staging';
 import type { ContentStateController, SubmitResponse } from './state';
 
 type SubmitInput = string | UserSubmissionPayload;
@@ -33,18 +29,6 @@ function normalizeSubmitInput(input: SubmitInput): UserSubmissionPayload {
   }
 
   return input;
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  const batchSize = 0x8000;
-
-  for (let offset = 0; offset < bytes.length; offset += batchSize) {
-    const batch = bytes.subarray(offset, offset + batchSize);
-    binary += String.fromCharCode(...batch);
-  }
-
-  return btoa(binary);
 }
 
 function formatFileCount(count: number): string {
@@ -97,84 +81,6 @@ export function createSubmitController(
     }) => Promise<void>;
   },
 ) {
-  const writeAttachmentsToStore = async (
-    submitId: string,
-    attachments: CapturedAttachment[],
-  ): Promise<AttachmentRef[]> => {
-    if (attachments.length === 0) {
-      return [];
-    }
-
-    if (attachments.length > ATTACHMENT_MAX_COUNT) {
-      throw new Error('too many files');
-    }
-
-    const refs: AttachmentRef[] = [];
-    let createdAttachment = false;
-
-    try {
-      for (const attachment of attachments) {
-        if (attachment.size > ATTACHMENT_MAX_FILE_BYTES) {
-          throw new Error('attachment too large');
-        }
-
-        const bytes = new Uint8Array(await attachment.file.arrayBuffer());
-        const ref: AttachmentRef = {
-          id: attachment.id,
-          name: attachment.name,
-          mime: attachment.mime,
-          size: attachment.size,
-          isPlainText: isProbablyPlainTextBytes(bytes),
-        };
-
-        const createResponse = await sendRuntimeMessage<{ ok?: boolean; error?: string }>({
-          type: 'ATTACHMENT_CREATE',
-          submitId,
-          ...ref,
-        });
-        if (!createResponse?.ok) {
-          throw new Error(createResponse?.error ?? 'failed to create attachment');
-        }
-        createdAttachment = true;
-
-        for (let offset = 0; offset < bytes.byteLength; offset += ATTACHMENT_CHUNK_BYTES) {
-          const chunk = bytes.subarray(offset, Math.min(offset + ATTACHMENT_CHUNK_BYTES, bytes.byteLength));
-          const appendResponse = await sendRuntimeMessage<{ ok?: boolean; error?: string }>({
-            type: 'ATTACHMENT_APPEND_CHUNK',
-            submitId,
-            attachmentId: attachment.id,
-            offset,
-            chunkBase64: bytesToBase64(chunk),
-          });
-          if (!appendResponse?.ok) {
-            throw new Error(appendResponse?.error ?? 'failed to append attachment');
-          }
-        }
-
-        const finalizeResponse = await sendRuntimeMessage<{ ok?: boolean; ref?: AttachmentRef; error?: string }>({
-          type: 'ATTACHMENT_FINALIZE',
-          submitId,
-          attachmentId: attachment.id,
-        });
-        if (!finalizeResponse?.ok || !finalizeResponse.ref) {
-          throw new Error(finalizeResponse?.error ?? 'failed to finalize attachment');
-        }
-
-        refs.push(finalizeResponse.ref);
-      }
-
-      return refs;
-    } catch (error) {
-      if (createdAttachment) {
-        await sendRuntimeMessage({
-          type: 'ATTACHMENT_ABORT',
-          submitId,
-        });
-      }
-      throw error;
-    }
-  };
-
   const reportUserSubmit = async (input: SubmitInput) => {
     const payload = normalizeSubmitInput(input);
     const content = payload.text.trim();
@@ -274,7 +180,7 @@ export function createSubmitController(
         });
       }
 
-      attachments = await writeAttachmentsToStore(submitId, payload.attachments);
+      attachments = await stageSubmitAttachments(submitId, payload.attachments);
 
       if (attachments.length > 0) {
         await dependencies.logDebug({

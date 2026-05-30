@@ -78,6 +78,8 @@ describe('submit controller attachment staging', () => {
 
     const state = createState();
     const onConsumed = vi.fn();
+    const file = new File(['abc'], 'sample.pdf', { type: 'application/pdf' });
+    const arrayBufferSpy = vi.spyOn(file, 'arrayBuffer');
     const controller = createSubmitController(createAdapter(), state as any, {
       reportPresence: vi.fn(),
       logDebug: vi.fn(),
@@ -92,7 +94,7 @@ describe('submit controller attachment staging', () => {
           mime: 'application/pdf',
           size: 3,
           source: 'file-input',
-          file: new File(['abc'], 'sample.pdf', { type: 'application/pdf' }),
+          file,
         },
       ],
       onConsumed,
@@ -111,6 +113,7 @@ describe('submit controller attachment staging', () => {
       type: 'ATTACHMENT_CREATE',
       isPlainText: true,
     });
+    expect(arrayBufferSpy).not.toHaveBeenCalled();
     expect(sendMessage.mock.calls.at(-1)?.[0]).toMatchObject({
       type: 'USER_SUBMIT',
       submitId: 'submit-1',

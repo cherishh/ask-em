@@ -457,3 +457,8 @@ type UploadCapability = {
 - [ ] 不静默把附件 submit 成纯文本：target submit 前必须通过 `getComposerAttachmentPresence()` 做 baseline+delta 确认 [A1]。
 - [ ] 不阻止源 provider 原生发送。
 - [ ] 不引入 `chrome.alarms` 或其他新权限。
+
+## Deferred Architecture Cleanup（当前 TODO 全部完成后再评估）
+
+- [ ] 抽公共 file input helper：复用 `accept` 解析、extension/MIME 匹配、`multiple` 选择等纯函数；provider-specific root/selector 继续留在各 adapter。
+- [ ] 封装 `ComposerAttachmentPresence` delta/key 语义：集中 `count + keys` 的 baseline/delta 计算、duplicate filename/聚合卡片约束和测试，避免 adapter 误用 keys。

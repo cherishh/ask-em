@@ -106,6 +106,7 @@ describe('dom provider adapter submit detection', () => {
       className: 'ask-em-chatgpt-ui',
       composerSelectors: ['#composer'],
       sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
     });
 
     const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
@@ -150,6 +151,7 @@ describe('dom provider adapter submit detection', () => {
       className: 'ask-em-chatgpt-ui',
       composerSelectors: ['#composer'],
       sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
     });
 
     const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
@@ -193,6 +195,7 @@ describe('dom provider adapter submit detection', () => {
       className: 'ask-em-chatgpt-ui',
       composerSelectors: ['#composer'],
       sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
     });
 
     const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
@@ -241,6 +244,7 @@ describe('dom provider adapter submit detection', () => {
       className: 'ask-em-chatgpt-ui',
       composerSelectors: ['#composer'],
       sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
     });
 
     const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
@@ -283,6 +287,7 @@ describe('dom provider adapter submit detection', () => {
       className: 'ask-em-chatgpt-ui',
       composerSelectors: ['#composer'],
       sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
     });
 
     const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
@@ -311,6 +316,50 @@ describe('dom provider adapter submit detection', () => {
     `;
 
     const file = new File(['abc'], 'removed.png', { type: 'image/png' });
+    const composer = document.getElementById('composer') as HTMLElement;
+    const pasteEvent = new Event('paste', { bubbles: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: {
+        files: [file],
+        items: [],
+      },
+    });
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    composer.dispatchEvent(pasteEvent);
+    document.getElementById('send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hello',
+      attachments: [],
+      attachmentResolution: expect.objectContaining({
+        capturedCount: 1,
+        currentCount: null,
+        submittedCount: 0,
+        reason: 'missing-source-snapshot',
+      }),
+    }));
+    unsubscribe?.();
+  });
+
+  it('does not use generic submit-time attachment labels unless explicitly opted in', () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">hello</div>
+      <div data-testid="attachment-card">sample.pdf</div>
+      <button id="send">Send</button>
+    `;
+
+    const file = new File(['abc'], 'sample.pdf', { type: 'application/pdf' });
     const composer = document.getElementById('composer') as HTMLElement;
     const pasteEvent = new Event('paste', { bubbles: true });
     Object.defineProperty(pasteEvent, 'clipboardData', {
@@ -361,6 +410,7 @@ describe('dom provider adapter submit detection', () => {
       className: 'ask-em-chatgpt-ui',
       composerSelectors: ['#composer'],
       sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
     });
 
     const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
@@ -413,6 +463,7 @@ describe('dom provider adapter submit detection', () => {
       className: 'ask-em-manus-ui',
       composerSelectors: ['#composer'],
       sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
     });
 
     const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
@@ -465,6 +516,7 @@ describe('dom provider adapter submit detection', () => {
       className: 'ask-em-chatgpt-ui',
       composerSelectors: ['#composer'],
       sendButtonSelectors: ['#send'],
+      useGenericAttachmentSnapshot: true,
     });
 
     const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);

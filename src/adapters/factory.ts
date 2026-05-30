@@ -56,6 +56,7 @@ type DomProviderAdapterConfig = {
   submitWaitMs?: number;
   submitTimeoutMs?: number;
   isSendButtonEnabled?: (button: HTMLElement) => boolean;
+  useGenericAttachmentSnapshot?: boolean;
   setComposerPayload?: (
     payload: ComposerPayload,
     context: {
@@ -245,13 +246,21 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
   };
   const getComposerAttachmentSnapshot = (
     capturedAttachments: CapturedAttachment[],
-  ): ComposerAttachmentSnapshot | null => (
-    config.getComposerAttachmentSnapshot?.({
-      findComposer,
-      findSendButton,
-      isFileInputForComposer,
-    }, capturedAttachments) ?? getDefaultComposerAttachmentSnapshot(capturedAttachments)
-  );
+  ): ComposerAttachmentSnapshot | null => {
+    if (config.getComposerAttachmentSnapshot) {
+      return config.getComposerAttachmentSnapshot({
+        findComposer,
+        findSendButton,
+        isFileInputForComposer,
+      }, capturedAttachments);
+    }
+
+    if (config.useGenericAttachmentSnapshot) {
+      return getDefaultComposerAttachmentSnapshot(capturedAttachments);
+    }
+
+    return capturedAttachments.length === 0 ? { count: 0, items: [] } : null;
+  };
 
   const getStatus = (): ProviderStatus => {
     prepareDom();
