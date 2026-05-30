@@ -113,8 +113,8 @@ rollout 顺序按 provider 分开交付，避免一套不稳定 DOM 策略同时
 | --- | --- | --- | --- | --- |
 | Claude | stable file input fallback | `data-testid="file-thumbnail"` / `img[alt]` / `Remove <filename>` filename key | 已完成，作为 baseline | 单图、文本文件、多文件可 fan-out 并自动发送 |
 | ChatGPT | composer-scoped `#upload-files` file input；无 scoped input 时 synthetic paste fallback | `role="group"` file tile / filename key | ChatGPT DOM 版本漂移，input 或 file tile selector 失效时会静默失败 | presence delta 确认后才 submit；失败不发纯文本 |
-| Gemini | synthetic paste；必要时 provider override 到 file input | `.text-input-field` 内的 `uploader-file-preview` / `gem-attachment` / `.gem-attachment-text` filename key | ProseMirror/Angular event 处理可能不吃合成 paste；当前页面无稳定 file input | presence delta 确认后才 submit；失败不发纯文本 |
-| DeepSeek | composer-scoped hidden/stable file input fallback | attachment chip / filename key | hidden input 查找范围过宽会误打页面无关 input | 找不到 scoped input 就 fail fast，不改 core |
+| Gemini | synthetic paste；必要时 provider override 到 file input | `.text-input-field` 内的 `uploader-file-preview` / `gem-attachment` / `.gem-attachment-text` filename key；长文件名需读 `aria-describedby` tooltip | ProseMirror/Angular event 处理可能不吃合成 paste；当前页面无稳定 file input | presence delta 确认后才 submit；失败不发纯文本 |
+| DeepSeek | composer-scoped hidden/stable `input[type=file][multiple]` fallback | `.ds-animated-size-item` filename key | hidden input 查找范围过宽会误打页面无关 input；icon buttons 需避开 DeepThink/Search/upload | 只在 composer root 内找 input；找不到 scoped input 就 fail fast，不改 core |
 | Manus | menu-triggered transient input fallback | attachment card / filename key | transient input 与菜单状态都脆弱，必须 teardown | 成功、失败、timeout 都清理 hook/菜单状态 |
 
 每家 provider 的 DOM 路径、payload 顺序、presence key、upload error selector 都留在 adapter；delivery core 不引入 provider 分支。

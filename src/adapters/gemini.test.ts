@@ -125,6 +125,89 @@ describe('Gemini attachment delivery adapter', () => {
     });
   });
 
+  it('counts multiple Gemini file tiles inside one uploader preview wrapper', async () => {
+    document.body.innerHTML = `
+      <div class="text-input-field with-file-preview">
+        <uploader-file-preview class="file-preview-strip">
+          <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+            <span class="gem-attachment-text">deck.pdf</span>
+          </gem-attachment>
+          <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+            <span class="gem-attachment-text">notes.pdf</span>
+          </gem-attachment>
+        </uploader-file-preview>
+        <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true"></div>
+        <button aria-label="Send message"></button>
+      </div>
+    `;
+
+    await expect(Promise.resolve(geminiAdapter.composer?.getComposerAttachmentPresence?.([
+      {
+        id: 'a1',
+        name: 'deck.pdf',
+        mime: 'application/pdf',
+        size: 3,
+      },
+      {
+        id: 'a2',
+        name: 'notes.pdf',
+        mime: 'application/pdf',
+        size: 4,
+      },
+    ]))).resolves.toEqual({
+      count: 2,
+      keys: ['deck.pdf', 'notes.pdf'],
+    });
+  });
+
+  it('matches long Gemini filenames from aria-describedby tooltip text when the visible tile is truncated', async () => {
+    document.body.innerHTML = `
+      <div class="text-input-field with-file-preview">
+        <uploader-file-preview class="file-preview-chip">
+          <div class="file-preview-container" aria-describedby="tooltip-file-1">
+            <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+              <span class="gem-attachment-text">20180301-中...码解除_PT0BYq</span>
+            </gem-attachment>
+          </div>
+        </uploader-file-preview>
+        <uploader-file-preview class="file-preview-chip">
+          <div class="file-preview-container" aria-describedby="tooltip-file-2">
+            <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+              <span class="gem-attachment-text">The_Murders</span>
+            </gem-attachment>
+          </div>
+        </uploader-file-preview>
+        <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true"></div>
+        <button aria-label="Send message"></button>
+      </div>
+      <div class="cdk-describedby-message-container" style="visibility: hidden;">
+        <div id="tooltip-file-1" role="tooltip">20180301-中邮证券-白马被抛弃？_密码解除_PT0BYq.pdf</div>
+        <div id="tooltip-file-2" role="tooltip">The_Murders.pdf</div>
+      </div>
+    `;
+
+    await expect(Promise.resolve(geminiAdapter.composer?.getComposerAttachmentPresence?.([
+      {
+        id: 'a1',
+        name: '20180301-中邮证券-白马被抛弃？_密码解除_PT0BYq.pdf',
+        mime: 'application/pdf',
+        size: 3,
+      },
+      {
+        id: 'a2',
+        name: 'The_Murders.pdf',
+        mime: 'application/pdf',
+        size: 4,
+      },
+    ]))).resolves.toEqual({
+      count: 2,
+      keys: [
+        '20180301-中邮证券-白马被抛弃？_密码解除_PT0BYq.pdf',
+        'The_Murders.pdf',
+      ],
+    });
+  });
+
   it('keeps old Gemini draft attachments from satisfying a new expected file', async () => {
     document.body.innerHTML = `
       <div class="text-input-field with-file-preview">

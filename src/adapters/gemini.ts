@@ -27,9 +27,16 @@ function findGeminiComposerRoot(
 }
 
 function getElementAccessibleText(element: HTMLElement): string {
+  const describedByText = (element.getAttribute('aria-describedby') ?? '')
+    .split(/\s+/)
+    .map((id) => document.getElementById(id)?.textContent ?? '')
+    .filter(Boolean)
+    .join(' ');
+
   return normalizeWhitespace(
     [
       element.getAttribute('aria-label'),
+      describedByText,
       element.getAttribute('title'),
       element.innerText || element.textContent,
     ]
@@ -70,35 +77,52 @@ function getGeminiAttachmentItems(container: ParentNode, expectedAttachments?: A
     full: compactAttachmentText(attachment.name),
     stem: compactAttachmentText(getAttachmentNameStem(attachment.name)),
   })).filter((item) => item.full || item.stem);
-  const matchExpectedName = (text: string): string | null => {
+  const matchExpectedNames = (candidateTexts: string[]): string[] => {
     if (expectedNames.length === 0) {
-      return text;
+      return candidateTexts;
     }
 
-    const compactText = compactAttachmentText(text);
-    const match = expectedNames.find((item) => (
-      (item.full && compactText.includes(item.full)) ||
-      (item.stem && compactText.includes(item.stem))
-    ));
+    const usedIndexes = new Set<number>();
+    const matchedItems: string[] = [];
+    for (const expectedName of expectedNames) {
+      const matchedIndex = candidateTexts.findIndex((text, index) => {
+        if (usedIndexes.has(index)) {
+          return false;
+        }
 
-    return match?.name ?? null;
+        const compactText = compactAttachmentText(text);
+        return (
+          (expectedName.full && compactText.includes(expectedName.full)) ||
+          (expectedName.stem && compactText.includes(expectedName.stem))
+        );
+      });
+
+      if (matchedIndex >= 0) {
+        usedIndexes.add(matchedIndex);
+        matchedItems.push(expectedName.name);
+      }
+    }
+
+    return matchedItems;
   };
   const selectors = [
-    'uploader-file-preview',
+    '.gem-attachment-text',
     'gem-attachment.gem-attachment-tile',
     '.file-preview-chip',
-    '.gem-attachment-text',
+    'uploader-file-preview',
   ];
 
   for (const selector of selectors) {
-    const items = Array.from(container.querySelectorAll<HTMLElement>(selector))
+    const candidateTexts = Array.from(container.querySelectorAll<HTMLElement>(selector))
       .filter(isVisible)
       .map(getElementTreeAccessibleText)
-      .filter(Boolean)
-      .map(matchExpectedName)
-      .filter((item): item is string => Boolean(item));
+      .filter(Boolean);
+    const items = matchExpectedNames(candidateTexts);
 
-    if (items.length > 0) {
+    if (
+      (expectedNames.length === 0 && items.length > 0) ||
+      (expectedNames.length > 0 && items.length >= expectedNames.length)
+    ) {
       return items;
     }
   }

@@ -291,8 +291,8 @@ type UploadCapability = {
 - [ ] 每家 provider 开工前先用 Chrome/extension 实测当前 composer DOM，记录：file injection 入口、attachment preview/chip selector、upload error selector、send button enable 条件。
   - [x] Claude：source snapshot / upload input / PDF preview DOM 已复核（`img[alt]` + `Remove <filename>`，上传后 `input.files` 会清空）。
   - [x] ChatGPT：target composer DOM 已复核（`form[data-type="unified-composer"]` / `#upload-files` / file tile / submit button）。
-  - [x] Gemini：target composer DOM 已复核（`.ql-editor[aria-label="Enter a prompt for Gemini"]` / `uploader-file-preview` / `gem-attachment` / `button[aria-label="Send message"]`；当前无稳定 file input）。
-  - [ ] DeepSeek。
+  - [x] Gemini：target composer DOM 已复核（`.ql-editor[aria-label="Enter a prompt for Gemini"]` / `uploader-file-preview` / `gem-attachment` / `button[aria-label="Send message"]`；长文件名会在 visible chip 截断，完整 filename 在 `aria-describedby` tooltip；当前无稳定 file input）。
+  - [x] DeepSeek：target composer DOM 已复核（`textarea[placeholder="Message DeepSeek"]` / composer-scoped hidden `input[type="file"][multiple]` / `.ds-animated-size-item` / `div.ds-icon-button[role="button"][aria-disabled]`）。
   - [ ] Manus。
 - [ ] 每家 provider 的 adapter 测试都覆盖：
   - [x] Claude/ChatGPT 当前链路覆盖注入、presence、baseline+delta、同名重复附件和 source snapshot 过滤。
@@ -300,10 +300,10 @@ type UploadCapability = {
   - [x] Gemini target 已有旧草稿附件时，baseline+delta 不误判。
   - [x] Gemini 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`（通用 controller gate + adapter presence fixture）。
   - [ ] Gemini 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认。
-  - [ ] DeepSeek 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
-  - [ ] DeepSeek target 已有旧草稿附件时，baseline+delta 不误判。
-  - [ ] DeepSeek 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`。
-  - [ ] DeepSeek 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认。
+  - [x] DeepSeek 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
+  - [x] DeepSeek target 已有旧草稿附件时，baseline+delta 不误判。
+  - [x] DeepSeek 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`（通用 controller gate + adapter fail-fast/old-draft fixture）。
+  - [x] DeepSeek 多文件一次上传和逐个粘贴/上传后 submit 都能通过确认（adapter fixture 覆盖多文件/同名 preview 计数；真实 smoke 待手测）。
   - [ ] Manus 注入成功后 `getComposerAttachmentPresence(expected)` 能返回新增 count/key。
   - [ ] Manus target 已有旧草稿附件时，baseline+delta 不误判。
   - [ ] Manus 注入失败或 presence delta 不足时，不点击 send，返回 `delivery-failed`。
@@ -362,23 +362,23 @@ type UploadCapability = {
 
 #### Phase 5.3：DeepSeek target delivery
 
-- [ ] 实测 DeepSeek 当前 composer DOM：`textarea[placeholder="Message DeepSeek"]`、隐藏/稳定 file input、附件 chip、upload error、send button。
-- [ ] 实现 DeepSeek `setComposerPayload`：
-  - [ ] 默认 text-first。
-  - [ ] 使用 provider-local hidden/stable file input fallback。
-  - [ ] 找不到 composer-scoped input 时 fail fast，不尝试全局乱选 input。
-  - [ ] suppression 覆盖 `input/change`。
-- [ ] 实现 DeepSeek `getComposerAttachmentPresence(expected)`：
-  - [ ] count delta。
-  - [ ] 可用 filename/preview key 时精确匹配。
-  - [ ] 同名重复文件无法唯一确认时 fail-closed。
-- [ ] 实现或明确保留 DeepSeek `detectAttachmentUploadError()`：
-  - [ ] upload failed / unsupported / toast / retry。
-  - [ ] 无稳定 selector 时靠 timeout，并记录 TODO evidence。
-- [ ] 测试：
-  - [ ] adapter DOM fixture 覆盖 hidden input 注入。
-  - [ ] presence baseline+delta 测试覆盖已有旧附件。
-  - [ ] delivery-controller 负向测试覆盖 DeepSeek presence 不足不 submit。
+- [x] 实测 DeepSeek 当前 composer DOM：`textarea[placeholder="Message DeepSeek"]`、隐藏/稳定 file input、附件 chip、upload error、send button。
+- [x] 实现 DeepSeek `setComposerPayload`：
+  - [x] 默认 text-first。
+  - [x] 使用 provider-local hidden/stable file input fallback。
+  - [x] 找不到 composer-scoped input 时 fail fast，不尝试全局乱选 input。
+  - [x] suppression 覆盖 `input/change`。
+- [x] 实现 DeepSeek `getComposerAttachmentPresence(expected)`：
+  - [x] count delta。
+  - [x] 可用 filename/preview key 时精确匹配。
+  - [x] 同名重复文件按 preview card 数量逐个匹配，不复用同一个 DOM card。
+- [x] 实现或明确保留 DeepSeek `detectAttachmentUploadError()`：
+  - [x] upload failed / unsupported / toast / retry。
+  - [x] 无稳定 selector 时保留 30s timeout 兜底。
+- [x] 测试：
+  - [x] adapter DOM fixture 覆盖 hidden input 注入。
+  - [x] presence baseline+delta 测试覆盖已有旧附件。
+  - [x] delivery-controller 负向测试覆盖 DeepSeek presence 不足不 submit（通用 controller gate 已覆盖，DeepSeek adapter fixture 提供 count/key 负样本）。
 - [ ] 手测：
   - [ ] Claude/任一 source → DeepSeek target：单图。
   - [ ] Claude/任一 source → DeepSeek target：`.md/.txt`。
