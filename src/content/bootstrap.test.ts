@@ -191,6 +191,51 @@ describe('content bootstrap wiring', () => {
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('set-warning');
   });
 
+  it('reports a final startup heartbeat when a new-chat page becomes ready', async () => {
+    const intervalCallbacks: Array<() => void> = [];
+    const setIntervalMock = window.setInterval as unknown as ReturnType<typeof vi.fn>;
+    setIntervalMock.mockImplementation((handler: () => void) => {
+      if (typeof handler === 'function') {
+        intervalCallbacks.push(handler);
+      }
+      return intervalCallbacks.length;
+    });
+    status = {
+      provider: 'claude',
+      currentUrl: 'https://claude.ai/new',
+      sessionId: null,
+      pageKind: 'new-chat',
+      pageState: 'not-ready',
+    };
+    const standaloneResponse = {
+      workspaceId: null,
+      providerEnabled: false,
+      globalSyncEnabled: true,
+      autoSyncNewChatsEnabled: true,
+      nextFanOutTargetCount: 2,
+      canStartNewSet: true,
+      shortcuts: DEFAULT_SHORTCUTS,
+      workspaceSummary: null,
+    };
+    routingMocks.sendRuntimeMessage.mockResolvedValue(standaloneResponse);
+
+    await bootstrap();
+    await flushMicrotasks();
+    routingMocks.sendRuntimeMessage.mockClear();
+
+    status = {
+      ...status,
+      pageState: 'ready',
+    };
+    intervalCallbacks[0]?.();
+    await flushMicrotasks();
+
+    expect(routingMocks.sendRuntimeMessage).toHaveBeenCalledWith({ type: 'HEARTBEAT' });
+    expect(ui.setVisible).toHaveBeenLastCalledWith(true);
+    expect(ui.setState).toHaveBeenLastCalledWith('idle', 'ready');
+    expect(ui.setSyncStatus).toHaveBeenLastCalledWith('next prompt will fan out to 2 models', 'neutral');
+  });
+
   it('updates indicator progress when SYNC_PROGRESS arrives for the current workspace', async () => {
     await bootstrap();
 
