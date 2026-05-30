@@ -9,6 +9,7 @@ import {
   type SessionState,
 } from './protocol';
 import { toClaimedTabKey } from './protocol';
+import { trimDebugLogsForStorage } from './debug-log-retention';
 import { rebuildWorkspaceIndex } from './workspace';
 
 export const DEFAULT_LOCAL_STATE: LocalState = {
@@ -29,8 +30,6 @@ export const DEFAULT_LOCAL_STATE: LocalState = {
 export const DEFAULT_SESSION_STATE: SessionState = {
   claimedTabs: {},
 };
-
-const DEBUG_LOG_LIMIT = 350;
 
 type StorageArea = Pick<
   chrome.storage.StorageArea,
@@ -102,6 +101,14 @@ function normalizeLocalState(state: LocalState): LocalState {
     normalized = {
       ...normalized,
       pauseAfterFirstFanOutEnabled: true,
+    };
+  }
+
+  const debugLogs = trimDebugLogsForStorage(normalized.debugLogs ?? []);
+  if (debugLogs !== normalized.debugLogs) {
+    normalized = {
+      ...normalized,
+      debugLogs,
     };
   }
 
@@ -198,7 +205,7 @@ export async function appendDebugLog(entry: Omit<DebugLogEntry, 'id' | 'timestam
 
     return {
       ...state,
-      debugLogs: [...state.debugLogs, debugLog].slice(-DEBUG_LOG_LIMIT),
+      debugLogs: trimDebugLogsForStorage([...state.debugLogs, debugLog]),
     };
   });
 }
