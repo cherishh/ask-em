@@ -23,22 +23,27 @@ function toEnabledProviderList(defaultEnabledProviders: DefaultEnabledProviders)
   return ALL_PROVIDERS.filter((provider) => defaultEnabledProviders[provider]);
 }
 
-function normalizeDefaultFanOutProviders(
+function reconcileDefaultFanOutProviders(
   selectedFanOutProviders: Provider[] | null | undefined,
+  previousEnabledProviders: Provider[],
   enabledProviders: Provider[],
 ): Provider[] | null {
   if (!selectedFanOutProviders) {
     return null;
   }
 
+  const previousEnabledSet = new Set(previousEnabledProviders);
   const enabledSet = new Set(enabledProviders);
-  const normalized = selectedFanOutProviders.filter((provider) => enabledSet.has(provider));
+  const selectedSet = new Set(selectedFanOutProviders);
+  const normalized = enabledProviders.filter(
+    (provider) => selectedSet.has(provider) || !previousEnabledSet.has(provider),
+  );
 
   if (normalized.length === 0) {
     return null;
   }
 
-  return normalized;
+  return normalized.length === enabledSet.size ? null : normalized;
 }
 
 export async function handleWorkspaceClear(
@@ -121,6 +126,7 @@ export async function handleSetDefaultEnabledProviders(
 ) {
   const nextProviders = createDefaultEnabledProviders(message.providers);
   const localState = await getLocalState();
+  const previousEnabledProviders = toEnabledProviderList(localState.defaultEnabledProviders);
   const enabledProviders = toEnabledProviderList(nextProviders);
 
   if (enabledProviders.length === 0) {
@@ -130,8 +136,9 @@ export async function handleSetDefaultEnabledProviders(
   await setLocalState({
     ...localState,
     defaultEnabledProviders: nextProviders,
-    defaultFanOutProviders: normalizeDefaultFanOutProviders(
+    defaultFanOutProviders: reconcileDefaultFanOutProviders(
       localState.defaultFanOutProviders,
+      previousEnabledProviders,
       enabledProviders,
     ),
   });

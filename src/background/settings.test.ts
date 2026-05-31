@@ -1,0 +1,41 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createDefaultEnabledProviders, type LocalState } from '../runtime/protocol';
+import { makeLocalState } from '../test/builders';
+
+const storageMocks = vi.hoisted(() => ({
+  appendDebugLog: vi.fn().mockResolvedValue(undefined),
+  clearDebugLogs: vi.fn(),
+  getLocalState: vi.fn(),
+  getSessionState: vi.fn(),
+  setLocalState: vi.fn(),
+  setSessionState: vi.fn(),
+}));
+
+vi.mock('../runtime/storage', () => storageMocks);
+
+describe('settings handlers', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    storageMocks.setLocalState.mockImplementation(async (state: LocalState) => state);
+  });
+
+  it('adds newly enabled providers to the default fan-out selection', async () => {
+    storageMocks.getLocalState.mockResolvedValue(makeLocalState({
+      defaultEnabledProviders: createDefaultEnabledProviders(['claude', 'chatgpt']),
+      defaultFanOutProviders: ['claude'],
+    }));
+
+    const { handleSetDefaultEnabledProviders } = await import('./settings');
+    const result = await handleSetDefaultEnabledProviders({
+      type: 'SET_DEFAULT_ENABLED_PROVIDERS',
+      providers: ['claude', 'chatgpt', 'gemini'],
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(storageMocks.setLocalState).toHaveBeenCalledWith(expect.objectContaining({
+      defaultEnabledProviders: createDefaultEnabledProviders(['claude', 'chatgpt', 'gemini']),
+      defaultFanOutProviders: ['claude', 'gemini'],
+    }));
+  });
+});

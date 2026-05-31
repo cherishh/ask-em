@@ -15,8 +15,9 @@ import { requestStatus } from '../popup-runtime';
 
 const POPUP_STATUS_POLL_MS = 3_000;
 
-function normalizeDefaultFanOutOverride(
+function reconcileDefaultFanOutOverride(
   selectedFanOutProviders: Provider[] | null,
+  previousEnabledProviders: Provider[],
   enabledProviders: Provider[],
 ): Provider[] | null {
   if (!selectedFanOutProviders) {
@@ -24,7 +25,13 @@ function normalizeDefaultFanOutOverride(
   }
 
   const selectedSet = new Set(selectedFanOutProviders);
-  const normalized = enabledProviders.filter((provider) => selectedSet.has(provider));
+  const previousEnabledSet = new Set(previousEnabledProviders);
+  const normalized = enabledProviders.filter(
+    (provider) => selectedSet.has(provider) || !previousEnabledSet.has(provider),
+  );
+  if (normalized.length === enabledProviders.length) {
+    return null;
+  }
   return normalized.length > 0 ? normalized : null;
 }
 
@@ -139,8 +146,9 @@ export function usePopupStatus() {
     const nextProviders = active
       ? enabledProviders.filter((item) => item !== provider)
       : PROVIDERS.filter((item) => enabledProviders.includes(item) || item === provider);
-    const nextDefaultFanOutProviders = normalizeDefaultFanOutOverride(
+    const nextDefaultFanOutProviders = reconcileDefaultFanOutOverride(
       defaultFanOutProviders,
+      enabledProviders,
       nextProviders,
     );
 
