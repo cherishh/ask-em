@@ -3,7 +3,7 @@
 
 
 
-
+- 导出为 md(text) & pdf(全页截图)
 - 手动新建 set。可以输入 urls，但不复用 tab 而是新开，来收集 tabid
 - ~~消息的格式化要保留~~
 - ext & 落地页要接 posthog，要获取 什么 work 什么不 work 的信息
