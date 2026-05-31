@@ -74,6 +74,47 @@ export {
   transferClaimedTabToWorkspace,
 };
 
+export async function handleTabRemoved(tabId: number) {
+  try {
+    const sweptAttachments = await sweepAttachmentsByOwnerTab(tabId);
+    if (sweptAttachments > 0) {
+      await logDebug({
+        level: 'info',
+        scope: 'background',
+        message: 'Swept attachments for closed tab',
+        detail: `tab=${tabId}; removed=${sweptAttachments}`,
+      });
+    }
+  } catch (error) {
+    console.warn('ask-em: failed to sweep attachment store for closed tab', error);
+  }
+
+  const sessionState = await getSessionState();
+  const { sessionState: nextSessionState, removedClaimedTabs } = removeClaimedTabsForTabId(sessionState, tabId);
+
+  if (removedClaimedTabs.length === 0) {
+    return;
+  }
+
+  await setSessionState(nextSessionState);
+
+  const affectedWorkspaceIds = new Set<string>();
+  for (const claimedTab of removedClaimedTabs) {
+    affectedWorkspaceIds.add(claimedTab.workspaceId);
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      workspaceId: claimedTab.workspaceId,
+      provider: claimedTab.provider,
+      message: 'Observed provider tab close',
+    });
+  }
+
+  for (const workspaceId of affectedWorkspaceIds) {
+    await scheduleGroupGcIfEmpty(workspaceId);
+  }
+}
+
 export default defineBackground(() => {
   void startupSweepAttachments()
     .then(({ expired, orphaned }) => {
@@ -95,41 +136,7 @@ export default defineBackground(() => {
     });
 
   chrome.tabs.onRemoved.addListener((tabId) => {
-    void (async () => {
-      try {
-        const sweptAttachments = await sweepAttachmentsByOwnerTab(tabId);
-        if (sweptAttachments > 0) {
-          await logDebug({
-            level: 'info',
-            scope: 'background',
-            message: 'Swept attachments for closed tab',
-            detail: `tab=${tabId}; removed=${sweptAttachments}`,
-          });
-        }
-      } catch (error) {
-        console.warn('ask-em: failed to sweep attachment store for closed tab', error);
-      }
-
-      const sessionState = await getSessionState();
-      const { sessionState: nextSessionState, removedClaimedTabs } = removeClaimedTabsForTabId(sessionState, tabId);
-
-      if (removedClaimedTabs.length === 0) {
-        return;
-      }
-
-      await setSessionState(nextSessionState);
-
-      for (const claimedTab of removedClaimedTabs) {
-        await logDebug({
-          level: 'info',
-          scope: 'background',
-          workspaceId: claimedTab.workspaceId,
-          provider: claimedTab.provider,
-          message: 'Observed provider tab close',
-        });
-        await scheduleGroupGcIfEmpty(claimedTab.workspaceId);
-      }
-    })();
+    void handleTabRemoved(tabId);
   });
 
   chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendResponse) => {

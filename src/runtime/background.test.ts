@@ -64,6 +64,10 @@ describe('background new-chat detachment', () => {
   });
 
   afterEach(() => {
+    storageMocks.getLocalState.mockReset();
+    storageMocks.setLocalState.mockReset();
+    storageMocks.getSessionState.mockReset();
+    storageMocks.setSessionState.mockReset();
     vi.unstubAllGlobals();
   });
 
@@ -440,6 +444,16 @@ describe('background claimed-tab reconciliation', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    storageMocks.setLocalState.mockImplementation(async (state: LocalState) => {
+      storageMocks.getLocalState.mockResolvedValue(state);
+      return state;
+    });
+    storageMocks.updateLocalState.mockImplementation(async (updater: (state: LocalState) => LocalState | Promise<LocalState>) => {
+      const current = await storageMocks.getLocalState();
+      const next = await updater(current);
+      await storageMocks.setLocalState(next);
+      return next;
+    });
     vi.stubGlobal('defineBackground', vi.fn((callback: unknown) => callback));
     vi.stubGlobal('chrome', {
       tabs: {
@@ -453,9 +467,14 @@ describe('background claimed-tab reconciliation', () => {
         update: vi.fn().mockResolvedValue({ id: 3 }),
       },
     });
+    storageMocks.getSessionState.mockResolvedValue(makeSessionState());
   });
 
   afterEach(() => {
+    storageMocks.getLocalState.mockReset();
+    storageMocks.setLocalState.mockReset();
+    storageMocks.getSessionState.mockReset();
+    storageMocks.setSessionState.mockReset();
     vi.unstubAllGlobals();
   });
 
@@ -716,10 +735,113 @@ describe('background claimed-tab reconciliation', () => {
   });
 });
 
+describe('background tab close cleanup', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.stubGlobal('defineBackground', vi.fn((callback: unknown) => callback));
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 9 }),
+        sendMessage: vi.fn().mockResolvedValue({ ok: true }),
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+  });
+
+  afterEach(() => {
+    storageMocks.getLocalState.mockReset();
+    storageMocks.setLocalState.mockReset();
+    storageMocks.getSessionState.mockReset();
+    storageMocks.setSessionState.mockReset();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('clears the workspace after the in-memory delay when only stale claimed tabs remain', async () => {
+    let localState = makeLocalState({
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          members: {
+            claude: makeConversationRef('claude', 'c-1', 'https://claude.ai/chat/c-1'),
+            chatgpt: makeConversationRef('chatgpt', 'g-1', 'https://chatgpt.com/c/g-1'),
+          },
+          enabledProviders: ['claude', 'chatgpt'],
+        }),
+      },
+    });
+    let sessionState = makeSessionState({
+      'w1:claude': makeClaimedTab({
+        provider: 'claude',
+        workspaceId: 'w1',
+        tabId: 11,
+      }),
+      'w1:chatgpt': makeClaimedTab({
+        provider: 'chatgpt',
+        workspaceId: 'w1',
+        tabId: 10,
+      }),
+    });
+
+    storageMocks.getLocalState.mockImplementation(async () => localState);
+    storageMocks.setLocalState.mockImplementation(async (state: LocalState) => {
+      localState = state;
+      return state;
+    });
+    storageMocks.getSessionState.mockImplementation(async () => sessionState);
+    storageMocks.setSessionState.mockImplementation(async (state: SessionState) => {
+      sessionState = state;
+      return state;
+    });
+    vi.mocked(chrome.tabs.get).mockImplementation(async (tabId) => {
+      if (tabId === 11) {
+        throw new Error('No tab with id: 11');
+      }
+
+      return { id: tabId } as chrome.tabs.Tab;
+    });
+
+    const { handleTabRemoved } = await import('../entrypoints/background');
+    await handleTabRemoved(10);
+
+    expect(localState.workspaces.w1).toBeDefined();
+    expect(sessionState.claimedTabs).toEqual({});
+
+    await vi.advanceTimersByTimeAsync(6_999);
+    expect(localState.workspaces.w1).toBeDefined();
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(localState.workspaces.w1).toBeUndefined();
+    expect(sessionState.claimedTabs).toEqual({});
+    expect(storageMocks.appendDebugLog).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Auto-cleared group after all tabs closed',
+      workspaceId: 'w1',
+    }));
+  });
+});
+
 describe('background submit routing', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    storageMocks.setLocalState.mockImplementation(async (state: LocalState) => {
+      storageMocks.getLocalState.mockResolvedValue(state);
+      return state;
+    });
+    storageMocks.updateLocalState.mockImplementation(async (updater: (state: LocalState) => LocalState | Promise<LocalState>) => {
+      const current = await storageMocks.getLocalState();
+      const next = await updater(current);
+      await storageMocks.setLocalState(next);
+      return next;
+    });
     vi.stubGlobal('defineBackground', vi.fn((callback: unknown) => callback));
     vi.stubGlobal('chrome', {
       tabs: {

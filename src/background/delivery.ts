@@ -49,7 +49,7 @@ export async function deliverPromptToWorkspaceTargets(
     return [];
   }
 
-  cancelScheduledGroupGc(workspaceId);
+  await cancelScheduledGroupGc(workspaceId);
 
   const providers = ALL_PROVIDERS.filter((provider) =>
     shouldSyncWorkspaceProvider(message.provider, provider, workspace.enabledProviders),
@@ -121,7 +121,7 @@ export async function handleUserSubmit(
       });
     }
 
-    cancelScheduledGroupGc(workspaceLookup.workspaceId);
+    await cancelScheduledGroupGc(workspaceLookup.workspaceId);
 
     if (message.attachments.length > 0) {
       await bindAttachments(message.submitId, workspaceLookup.workspaceId);

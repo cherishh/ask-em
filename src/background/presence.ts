@@ -41,7 +41,7 @@ export async function handlePresenceMessage(message: HelloMessage | HeartbeatMes
     return buildStandalonePresenceResponse(localState, message.provider);
   }
 
-  cancelScheduledGroupGc(workspaceLookup.workspaceId);
+  await cancelScheduledGroupGc(workspaceLookup.workspaceId);
   localState = await persistPresenceObservation({
     localState,
     sessionState,
