@@ -42,6 +42,28 @@ function renderDeepseekComposer(extra = '') {
   `;
 }
 
+function renderLocalizedDeepseekComposer() {
+  document.body.innerHTML = `
+    <div class="_77cefa5 _9996a53 focused">
+      <div class="_020ab5b">
+        <div class="_24fad49">
+          <textarea
+            class="_27c9245 ds-scroll-area ds-scroll-area--show-on-focus-within ds-scroll-area--enabled d96f2d2a"
+            placeholder="给 DeepSeek 发送消息 "
+            rows="2"
+            autocomplete="off"
+            name="search"
+          ></textarea>
+        </div>
+        <div class="ec4f5d61">
+          <div class="ds-button ds-button--iconLabelPrimary ds-button--icon ds-button--capsule ds-button--s ds-button--icon-relative-m f02f0e25" role="button"></div>
+          <div id="send" class="ds-button ds-button--primary ds-button--filled ds-button--circle ds-button--m ds-button--icon-relative-m _52c986b" role="button"></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 describe('DeepSeek attachment delivery adapter', () => {
   let rectSpy: ReturnType<typeof vi.spyOn>;
   let uninstallFileInputDeliveryBridge: () => void;
@@ -92,6 +114,12 @@ describe('DeepSeek attachment delivery adapter', () => {
     expect(input.files?.[0]?.name).toBe('sample.pdf');
     expect(input.files?.[0]?.type).toBe('application/pdf');
     expect(document.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('hello');
+  });
+
+  it('treats the localized DeepSeek composer as ready', () => {
+    renderLocalizedDeepseekComposer();
+
+    expect(deepseekAdapter.session.getStatus().pageState).toBe('ready');
   });
 
   it('fails fast when no scoped DeepSeek file input exists', async () => {
@@ -317,6 +345,26 @@ describe('DeepSeek attachment delivery adapter', () => {
 
     expect(clickedSend).toBe(true);
     expect(clickedToggle).toBe(false);
+    expect(clickedUpload).toBe(false);
+  });
+
+  it('clicks the localized DeepSeek send button without hitting upload', async () => {
+    renderLocalizedDeepseekComposer();
+    const send = document.getElementById('send') as HTMLElement;
+    const upload = document.querySelector<HTMLElement>('.f02f0e25');
+    let clickedSend = false;
+    let clickedUpload = false;
+
+    send.addEventListener('click', () => {
+      clickedSend = true;
+    });
+    upload?.addEventListener('click', () => {
+      clickedUpload = true;
+    });
+
+    await deepseekAdapter.composer?.submit({ timeoutMs: 250 });
+
+    expect(clickedSend).toBe(true);
     expect(clickedUpload).toBe(false);
   });
 });

@@ -2,6 +2,12 @@
 - 总体原则是把复杂度都留给 provider-specific 的逻辑，插件核心逻辑保持尽可能干净鲁棒
 
 
+- 用户可能直接从已有的session 开始；
+- 用户可能开了很多tab，所以意识不到插件开了tab；
+- 部分provider 没有登录，发送follow up question 时不停开新的未登录tab；
+- 语言会影响adaptor
+
+
 
 - 导出为 md(text) & pdf(全页截图)
 - 手动新建 set。可以输入 urls，但不复用 tab 而是新开，来收集 tabid

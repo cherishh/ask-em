@@ -158,6 +158,62 @@ describe('Gemini attachment delivery adapter', () => {
     }
   });
 
+  it('uses the localized Gemini send button enabled state from the host element', async () => {
+    vi.useFakeTimers({
+      toFake: ['Date', 'setTimeout', 'clearTimeout'],
+    });
+    try {
+      document.body.innerHTML = `
+        <div class="text-input-field">
+          <rich-textarea>
+            <div class="ql-editor textarea new-input-ui" role="textbox" aria-label="为 Gemini 输入提示" contenteditable="true"></div>
+          </rich-textarea>
+          <gem-icon-button class="send-button submit" aria-disabled="true">
+            <button aria-label="发送"></button>
+          </gem-icon-button>
+        </div>
+      `;
+
+      const composer = document.querySelector<HTMLElement>('.ql-editor');
+      const sendHost = document.querySelector<HTMLElement>('gem-icon-button.send-button');
+      composer?.addEventListener('paste', () => {
+        document.querySelector('.text-input-field')?.insertAdjacentHTML('afterbegin', `
+          <uploader-file-preview class="file-preview-chip">
+            <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+              <span class="gem-attachment-text">notes.md</span>
+            </gem-attachment>
+          </uploader-file-preview>
+        `);
+      });
+
+      const delivery = geminiAdapter.composer?.setComposerPayload?.({
+        text: 'hello',
+        attachments: [
+          {
+            id: 'a1',
+            name: 'notes.md',
+            mime: 'text/markdown',
+            size: 3,
+          },
+        ],
+      });
+
+      await flushMicrotasks();
+      expect(composer?.textContent).not.toContain('hello');
+
+      await vi.advanceTimersByTimeAsync(5_250);
+      expect(composer?.textContent).not.toContain('hello');
+
+      sendHost?.setAttribute('aria-disabled', 'false');
+      await vi.advanceTimersByTimeAsync(5_250);
+      await delivery;
+
+      expect(composer?.textContent).toContain('hello');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('uses a Gemini attachment baseline so existing matching drafts do not release prompt text early', async () => {
     vi.useFakeTimers({
       toFake: ['Date', 'setTimeout', 'clearTimeout'],
@@ -517,6 +573,29 @@ describe('Gemini attachment delivery adapter', () => {
       }),
     }));
     unsubscribe?.();
+  });
+
+  it('clicks the localized Gemini send button without clicking the disabled host', async () => {
+    document.body.innerHTML = `
+      <div class="text-input-field">
+        <rich-textarea>
+          <div class="ql-editor textarea new-input-ui" role="textbox" aria-label="为 Gemini 输入提示" contenteditable="true">hello</div>
+        </rich-textarea>
+        <gem-icon-button class="send-button submit has-input" aria-disabled="false">
+          <button aria-label="发送"></button>
+        </gem-icon-button>
+      </div>
+    `;
+    const sendButton = document.querySelector<HTMLButtonElement>('button[aria-label="发送"]');
+    let clickedSend = false;
+
+    sendButton?.addEventListener('click', () => {
+      clickedSend = true;
+    });
+
+    await geminiAdapter.composer?.submit({ timeoutMs: 250 });
+
+    expect(clickedSend).toBe(true);
   });
 
   it('captures multiple Gemini transient upload files from one picker event before submit', () => {

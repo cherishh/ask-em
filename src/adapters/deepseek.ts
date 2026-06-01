@@ -68,6 +68,15 @@ function findDeepseekFileInput(container: ParentNode, attachments: AttachmentRef
   );
 }
 
+function getDeepseekComposerButtons(container: ParentNode): HTMLElement[] {
+  if (!(container instanceof Element || container instanceof Document)) {
+    return [];
+  }
+
+  return Array.from(container.querySelectorAll<HTMLElement>('button, [role="button"], .ds-button, .ds-icon-button'))
+    .filter((element) => isVisible(element) && container.contains(element));
+}
+
 function getElementAccessibleText(element: HTMLElement): string {
   return normalizeWhitespace(
     [
@@ -220,7 +229,12 @@ export const deepseekAdapter = createDomProviderAdapter({
         .join(' | ')}`,
     };
   },
-  composerSelectors: ['textarea[placeholder="Message DeepSeek"]'],
+  composerSelectors: [
+    'textarea[placeholder="Message DeepSeek"]',
+    'textarea[placeholder="给 DeepSeek 发送消息 "]',
+    'textarea[placeholder*="DeepSeek"]',
+    'textarea[name="search"]',
+  ],
   findSendButton(findComposer) {
     const composer = findComposer();
     const container = composer?.closest('div')?.parentElement;
@@ -229,11 +243,13 @@ export const deepseekAdapter = createDomProviderAdapter({
       return null;
     }
 
-    const buttons = Array.from(
-      container.querySelectorAll<HTMLElement>('div.ds-icon-button[role="button"][aria-disabled]'),
-    ).filter((element) => isElementWithin(element, container));
+    const buttons = getDeepseekComposerButtons(container);
+    const primaryButton = buttons.find((element) =>
+      element.classList.contains('ds-button--primary') &&
+      element.classList.contains('ds-button--circle'),
+    );
 
-    return buttons.at(-1) ?? null;
+    return primaryButton ?? buttons.at(-1) ?? null;
   },
   errorKeywords: ['network error', 'something went wrong'],
   async setComposerPayload(payload, context) {
@@ -283,6 +299,8 @@ export const deepseekAdapter = createDomProviderAdapter({
     return detectDeepseekUploadErrorText();
   },
   isSendButtonEnabled(button) {
-    return button.getAttribute('aria-disabled') !== 'true';
+    return button.getAttribute('aria-disabled') !== 'true' &&
+      !button.hasAttribute('disabled') &&
+      !button.classList.contains('ds-button--disabled');
   },
 });

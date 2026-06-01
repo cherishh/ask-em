@@ -155,12 +155,19 @@ function isGeminiSendButtonEnabled(button: HTMLElement | null): boolean {
     return false;
   }
 
+  const stateElement = button.closest<HTMLElement>('gem-icon-button.send-button, .send-button') ?? button;
   const className = typeof button.className === 'string' ? button.className.toLowerCase() : '';
+  const stateClassName = typeof stateElement.className === 'string' ? stateElement.className.toLowerCase() : '';
+
   return (
     !button.hasAttribute('disabled') &&
     button.getAttribute('aria-disabled') !== 'true' &&
     button.getAttribute('data-disabled') !== 'true' &&
-    !className.includes('disabled')
+    !className.includes('disabled') &&
+    !stateElement.hasAttribute('disabled') &&
+    stateElement.getAttribute('aria-disabled') !== 'true' &&
+    stateElement.getAttribute('data-disabled') !== 'true' &&
+    !stateClassName.includes('disabled')
   );
 }
 
@@ -246,7 +253,16 @@ export const geminiAdapter = createDomProviderAdapter({
     };
   },
   composerSelectors: ['.ql-editor[role="textbox"]', '[aria-label="Enter a prompt for Gemini"]'],
-  sendButtonSelectors: ['button[aria-label="Send message"]', 'button.send-button[aria-label="Send message"]'],
+  sendButtonSelectors: [
+    'button[aria-label="Send message"]',
+    'button[aria-label="发送"]',
+    'gem-icon-button.send-button button[aria-label="Send message"]',
+    'gem-icon-button.send-button button[aria-label="发送"]',
+    'gem-icon-button.send-button button',
+    'button.send-button[aria-label="Send message"]',
+    'button.send-button[aria-label="发送"]',
+    'gem-icon-button.send-button',
+  ],
   isSendButtonEnabled: isGeminiSendButtonEnabled,
   errorKeywords: ['something went wrong', 'try again in a bit'],
   async setComposerPayload(payload, context) {
