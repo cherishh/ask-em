@@ -85,7 +85,7 @@ export function AdvancedView(props: {
           <div className="askem-us-row-header askem-ep-header">
             <div>
               <span className="askem-us-row-title">Enabled providers</span>
-              <span className="askem-us-row-sub">Choose which providers appear on Home.</span>
+              <span className="askem-us-row-sub">Choose which providers can join new sets.</span>
             </div>
             <div className="askem-ep-header-actions">
               <span className="askem-ep-count">{props.enabledProviders.length} shown</span>
@@ -142,8 +142,8 @@ export function AdvancedView(props: {
               <span className="askem-us-row-title">Pause after first fan-out</span>
               <span className="askem-us-row-sub">
                 {props.status?.pauseAfterFirstFanOutEnabled ?? false
-                  ? 'Follow-up prompts stay local unless you re-enable the set.'
-                  : 'Follow-up prompts keep syncing until you pause the set.'}
+                  ? 'Compare first answers, then ask each model its own follow-up.'
+                  : 'Keep off when you want the same follow-up sent to every model.'}
               </span>
             </div>
             <button
@@ -169,8 +169,8 @@ export function AdvancedView(props: {
               <span className="askem-us-row-title">Close tabs used by this set</span>
               <span className="askem-us-row-sub">
                 {props.status?.closeTabsOnDeleteSet
-                  ? 'Delete Set also closes tabs currently used by this set.'
-                  : 'Delete Set keeps those tabs open.'}
+                  ? 'Deleting a set also closes its provider tabs.'
+                  : 'Deleting a set keeps provider tabs open.'}
               </span>
             </div>
             <button
@@ -248,7 +248,7 @@ export function AdvancedView(props: {
             <div className="askem-debug-copy">
               <p className="askem-card-label">Diagnostics</p>
               <h2>Bug Report Trace</h2>
-              <p className="askem-card-copy">Turn this on only when you need to report a bug.</p>
+              <p className="askem-card-copy">Keep trace on so sync issues can be fixed faster.</p>
             </div>
             <div className="askem-log-actions">
               <button
@@ -291,7 +291,7 @@ export function AdvancedView(props: {
             </div>
           ) : (
             <p className="askem-settings-note">
-              Turn it on only when something breaks, then export the JSON file.
+              Keep trace on, then export logs when something breaks.
             </p>
           )}
         </section>

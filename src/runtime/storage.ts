@@ -1,5 +1,6 @@
 import {
   createDefaultEnabledProviders,
+  DEFAULT_SHOW_DIAGNOSTICS,
   DEFAULT_SHORTCUTS,
   type DebugLogEntry,
   STORAGE_KEYS,
@@ -17,7 +18,7 @@ export const DEFAULT_LOCAL_STATE: LocalState = {
   autoSyncNewChatsEnabled: true,
   pauseAfterFirstFanOutEnabled: false,
   debugLoggingEnabled: true,
-  showDiagnostics: false,
+  showDiagnostics: DEFAULT_SHOW_DIAGNOSTICS,
   closeTabsOnDeleteSet: false,
   defaultEnabledProviders: createDefaultEnabledProviders(),
   defaultFanOutProviders: null,
@@ -101,6 +102,13 @@ function normalizeLocalState(state: LocalState): LocalState {
     normalized = {
       ...normalized,
       pauseAfterFirstFanOutEnabled: false,
+    };
+  }
+
+  if (normalized.showDiagnostics === undefined) {
+    normalized = {
+      ...normalized,
+      showDiagnostics: DEFAULT_SHOW_DIAGNOSTICS,
     };
   }
 

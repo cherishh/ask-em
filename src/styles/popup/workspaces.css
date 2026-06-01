@@ -2,6 +2,12 @@
   padding: 16px;
 }
 
+.askem-set-card .askem-clear-workspace {
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .askem-card-meta {
   display: flex;
   flex-wrap: wrap;
@@ -40,10 +46,11 @@
 }
 
 .askem-provider-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  column-gap: 10px;
+  row-gap: 6px;
   border-top: 1px solid var(--askem-border-soft);
   padding-top: 10px;
 }
@@ -75,7 +82,8 @@
 .askem-provider-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  align-self: center;
   gap: 12px;
 }
 
@@ -91,7 +99,21 @@
 }
 
 .askem-provider-actions .askem-provider-clear {
+  min-height: 28px;
+  padding: 6px 9px;
+  background: transparent;
+  color: rgba(94, 93, 89, 0.92);
+  flex-shrink: 0;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
   white-space: nowrap;
+}
+
+.askem-provider-actions .askem-provider-clear:not(:disabled):hover {
+  border-color: rgba(185, 56, 47, 0.2);
+  background: var(--askem-danger-surface);
+  color: var(--askem-danger-strong);
 }
 
 .askem-state {

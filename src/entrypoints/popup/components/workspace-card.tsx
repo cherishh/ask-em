@@ -113,11 +113,13 @@ export function WorkspaceCard({
               </div>
               <div className="askem-provider-actions">
                 <button
+                  type="button"
                   className="askem-provider-clear"
+                  aria-label={`Remove ${provider} from this set`}
                   onClick={() => void onClearProvider(workspace.id, provider)}
                   disabled={busyKey === `${workspace.id}:${provider}`}
                 >
-                  Remove
+                  Remove from set
                 </button>
               </div>
             </div>

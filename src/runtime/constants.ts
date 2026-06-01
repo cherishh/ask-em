@@ -6,6 +6,10 @@ export const PENDING_WORKSPACE_TIMEOUT_MS = 30_000;
 
 export const HEARTBEAT_STALE_MS = 240_000;
 
+// Toggle the default visibility of the Diagnostics card for fresh installs and
+// reset storage. Existing explicit user choices are preserved.
+export const DEFAULT_SHOW_DIAGNOSTICS = true;
+
 export const STORAGE_KEYS = {
   local: 'ask-em-local-state',
   session: 'ask-em-session-state',

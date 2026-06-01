@@ -1,7 +1,7 @@
 body {
   margin: 0;
-  min-width: 396px;
-  min-height: 360px;
+  min-width: 400px;
+  min-height: 400px;
   background:
     radial-gradient(circle at top left, rgba(201, 100, 66, 0.08), transparent 40%),
     var(--askem-bg-base);
@@ -30,10 +30,11 @@ body {
 
 .askem-panel {
   position: relative;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  min-height: 360px;
+  gap: 16px;
+  min-height: 380px;
   padding: 20px;
 }
 

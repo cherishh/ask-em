@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import {
+  DEFAULT_SHOW_DIAGNOSTICS,
   MAX_WORKSPACES,
 } from '../../runtime/protocol';
 import { LegalContent, type LegalPage } from './components/legal-content';
@@ -184,7 +185,7 @@ export default function App() {
             resolvedShortcuts={resolvedShortcuts}
             recordingShortcutId={recordingShortcutId}
             logActionBusy={logActionBusy}
-            showDiagnostics={status?.showDiagnostics ?? false}
+            showDiagnostics={status?.showDiagnostics ?? DEFAULT_SHOW_DIAGNOSTICS}
             onOpenRequestModal={openRequestModal}
             onToggleEnabledProvider={(provider) => void toggleEnabledProvider(provider)}
             onTogglePauseAfterFirstFanOut={() => void togglePauseAfterFirstFanOut()}
@@ -250,7 +251,7 @@ export default function App() {
       <DevToolsModal
         open={devModalOpen}
         busy={devActionBusy}
-        showDiagnostics={status?.showDiagnostics ?? false}
+        showDiagnostics={status?.showDiagnostics ?? DEFAULT_SHOW_DIAGNOSTICS}
         onClose={() => setDevModalOpen(false)}
         onClearPersistentStorage={() => void handleClearPersistentStorage()}
         onResetRequestCooldown={resetRequestCooldownForDev}

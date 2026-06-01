@@ -62,8 +62,8 @@ export function HomeView(props: {
       {props.workspaceCount >= MIN_WORKSPACES_FOR_FREEZE_CONTROL && (
         <section className="askem-freeze-section">
           <div className="askem-freeze-copy">
-            <span className="askem-freeze-title">Freeze the world</span>
-            <span className="askem-freeze-sub">Stop syncing for all sets</span>
+            <span className="askem-freeze-title">Pause all sets</span>
+            <span className="askem-freeze-sub">Stop syncing for every running set</span>
           </div>
           <button
             type="button"
@@ -71,7 +71,7 @@ export function HomeView(props: {
             data-enabled={String(!props.globalSyncEnabled)}
             onClick={props.onToggleGlobalSync}
             disabled={props.loading}
-            aria-label={props.globalSyncEnabled ? 'Freeze sync' : 'Unfreeze sync'}
+            aria-label={props.globalSyncEnabled ? 'Pause all sync' : 'Resume all sync'}
           />
         </section>
       )}

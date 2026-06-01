@@ -11,7 +11,7 @@
 }
 
 .askem-onboarding-header {
-  padding: 16px 18px 14px;
+  padding: 14px 18px 12px;
   border-bottom: 1px solid rgba(201, 100, 66, 0.08);
   background:
     radial-gradient(circle at top left, rgba(201, 100, 66, 0.08), transparent 52%);
@@ -19,7 +19,7 @@
 
 .askem-onboarding-header .askem-onboarding-step {
   display: inline-flex;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: var(--askem-accent);
   font: 700 10px/1 var(--askem-font-sans);
   letter-spacing: 0.18em;
@@ -36,7 +36,7 @@
 }
 
 .askem-onboarding-body {
-  padding: 14px 18px 18px;
+  padding: 12px 18px 16px;
 }
 
 .askem-onboarding-desc {
@@ -49,8 +49,8 @@
 
 .askem-onboarding-steps {
   display: grid;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 7px;
+  margin-bottom: 12px;
 }
 
 .askem-onboarding-step-item {
@@ -75,8 +75,8 @@
 }
 
 .askem-onboarding-hint {
-  margin: 0 0 12px;
-  padding: 10px 12px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
   border: 1px solid rgba(201, 100, 66, 0.14);
   border-radius: 12px;
   background:
@@ -110,7 +110,7 @@
   border: 1px solid var(--askem-border-soft);
   border-radius: 12px;
   background: var(--askem-white-surface-muted);
-  padding: 10px 12px;
+  padding: 9px 12px;
   color: rgba(107, 100, 89, 0.62);
   cursor: pointer;
   font: 700 10px/1 var(--askem-font-sans);

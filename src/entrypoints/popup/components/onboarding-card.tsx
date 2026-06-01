@@ -18,15 +18,10 @@ export function OnboardingCard({
         <p className="askem-onboarding-title">Ask every AI at once</p>
       </div>
       <div className="askem-onboarding-body">
-        <p className="askem-onboarding-desc">
-          ask&apos;em lets you compare models without leaving their official apps, so you keep
-          artifacts, web search, file uploads, long-term memory, and every new feature each
-          provider ships.
-        </p>
         <div className="askem-onboarding-steps">
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">1</span>
-            <span>Choose who joins the default fan-out</span>
+            <span>Pick models you want to sync with</span>
           </div>
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">2</span>
@@ -34,11 +29,11 @@ export function OnboardingCard({
           </div>
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">3</span>
-            <span>It auto-syncs to selected models</span>
+            <span>Send prompt as usual. It auto-syncs to other models</span>
           </div>
         </div>
         <p className="askem-onboarding-hint">
-          Make sure you&apos;re logged in to each provider you want to sync.
+          Make sure you&apos;re logged in to each selected AI chat first.
         </p>
         <div className="askem-onboarding-providers">
           {providers.length > 0 ? (

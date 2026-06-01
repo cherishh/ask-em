@@ -54,6 +54,21 @@ describe('storage update queues', () => {
     });
   });
 
+  it('defaults diagnostics visibility from the product flag', async () => {
+    const storage = await import('./storage');
+    const { DEFAULT_SHOW_DIAGNOSTICS, STORAGE_KEYS } = await import('./protocol');
+
+    expect(storage.DEFAULT_LOCAL_STATE.showDiagnostics).toBe(DEFAULT_SHOW_DIAGNOSTICS);
+    expect(storage.DEFAULT_LOCAL_STATE.showDiagnostics).toBe(true);
+
+    const legacyLocalState: Partial<LocalState> = { ...storage.DEFAULT_LOCAL_STATE };
+    delete legacyLocalState.showDiagnostics;
+    await chrome.storage.local.set({ [STORAGE_KEYS.local]: legacyLocalState });
+
+    const normalizedState = await storage.getLocalState();
+    expect(normalizedState.showDiagnostics).toBe(DEFAULT_SHOW_DIAGNOSTICS);
+  });
+
   it('serializes local state updates so debug logs are not lost under concurrent writes', async () => {
     const storage = await import('./storage');
     const deferred = createDeferred<LocalState>();
