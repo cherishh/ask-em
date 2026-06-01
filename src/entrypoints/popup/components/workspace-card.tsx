@@ -51,11 +51,14 @@ export function WorkspaceCard({
           </h2>
         </div>
         <button
+          type="button"
           className="askem-clear-workspace"
+          aria-label="Delete set"
+          title="Delete set"
           onClick={() => void onClearWorkspace(workspace.id)}
           disabled={busyKey === workspace.id}
         >
-          Delete Set
+          <span aria-hidden="true">×</span>
         </button>
       </div>
 

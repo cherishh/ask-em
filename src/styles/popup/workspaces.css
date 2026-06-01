@@ -3,9 +3,25 @@
 }
 
 .askem-set-card .askem-clear-workspace {
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  color: rgba(94, 93, 89, 0.82);
+  font-size: 20px;
+  line-height: 1;
   letter-spacing: 0;
   text-transform: none;
+}
+
+.askem-set-card .askem-clear-workspace:not(:disabled):hover {
+  border-color: rgba(185, 56, 47, 0.2);
+  background: var(--askem-danger-surface);
+  color: var(--askem-danger-strong);
 }
 
 .askem-card-meta {
