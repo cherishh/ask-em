@@ -916,6 +916,110 @@ describe('background submit routing', () => {
     expect(result.workspaceSummary?.workspace.enabledProviders).toEqual(['claude', 'chatgpt']);
   });
 
+  it('continues fan-out from the routed workspace when the delivery storage read misses it', async () => {
+    const localState: LocalState = {
+      ...makeLocalState(),
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          members: {
+            deepseek: makeConversationRef(
+              'deepseek',
+              'd-1',
+              'https://chat.deepseek.com/a/chat/s/d-1',
+            ),
+            chatgpt: makeConversationRef('chatgpt', 'g-1', 'https://chatgpt.com/c/g-1'),
+          },
+          enabledProviders: ['deepseek', 'chatgpt'],
+        }),
+      },
+      workspaceIndex: {
+        'deepseek:d-1': 'w1',
+        'chatgpt:g-1': 'w1',
+      },
+    };
+    const missingWorkspaceState = makeLocalState();
+    const sessionState = makeSessionState({
+      'w1:chatgpt': makeClaimedTab({
+        provider: 'chatgpt',
+        workspaceId: 'w1',
+        tabId: 10,
+        currentUrl: 'https://chatgpt.com/c/g-1',
+        sessionId: 'g-1',
+      }),
+    });
+
+    storageMocks.getLocalState
+      .mockResolvedValueOnce(localState)
+      .mockResolvedValueOnce(missingWorkspaceState)
+      .mockResolvedValue(missingWorkspaceState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+    storageMocks.setLocalState.mockImplementation(async (state: LocalState) => state);
+    storageMocks.updateLocalState.mockImplementation(
+      async (updater: (state: LocalState) => LocalState | Promise<LocalState>) =>
+        updater(missingWorkspaceState),
+    );
+
+    const sendMessage = vi.fn().mockImplementation((tabId: number, message: { type: string }) => {
+      if (tabId === 10 && message.type === 'PING') {
+        return Promise.resolve({
+          type: 'PING_RESPONSE',
+          provider: 'chatgpt',
+          currentUrl: 'https://chatgpt.com/c/g-1',
+          sessionId: 'g-1',
+          pageState: 'ready',
+          pageKind: 'existing-session',
+        });
+      }
+
+      return Promise.resolve({ ok: true, accepted: true, confirmed: true });
+    });
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 10 }),
+        sendMessage,
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { handleUserSubmit } = await import('../entrypoints/background');
+    const result = await handleUserSubmit(
+      makeSubmitMessage({
+        provider: 'deepseek',
+        currentUrl: 'https://chat.deepseek.com/a/chat/s/d-1',
+        sessionId: 'd-1',
+        pageKind: 'existing-session',
+        content: 'from deepseek',
+      }),
+      { tab: { id: 9 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(sendMessage).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({
+        type: 'DELIVER_PROMPT',
+        provider: 'chatgpt',
+        content: 'from deepseek',
+      }),
+    );
+    expect(result.deliveryResults).toEqual([
+      expect.objectContaining({ provider: 'chatgpt', ok: true }),
+    ]);
+    expect(storageMocks.appendDebugLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        message: 'Recovered fan-out from routed workspace snapshot',
+        workspaceId: 'w1',
+      }),
+    );
+  });
+
   it('does not create a source-only workspace when there are no fan-out targets', async () => {
     storageMocks.getLocalState.mockResolvedValue(makeLocalState({
       defaultEnabledProviders: createDefaultEnabledProviders(['claude']),

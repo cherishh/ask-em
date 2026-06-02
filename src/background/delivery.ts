@@ -3,6 +3,7 @@ import {
   type LocalState,
   type ProviderDeliveryResult,
   type UserSubmitMessage,
+  type Workspace,
 } from '../runtime/protocol';
 import {
   getLocalState,
@@ -41,12 +42,36 @@ export async function deliverPromptToWorkspaceTargets(
   workspaceId: string,
   message: UserSubmitMessage,
   sourceTabId?: number,
+  workspaceSnapshot?: Workspace,
 ): Promise<ProviderDeliveryResult[]> {
   const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
-  const workspace = localState.workspaces[workspaceId];
+  const storedWorkspace = localState.workspaces[workspaceId];
+  const workspace = storedWorkspace ?? (workspaceSnapshot?.id === workspaceId ? workspaceSnapshot : null);
 
   if (!workspace) {
+    await logDebug({
+      level: 'warn',
+      scope: 'background',
+      provider: message.provider,
+      workspaceId,
+      message: 'Skipped fan-out because routed workspace was missing',
+      detail: 'No stored workspace and no routed workspace snapshot were available',
+    });
     return [];
+  }
+
+  if (!storedWorkspace && workspaceSnapshot) {
+    // Defensive recovery for a storage/GC interleaving: the submit was already
+    // routed to this workspace, so keep fan-out working and leave a clear log
+    // marker for root-cause investigation if this appears again.
+    await logDebug({
+      level: 'warn',
+      scope: 'background',
+      provider: message.provider,
+      workspaceId,
+      message: 'Recovered fan-out from routed workspace snapshot',
+      detail: `Stored workspace missing during delivery; enabled providers: ${workspace.enabledProviders.join(', ')}`,
+    });
   }
 
   await cancelScheduledGroupGc(workspaceId);
@@ -189,6 +214,7 @@ export async function handleUserSubmit(
       workspaceLookup.workspaceId,
       message,
       tabId,
+      workspaceLookup.workspace,
     );
     await logFanOutCompletion(
       message.provider,
