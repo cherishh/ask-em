@@ -124,6 +124,22 @@ describe('content indicator presentation', () => {
     });
   });
 
+  it('shows standalone private-mode pages as local-only', () => {
+    expect(
+      getContentIndicatorPresentation(
+        createInput({
+          pageState: 'private-mode',
+        }),
+      ),
+    ).toEqual({
+      state: 'blocked',
+      label: 'Local only',
+      syncLabel: 'private chat stays here',
+      syncTone: 'neutral',
+      alertLevel: 'normal',
+    });
+  });
+
   it('shows standalone set limit warning', () => {
     expect(
       getContentIndicatorPresentation(

@@ -17,6 +17,13 @@ export function isGeminiLoginRequiredPage(input: {
   return pathname === '/app' && buttonTexts.some((text) => text === 'sign in');
 }
 
+export function isGeminiPrivateModePage(): boolean {
+  return Boolean(
+    document.querySelector('chat-window.is-temporary-chat') ||
+    document.querySelector('[data-test-id="temp-chat-button"].temp-chat-on'),
+  );
+}
+
 function findGeminiComposerRoot(
   composer: HTMLElement | null,
   sendButton: HTMLElement | null,
@@ -241,6 +248,7 @@ export const geminiAdapter = createDomProviderAdapter({
   uploadCapability: PROVIDER_UPLOAD_CAPABILITIES.gemini,
   mountId: 'ask-em-gemini-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-gemini',
+  isPrivateMode: isGeminiPrivateModePage,
   classifyAuth() {
     const pathname = window.location.pathname;
     const buttonTexts = getVisibleButtonTexts();

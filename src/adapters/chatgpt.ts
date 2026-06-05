@@ -29,6 +29,18 @@ export function isChatgptLoginRequiredPage(input: {
   );
 }
 
+export function isChatgptPrivateModePage(url: string): boolean {
+  try {
+    return new URL(url).searchParams.get('temporary-chat') === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function hasChatgptTemporaryChatSurface(): boolean {
+  return Boolean(document.querySelector('[data-testid="temporary-chat-label"]'));
+}
+
 function findChatgptComposerRoot(
   composer: HTMLElement | null,
   sendButton: HTMLElement | null,
@@ -200,6 +212,9 @@ export const chatgptAdapter = createDomProviderAdapter({
   pastedTextAttachmentMinChars: CHATGPT_PASTED_TEXT_ATTACHMENT_MIN_CHARS,
   mountId: 'ask-em-chatgpt-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-chatgpt',
+  isPrivateMode() {
+    return isChatgptPrivateModePage(window.location.href) || hasChatgptTemporaryChatSurface();
+  },
   classifyAuth() {
     const pathname = window.location.pathname;
     const buttonTexts = getVisibleButtonTexts();

@@ -53,6 +53,14 @@ export function isClaudeLoginRequiredPage(input: {
   );
 }
 
+export function isClaudePrivateModePage(url: string): boolean {
+  try {
+    return new URL(url).searchParams.has('incognito');
+  } catch {
+    return false;
+  }
+}
+
 function findClaudeFileInput(container: ParentNode, attachments: AttachmentRef[]): HTMLInputElement | null {
   const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
     .filter((input) => !input.disabled);
@@ -251,6 +259,9 @@ export const claudeAdapter = createDomProviderAdapter({
   pastedTextAttachmentMinChars: CLAUDE_PASTED_TEXT_ATTACHMENT_MIN_CHARS,
   mountId: 'ask-em-claude-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-claude',
+  isPrivateMode() {
+    return isClaudePrivateModePage(window.location.href);
+  },
   classifyAuth() {
     const pathname = window.location.pathname;
     const buttonTexts = getVisibleButtonTexts();

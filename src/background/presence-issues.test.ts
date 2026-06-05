@@ -40,4 +40,20 @@ describe('applyPresenceWorkspaceIssue', () => {
     expect(result.localState.workspaces.w1.memberIssues?.deepseek).toBeUndefined();
     expect(result.shouldPersist).toBe(true);
   });
+
+  it('marks private-mode pages as presence issues', () => {
+    const state = makeLocalState({
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          enabledProviders: ['chatgpt', 'deepseek'],
+        }),
+      },
+    });
+
+    const result = applyPresenceWorkspaceIssue(state, 'w1', 'deepseek', 'private-mode');
+
+    expect(result.localState.workspaces.w1.memberIssues?.deepseek).toBe('private-mode');
+    expect(result.shouldPersist).toBe(true);
+  });
 });

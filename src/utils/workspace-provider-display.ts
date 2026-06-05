@@ -6,6 +6,7 @@ export type WorkspaceProviderDisplayKind =
   | 'paused'
   | 'needs-login'
   | 'loading'
+  | 'private-mode'
   | 'needs-attention'
   | 'will-reopen';
 
@@ -78,6 +79,14 @@ export function getWorkspaceProviderDisplay(
     };
   }
 
+  if (input.memberIssue === 'private-mode' || input.memberState === 'private-mode') {
+    return {
+      kind: 'private-mode',
+      label: 'Private',
+      detail: 'This chat stays local',
+    };
+  }
+
   if (input.memberIssue === 'loading' || input.memberState === 'not-ready') {
     return {
       kind: 'loading',
@@ -146,6 +155,7 @@ export function getWorkspaceProviderTone(
       return globalSyncEnabled ? 'sync-paused' : 'frozen';
     case 'needs-login':
     case 'loading':
+    case 'private-mode':
     case 'needs-attention':
       return 'warning';
     case 'will-reopen':
@@ -166,6 +176,7 @@ export function getWorkspaceProviderDotState(
     input.memberIssue === 'delivery-failed' ||
     input.memberIssue === 'upload-failed' ||
     input.memberIssue === 'error-page' ||
+    input.memberIssue === 'private-mode' ||
     input.memberIssue === 'attachment-limit' ||
     input.memberIssue === 'unsupported-attachment'
   ) {
@@ -183,7 +194,8 @@ export function getWorkspaceProviderDotState(
   if (
     input.memberState === 'login-required' ||
     input.memberState === 'not-ready' ||
-    input.memberState === 'error'
+    input.memberState === 'error' ||
+    input.memberState === 'private-mode'
   ) {
     return 'warning';
   }

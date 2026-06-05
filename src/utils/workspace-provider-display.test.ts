@@ -101,6 +101,22 @@ describe('workspace provider display', () => {
     });
   });
 
+  it('surfaces private-mode pages as local-only provider state', () => {
+    expect(
+      getWorkspaceProviderDisplay({
+        memberState: 'private-mode',
+        memberIssue: 'private-mode',
+        enabled: true,
+        globalSyncEnabled: true,
+        hasMember: true,
+      }),
+    ).toEqual({
+      kind: 'private-mode',
+      label: 'Private',
+      detail: 'This chat stays local',
+    });
+  });
+
   it('surfaces unsupported attachments as needs attention', () => {
     expect(
       getWorkspaceProviderDisplay({

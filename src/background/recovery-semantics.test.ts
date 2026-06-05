@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { getRecoveryStatusError, isTerminalRecoveryPageState } from './recovery-semantics';
 
 describe('recovery-semantics', () => {
-  it('treats ready, login-required, and error as terminal recovery states', () => {
+  it('treats ready, login-required, error, and private-mode as terminal recovery states', () => {
     expect(isTerminalRecoveryPageState('ready')).toBe(true);
     expect(isTerminalRecoveryPageState('login-required')).toBe(true);
     expect(isTerminalRecoveryPageState('error')).toBe(true);
+    expect(isTerminalRecoveryPageState('private-mode')).toBe(true);
     expect(isTerminalRecoveryPageState('not-ready')).toBe(false);
   });
 
@@ -31,6 +32,16 @@ describe('recovery-semantics', () => {
         pageKind: 'existing-session',
       }),
     ).toBe('claude error page');
+    expect(
+      getRecoveryStatusError('claude', {
+        type: 'PING_RESPONSE',
+        provider: 'claude',
+        currentUrl: 'https://claude.ai/new?incognito=',
+        sessionId: null,
+        pageState: 'private-mode',
+        pageKind: 'new-chat',
+      }),
+    ).toBe('claude private chat');
     expect(
       getRecoveryStatusError('claude', {
         type: 'PING_RESPONSE',

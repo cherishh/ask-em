@@ -50,6 +50,7 @@ type DomProviderAdapterConfig = {
     signals?: string;
   };
   isLoginRequired?: () => boolean;
+  isPrivateMode?: () => boolean;
   composerSelectors: string[];
   sendButtonSelectors?: string[];
   findSendButton?: (findComposer: () => HTMLElement | null) => HTMLElement | null;
@@ -281,9 +282,18 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
         ? { isLoginRequired: config.isLoginRequired() }
         : { isLoginRequired: detectLoginRequired(config.loginKeywords ?? []) };
     const isLoginRequired = authClassification.isLoginRequired;
+    const isPrivateMode = config.isPrivateMode?.() ?? false;
     const hasObviousError = detectObviousErrorPage(config.errorKeywords ?? []);
     const isReady = Boolean(findComposer()) && !hasObviousError;
-    const pageState = isLoginRequired ? 'login-required' : hasObviousError ? 'error' : isReady ? 'ready' : 'not-ready';
+    const pageState = isPrivateMode
+      ? 'private-mode'
+      : isLoginRequired
+        ? 'login-required'
+        : hasObviousError
+          ? 'error'
+          : isReady
+            ? 'ready'
+            : 'not-ready';
 
     return {
       provider: config.provider,

@@ -1,7 +1,12 @@
 import type { PageState, PingResponseMessage, Provider } from '../runtime/protocol';
 
 export function isTerminalRecoveryPageState(pageState: PageState): boolean {
-  return pageState === 'ready' || pageState === 'login-required' || pageState === 'error';
+  return (
+    pageState === 'ready' ||
+    pageState === 'login-required' ||
+    pageState === 'error' ||
+    pageState === 'private-mode'
+  );
 }
 
 export function getRecoveryStatusError(
@@ -18,6 +23,10 @@ export function getRecoveryStatusError(
 
   if (status.pageState === 'error') {
     return `${provider} error page`;
+  }
+
+  if (status.pageState === 'private-mode') {
+    return `${provider} private chat`;
   }
 
   if (status.pageState !== 'ready') {

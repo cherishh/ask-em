@@ -44,7 +44,7 @@ function formatAttentionCount(count: number): string {
 }
 
 function isWarningMemberState(state: GroupMemberState | undefined) {
-  return state === 'login-required' || state === 'not-ready' || state === 'error';
+  return state === 'login-required' || state === 'not-ready' || state === 'error' || state === 'private-mode';
 }
 
 function isWarningIssue(issue: WorkspaceIssue | null | undefined) {
@@ -54,6 +54,7 @@ function isWarningIssue(issue: WorkspaceIssue | null | undefined) {
     issue === 'delivery-failed' ||
     issue === 'upload-failed' ||
     issue === 'error-page' ||
+    issue === 'private-mode' ||
     issue === 'attachment-limit' ||
     issue === 'unsupported-attachment'
   );
@@ -83,6 +84,10 @@ function getCurrentTabLabel(input: ContentIndicatorInput): string {
       return 'page has an error';
     }
 
+    if (input.pageState === 'private-mode') {
+      return 'Local only';
+    }
+
     if (!input.globalSyncEnabled || !input.standaloneCreateSetEnabled) {
       return 'Local only';
     }
@@ -104,6 +109,10 @@ function getCurrentTabLabel(input: ContentIndicatorInput): string {
 
   if (input.pageState === 'error') {
     return 'current model page has an error';
+  }
+
+  if (input.pageState === 'private-mode') {
+    return 'current model is private';
   }
 
   return 'current model is in sync';
@@ -128,6 +137,13 @@ function getStandaloneSyncStatus(input: ContentIndicatorInput) {
     return {
       label: 'open a valid chat to sync',
       tone: 'warning' as const,
+    };
+  }
+
+  if (input.pageState === 'private-mode') {
+    return {
+      label: 'private chat stays here',
+      tone: 'neutral' as const,
     };
   }
 
@@ -209,6 +225,13 @@ function getWorkspaceSyncStatus(input: ContentIndicatorInput) {
     };
   }
 
+  if (input.pageState === 'private-mode') {
+    return {
+      label: 'private chat stays here',
+      tone: 'neutral' as const,
+    };
+  }
+
   if (!input.globalSyncEnabled) {
     return {
       label: 'sync paused',
@@ -238,6 +261,10 @@ function getWorkspaceSyncStatus(input: ContentIndicatorInput) {
 }
 
 function getIndicatorAlertLevel(input: ContentIndicatorInput): IndicatorAlertLevel {
+  if (input.pageState === 'private-mode') {
+    return 'normal';
+  }
+
   if (input.globalSyncEnabled && input.providerEnabled && input.pageState !== 'ready') {
     return 'current-warning';
   }

@@ -84,6 +84,24 @@ describe('dom provider adapter submit detection', () => {
     unsubscribe?.();
   });
 
+  it('reports private mode as not sync-eligible', () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">hello</div>
+      <button id="send">Send</button>
+    `;
+
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      isPrivateMode: () => true,
+    });
+
+    expect(adapter.session.getStatus().pageState).toBe('private-mode');
+  });
+
   it('captures stable file input changes when a submit-time source preview is present', () => {
     document.body.innerHTML = `
       <form>

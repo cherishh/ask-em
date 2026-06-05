@@ -1,8 +1,10 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it } from 'vitest';
-import { isClaudeLoginRequiredPage } from './claude';
-import { isChatgptLoginRequiredPage } from './chatgpt';
+import { isClaudeLoginRequiredPage, isClaudePrivateModePage } from './claude';
+import { isChatgptLoginRequiredPage, isChatgptPrivateModePage } from './chatgpt';
 import { isDeepseekLoginRequiredPage } from './deepseek';
-import { isGeminiLoginRequiredPage } from './gemini';
+import { isGeminiLoginRequiredPage, isGeminiPrivateModePage } from './gemini';
 import { isManusLoginRequiredPage } from './manus';
 
 describe('provider login-required detection', () => {
@@ -73,5 +75,28 @@ describe('provider login-required detection', () => {
         buttonTexts: ['Create slides', 'Build website', 'Design'],
       }),
     ).toBe(false);
+  });
+});
+
+describe('provider private-mode detection', () => {
+  it('detects Claude incognito from the URL query', () => {
+    expect(isClaudePrivateModePage('https://claude.ai/new?incognito=')).toBe(true);
+    expect(isClaudePrivateModePage('https://claude.ai/new')).toBe(false);
+  });
+
+  it('detects ChatGPT temporary chat from the URL query', () => {
+    expect(isChatgptPrivateModePage('https://chatgpt.com/?temporary-chat=true')).toBe(true);
+    expect(isChatgptPrivateModePage('https://chatgpt.com/?temporary-chat=false')).toBe(false);
+  });
+
+  it('detects Gemini temporary chat from structural state', () => {
+    document.body.innerHTML = '<chat-window class="is-temporary-chat"></chat-window>';
+    expect(isGeminiPrivateModePage()).toBe(true);
+
+    document.body.innerHTML = '<gem-icon-button data-test-id="temp-chat-button" class="temp-chat-on"></gem-icon-button>';
+    expect(isGeminiPrivateModePage()).toBe(true);
+
+    document.body.innerHTML = '<chat-window></chat-window>';
+    expect(isGeminiPrivateModePage()).toBe(false);
   });
 });

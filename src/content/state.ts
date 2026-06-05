@@ -37,7 +37,10 @@ export type { PresenceResponse, SubmitResponse } from './context';
 
 export function shouldShowStandaloneIndicator(adapter: ProviderAdapter): boolean {
   const status = adapter.session.getStatus();
-  return status.pageKind === 'new-chat' && status.pageState === 'ready';
+  return (
+    status.pageKind === 'new-chat' &&
+    (status.pageState === 'ready' || status.pageState === 'private-mode')
+  );
 }
 
 export function createContentState(

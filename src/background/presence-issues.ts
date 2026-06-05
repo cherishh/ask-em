@@ -2,7 +2,7 @@ import type { Provider, WorkspaceIssue } from '../runtime/protocol';
 import type { LocalState, PageState } from '../runtime/types';
 import { clearWorkspaceProviderIssue, setWorkspaceProviderIssue } from '../runtime/workspace';
 
-const PRESENCE_ISSUES: WorkspaceIssue[] = ['needs-login', 'loading', 'error-page'];
+const PRESENCE_ISSUES: WorkspaceIssue[] = ['needs-login', 'loading', 'error-page', 'private-mode'];
 
 function isPresenceIssue(issue: WorkspaceIssue | null | undefined): boolean {
   return Boolean(issue && PRESENCE_ISSUES.includes(issue));
@@ -23,6 +23,10 @@ export function getWorkspaceIssueForPageState(pageState: PageState): WorkspaceIs
 
   if (pageState === 'not-ready') {
     return 'loading';
+  }
+
+  if (pageState === 'private-mode') {
+    return 'private-mode';
   }
 
   return null;
