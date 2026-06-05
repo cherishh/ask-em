@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { trimDebugLogsForFeedback } from '../../../runtime/debug-log-retention';
-import { requestFullLogs } from '../popup-runtime';
+import type { DebugLogEntry, StatusResponseMessage } from '../../../runtime/protocol';
+import { requestFullLogs, requestStatus } from '../popup-runtime';
 import {
   FEEDBACK_ATTACHMENT_ACCEPT,
   FEEDBACK_ATTACHMENT_LIMIT,
   FEEDBACK_ATTACHMENT_MAX_BYTES,
   type FeedbackKind,
   type FeedbackStep,
-  type FeatureRequestChoice,
-  getFeatureRequestLabel,
 } from '../feedback';
 import { getFeedbackEndpoint } from '../support-endpoints';
 
@@ -23,19 +22,189 @@ export type FeedbackAttachmentDraft = {
   previewUrl: string;
 };
 
+type BugReportEnvironment = {
+  clientTimestamp: string;
+  ianaTimeZone: string | null;
+  browserLanguage: string | null;
+  browserLanguages: string[];
+  browserName: string | null;
+  browserVersion: string | null;
+  os: string | null;
+  activeTabTitle: string | null;
+  geolocation: {
+    latitude: number;
+    longitude: number;
+    accuracy: number | null;
+    timestamp: number | null;
+  } | null;
+};
+
 function normalizeMessage(value: string): string {
   return value.trim().slice(0, FEEDBACK_MAX_LENGTH);
 }
 
-function createFeatureRequestMessage(
-  choice: FeatureRequestChoice | null,
-  customText: string,
-): string {
-  if (choice === 'custom') {
-    return normalizeMessage(customText);
+function normalizeEnvironmentString(value: unknown, maxLength = 120): string | null {
+  if (typeof value !== 'string') {
+    return null;
   }
 
-  return getFeatureRequestLabel(choice).slice(0, FEEDBACK_MAX_LENGTH);
+  const normalized = value.trim().slice(0, maxLength);
+  return normalized.length > 0 ? normalized : null;
+}
+
+function parseBrowserFromUserAgent(userAgent: string): Pick<BugReportEnvironment, 'browserName' | 'browserVersion'> {
+  const patterns: Array<{ name: string; pattern: RegExp }> = [
+    { name: 'Microsoft Edge', pattern: /\bEdg\/([\d.]+)/ },
+    { name: 'Opera', pattern: /\bOPR\/([\d.]+)/ },
+    { name: 'Firefox', pattern: /\bFirefox\/([\d.]+)/ },
+    { name: 'Chrome', pattern: /\bChrome\/([\d.]+)/ },
+    { name: 'Safari', pattern: /\bVersion\/([\d.]+).*?\bSafari\// },
+  ];
+
+  for (const { name, pattern } of patterns) {
+    const match = userAgent.match(pattern);
+    if (match?.[1]) {
+      return {
+        browserName: name,
+        browserVersion: match[1].slice(0, 64),
+      };
+    }
+  }
+
+  return {
+    browserName: null,
+    browserVersion: null,
+  };
+}
+
+function getIanaTimeZone(): string | null {
+  try {
+    return normalizeEnvironmentString(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  } catch {
+    return null;
+  }
+}
+
+async function getPlatformOs(): Promise<string | null> {
+  if (typeof chrome === 'undefined' || typeof chrome.runtime?.getPlatformInfo !== 'function') {
+    return null;
+  }
+
+  return await new Promise((resolve) => {
+    chrome.runtime.getPlatformInfo((platformInfo) => {
+      resolve(normalizeEnvironmentString(platformInfo.os));
+    });
+  });
+}
+
+async function getActiveTabTitle(): Promise<string | null> {
+  if (typeof chrome === 'undefined' || typeof chrome.tabs?.query !== 'function') {
+    return null;
+  }
+
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    return normalizeEnvironmentString(tabs[0]?.title, 500);
+  } catch {
+    return null;
+  }
+}
+
+async function getCurrentGeolocation(): Promise<BugReportEnvironment['geolocation']> {
+  if (!navigator.geolocation) {
+    return null;
+  }
+
+  return await new Promise((resolve) => {
+    const timeoutId = window.setTimeout(() => resolve(null), 3000);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        window.clearTimeout(timeoutId);
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
+          timestamp: Number.isFinite(position.timestamp) ? position.timestamp : null,
+        });
+      },
+      () => {
+        window.clearTimeout(timeoutId);
+        resolve(null);
+      },
+      {
+        maximumAge: 5 * 60 * 1000,
+        timeout: 2500,
+      },
+    );
+  });
+}
+
+async function createBugReportEnvironment(): Promise<BugReportEnvironment> {
+  const userAgent = normalizeEnvironmentString(navigator.userAgent, 1000) ?? '';
+  const browser = parseBrowserFromUserAgent(userAgent);
+  const [os, activeTabTitle, geolocation] = await Promise.all([
+    getPlatformOs(),
+    getActiveTabTitle(),
+    getCurrentGeolocation(),
+  ]);
+
+  return {
+    clientTimestamp: new Date().toISOString(),
+    ianaTimeZone: getIanaTimeZone(),
+    browserLanguage: normalizeEnvironmentString(navigator.language),
+    browserLanguages: Array.isArray(navigator.languages)
+      ? navigator.languages
+          .map((language) => normalizeEnvironmentString(language))
+          .filter((language): language is string => Boolean(language))
+          .slice(0, 10)
+      : [],
+    browserName: browser.browserName,
+    browserVersion: browser.browserVersion,
+    os,
+    activeTabTitle,
+    geolocation,
+  };
+}
+
+function createFeedbackContextLog(
+  status: StatusResponseMessage | null,
+  attachmentCount: number,
+): DebugLogEntry {
+  const detail = status
+    ? {
+        workspaceCount: status.workspaces.length,
+        workspaceLimit: status.workspaceLimit,
+        globalSyncEnabled: status.globalSyncEnabled,
+        autoSyncNewChatsEnabled: status.autoSyncNewChatsEnabled,
+        pauseAfterFirstFanOutEnabled: status.pauseAfterFirstFanOutEnabled,
+        debugLoggingEnabled: status.debugLoggingEnabled,
+        showDiagnostics: status.showDiagnostics,
+        closeTabsOnDeleteSet: status.closeTabsOnDeleteSet,
+        defaultEnabledProviders: status.defaultEnabledProviders,
+        defaultFanOutProviders: status.defaultFanOutProviders,
+        attachmentCount,
+        workspaces: status.workspaces.map((workspaceSummary) => ({
+          workspaceId: workspaceSummary.workspace.id,
+          enabledProviders: workspaceSummary.workspace.enabledProviders,
+          pendingSource: workspaceSummary.workspace.pendingSource ?? null,
+          memberStates: workspaceSummary.memberStates,
+          memberIssues: workspaceSummary.memberIssues,
+        })),
+      }
+    : {
+        statusUnavailable: true,
+        attachmentCount,
+      };
+
+  return {
+    id: crypto.randomUUID(),
+    timestamp: Date.now(),
+    level: 'info',
+    scope: 'background',
+    message: 'Feedback context snapshot',
+    detail: JSON.stringify(detail),
+  };
 }
 
 function createPreviewUrl(file: File): string {
@@ -54,8 +223,6 @@ export function useFeedback() {
   const feedbackConfigured = getFeedbackEndpoint().length > 0;
   const [feedbackStep, setFeedbackStep] = useState<FeedbackStep>('category');
   const [feedbackKind, setFeedbackKind] = useState<FeedbackKind | null>(null);
-  const [featureRequestChoice, setFeatureRequestChoice] = useState<FeatureRequestChoice | null>(null);
-  const [customFeatureRequestText, setCustomFeatureRequestText] = useState('');
   const [feedbackText, setFeedbackText] = useState('');
   const [includeLogs, setIncludeLogs] = useState(true);
   const [attachments, setAttachments] = useState<FeedbackAttachmentDraft[]>([]);
@@ -73,11 +240,6 @@ export function useFeedback() {
     attachmentsRef.current.forEach((attachment) => revokePreviewUrl(attachment.previewUrl));
   }, []);
 
-  const featureRequestMessage = useMemo(
-    () => createFeatureRequestMessage(featureRequestChoice, customFeatureRequestText),
-    [customFeatureRequestText, featureRequestChoice],
-  );
-
   const clearAttachments = useCallback(() => {
     const current = attachmentsRef.current;
     current.forEach((attachment) => revokePreviewUrl(attachment.previewUrl));
@@ -91,24 +253,17 @@ export function useFeedback() {
       return false;
     }
 
-    if (feedbackKind === 'feature-request') {
-      return featureRequestMessage.length > 0;
-    }
-
     return normalizeMessage(feedbackText).length > 0;
   }, [
     feedbackConfigured,
     feedbackKind,
     feedbackSubmitting,
     feedbackText,
-    featureRequestMessage,
   ]);
 
   const resetFeedback = useCallback(() => {
     setFeedbackStep('category');
     setFeedbackKind(null);
-    setFeatureRequestChoice(null);
-    setCustomFeatureRequestText('');
     setFeedbackText('');
     setIncludeLogs(true);
     clearAttachments();
@@ -121,12 +276,6 @@ export function useFeedback() {
     setFeedbackKind(kind);
     setFeedbackSubmitted(false);
     setFeedbackError(null);
-
-    if (kind === 'feature-request') {
-      setFeedbackStep('feature-request');
-      setIncludeLogs(false);
-      return;
-    }
 
     setFeedbackStep('message');
     setIncludeLogs(kind === 'bug-report');
@@ -209,10 +358,7 @@ export function useFeedback() {
 
   const submitFeedback = useCallback(async () => {
     const endpoint = getFeedbackEndpoint();
-    const message =
-      feedbackKind === 'feature-request'
-        ? featureRequestMessage
-        : normalizeMessage(feedbackText);
+    const message = normalizeMessage(feedbackText);
 
     if (!endpoint || !feedbackKind || !message || feedbackSubmitting) {
       return;
@@ -223,18 +369,23 @@ export function useFeedback() {
 
     try {
       const shouldIncludeLogs = feedbackKind === 'bug-report' && includeLogs;
-      const logs = shouldIncludeLogs ? trimDebugLogsForFeedback(await requestFullLogs()) : [];
+      const [rawLogs, status] = shouldIncludeLogs
+        ? await Promise.all([requestFullLogs(), requestStatus()])
+        : [[], null] as const;
+      const logs = shouldIncludeLogs
+        ? trimDebugLogsForFeedback([
+            ...rawLogs,
+            createFeedbackContextLog(status, attachmentsRef.current.length),
+          ])
+        : [];
       const payload = {
         kind: feedbackKind,
         message,
         includeLogs: shouldIncludeLogs,
         logs,
-        featureRequestChoice:
-          feedbackKind === 'feature-request' ? featureRequestChoice : null,
-        featureRequestDetail:
-          feedbackKind === 'feature-request' && featureRequestChoice === 'custom'
-            ? message
-            : null,
+        environment: feedbackKind === 'bug-report' ? await createBugReportEnvironment() : null,
+        featureRequestChoice: null,
+        featureRequestDetail: null,
         extensionVersion: chrome.runtime.getManifest().version,
       };
       const formData = new FormData();
@@ -265,18 +416,13 @@ export function useFeedback() {
     feedbackKind,
     feedbackSubmitting,
     feedbackText,
-    featureRequestChoice,
-    featureRequestMessage,
     includeLogs,
-    clearAttachments,
   ]);
 
   return {
     feedbackConfigured,
     feedbackStep,
     feedbackKind,
-    featureRequestChoice,
-    customFeatureRequestText,
     feedbackText,
     includeLogs,
     attachments,
@@ -289,8 +435,6 @@ export function useFeedback() {
     setIncludeLogs,
     addAttachmentFiles,
     removeAttachment,
-    setFeatureRequestChoice,
-    setCustomFeatureRequestText,
     resetFeedback,
     selectFeedbackKind,
     goBack,

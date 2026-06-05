@@ -6,11 +6,11 @@ import {
   FEEDBACK_DEBUG_LOG_MAX_BYTES,
   getDebugLogsByteLength,
 } from '../../../runtime/debug-log-retention';
-import type { DebugLogEntry } from '../../../runtime/protocol';
+import type { DebugLogEntry, StatusResponseMessage } from '../../../runtime/protocol';
 import { renderHookHarness } from './test-utils';
 import { useFeedback } from './use-feedback';
 
-const { requestFullLogs } = vi.hoisted(() => ({
+const { requestFullLogs, requestStatus } = vi.hoisted(() => ({
   requestFullLogs: vi.fn(async (): Promise<DebugLogEntry[]> => [
     {
       id: 'log-1',
@@ -20,10 +20,53 @@ const { requestFullLogs } = vi.hoisted(() => ({
       message: 'test log',
     },
   ]),
+  requestStatus: vi.fn(async (): Promise<StatusResponseMessage> => ({
+    type: 'STATUS_RESPONSE',
+    globalSyncEnabled: true,
+    autoSyncNewChatsEnabled: true,
+    pauseAfterFirstFanOutEnabled: false,
+    debugLoggingEnabled: true,
+    showDiagnostics: true,
+    closeTabsOnDeleteSet: false,
+    workspaceLimit: 5,
+    defaultEnabledProviders: {
+      claude: true,
+      chatgpt: true,
+      gemini: true,
+      deepseek: true,
+      manus: true,
+    },
+    defaultFanOutProviders: null,
+    shortcuts: {
+      togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false },
+      nextProviderTab: { key: '.', meta: false, ctrl: true, shift: true, alt: false },
+      previousProviderTab: { key: ',', meta: false, ctrl: true, shift: true, alt: false },
+    },
+    workspaces: [
+      {
+        workspace: {
+          id: 'workspace-1',
+          members: {},
+          enabledProviders: ['claude', 'chatgpt'],
+          createdAt: 1,
+          updatedAt: 2,
+        },
+        memberStates: {
+          claude: 'ready',
+          chatgpt: 'not-ready',
+        },
+        memberIssues: {
+          chatgpt: 'loading',
+        },
+      },
+    ],
+    recentLogs: [],
+  })),
 }));
 
 vi.mock('../popup-runtime', () => ({
   requestFullLogs,
+  requestStatus,
 }));
 
 describe('useFeedback', () => {
@@ -40,7 +83,27 @@ describe('useFeedback', () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
     vi.stubEnv('WXT_FEEDBACK_ENDPOINT', 'https://support.example.com/feedback');
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      language: 'zh-CN',
+      languages: ['zh-CN', 'en-US'],
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
+      geolocation: {
+        getCurrentPosition: vi.fn((success: PositionCallback) => {
+          success({
+            coords: {
+              latitude: 1.23,
+              longitude: 4.56,
+              accuracy: 7,
+            },
+            timestamp: 12345,
+          } as GeolocationPosition);
+        }),
+      },
+    });
     requestFullLogs.mockClear();
+    requestStatus.mockClear();
     globalThis.fetch = vi.fn(async () => ({ ok: true } as Response)) as unknown as typeof fetch;
     globalThis.chrome = {
       permissions: {
@@ -49,6 +112,12 @@ describe('useFeedback', () => {
       },
       runtime: {
         getManifest: () => ({ version: '0.1.0' }),
+        getPlatformInfo: (callback: (platformInfo: chrome.runtime.PlatformInfo) => void) => {
+          callback({ os: 'mac', arch: 'arm', nacl_arch: 'arm' });
+        },
+      },
+      tabs: {
+        query: vi.fn(async () => [{ title: 'Ask\'em test tab title' }]),
       },
     } as unknown as typeof chrome;
   });
@@ -86,13 +155,13 @@ describe('useFeedback', () => {
       hook.current.selectFeedbackKind('feature-request');
     });
 
-    expect(hook.current.feedbackStep).toBe('feature-request');
+    expect(hook.current.feedbackStep).toBe('message');
     expect(hook.current.feedbackKind).toBe('feature-request');
     expect(hook.current.includeLogs).toBe(false);
     expect(hook.current.canSubmit).toBe(false);
 
     await act(async () => {
-      hook.current.setFeatureRequestChoice('more-providers');
+      hook.current.setFeedbackText('More provider coverage');
     });
 
     expect(hook.current.canSubmit).toBe(true);
@@ -104,8 +173,7 @@ describe('useFeedback', () => {
 
     await act(async () => {
       hook.current.selectFeedbackKind('feature-request');
-      hook.current.setFeatureRequestChoice('custom');
-      hook.current.setCustomFeatureRequestText('Custom workspace history filters');
+      hook.current.setFeedbackText('Custom workspace history filters');
     });
 
     await act(async () => {
@@ -123,8 +191,9 @@ describe('useFeedback', () => {
       message: 'Custom workspace history filters',
       includeLogs: false,
       logs: [],
-      featureRequestChoice: 'custom',
-      featureRequestDetail: 'Custom workspace history filters',
+      environment: null,
+      featureRequestChoice: null,
+      featureRequestDetail: null,
       extensionVersion: '0.1.0',
     });
     expect(attachments).toHaveLength(0);
@@ -156,9 +225,45 @@ describe('useFeedback', () => {
       kind: 'bug-report',
       includeLogs: true,
       message: 'Gemini delivery sometimes stalls.',
+      environment: {
+        clientTimestamp: expect.any(String),
+        ianaTimeZone: expect.any(String),
+        browserLanguage: 'zh-CN',
+        browserLanguages: ['zh-CN', 'en-US'],
+        browserName: 'Chrome',
+        browserVersion: '142.0.0.0',
+        os: 'mac',
+        activeTabTitle: 'Ask\'em test tab title',
+        geolocation: {
+          latitude: 1.23,
+          longitude: 4.56,
+          accuracy: 7,
+          timestamp: 12345,
+        },
+      },
     });
     expect(attachments).toHaveLength(1);
     expect(attachments[0]).toBeInstanceOf(File);
+    expect(requestStatus).toHaveBeenCalledTimes(1);
+    const contextLog = payload.logs.find(
+      (log: DebugLogEntry) => log.message === 'Feedback context snapshot',
+    );
+    expect(contextLog).toBeTruthy();
+    expect(JSON.parse(contextLog.detail)).toMatchObject({
+      workspaceCount: 1,
+      workspaceLimit: 5,
+      globalSyncEnabled: true,
+      attachmentCount: 1,
+      workspaces: [
+        {
+          workspaceId: 'workspace-1',
+          enabledProviders: ['claude', 'chatgpt'],
+          memberIssues: {
+            chatgpt: 'loading',
+          },
+        },
+      ],
+    });
 
     await act(async () => {
       hook.current.resetFeedback();
@@ -182,8 +287,10 @@ describe('useFeedback', () => {
       includeLogs: false,
       logs: [],
       message: 'The workspace indicator feels great.',
+      environment: null,
     });
     expect(attachments).toHaveLength(1);
+    expect(requestStatus).toHaveBeenCalledTimes(1);
 
     hook.unmount();
   });
@@ -214,79 +321,43 @@ describe('useFeedback', () => {
 
     expect(payload.includeLogs).toBe(true);
     expect(getDebugLogsByteLength(payload.logs)).toBeLessThanOrEqual(FEEDBACK_DEBUG_LOG_MAX_BYTES);
-    expect(payload.logs.at(-1).id).toBe('log-119');
-    expect(payload.logs.at(-1).detail).toContain('...[truncated ');
+    expect(payload.logs.at(-1).message).toBe('Feedback context snapshot');
+    const lastOriginalLog = [...payload.logs].reverse().find(
+      (log: DebugLogEntry) => log.id.startsWith('log-'),
+    );
+    expect(lastOriginalLog?.id).toBe('log-119');
+    expect(lastOriginalLog?.detail).toContain('...[truncated ');
 
     hook.unmount();
   });
 
-  it('supports the new feature request presets', async () => {
+  it('submits typed feature requests with screenshots', async () => {
     const hook = renderHookHarness(() => useFeedback());
 
     await act(async () => {
       hook.current.selectFeedbackKind('feature-request');
-      hook.current.setFeatureRequestChoice('more-providers');
+      hook.current.setFeedbackText('Please support more providers.');
+      hook.current.addAttachmentFiles([new File(['request'], 'request.png', { type: 'image/png' })]);
     });
 
     await act(async () => {
       await hook.current.submitFeedback();
     });
 
-    let [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
-    let { payload, attachments } = readPayloadFromFormData(init?.body);
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    const { payload, attachments } = readPayloadFromFormData(init?.body);
 
     expect(payload).toMatchObject({
       kind: 'feature-request',
-      message: 'More providers',
+      message: 'Please support more providers.',
       includeLogs: false,
-      featureRequestChoice: 'more-providers',
+      logs: [],
+      environment: null,
+      featureRequestChoice: null,
       featureRequestDetail: null,
     });
-    expect(attachments).toHaveLength(0);
-
-    await act(async () => {
-      hook.current.resetFeedback();
-      hook.current.selectFeedbackKind('feature-request');
-      hook.current.setFeatureRequestChoice('switch-models');
-    });
-
-    await act(async () => {
-      await hook.current.submitFeedback();
-    });
-
-    [, init] = vi.mocked(globalThis.fetch).mock.calls[1];
-    ({ payload, attachments } = readPayloadFromFormData(init?.body));
-
-    expect(payload).toMatchObject({
-      kind: 'feature-request',
-      message: 'Switch models',
-      includeLogs: false,
-      featureRequestChoice: 'switch-models',
-      featureRequestDetail: null,
-    });
-    expect(attachments).toHaveLength(0);
-
-    await act(async () => {
-      hook.current.resetFeedback();
-      hook.current.selectFeedbackKind('feature-request');
-      hook.current.setFeatureRequestChoice('image-paste');
-    });
-
-    await act(async () => {
-      await hook.current.submitFeedback();
-    });
-
-    [, init] = vi.mocked(globalThis.fetch).mock.calls[2];
-    ({ payload, attachments } = readPayloadFromFormData(init?.body));
-
-    expect(payload).toMatchObject({
-      kind: 'feature-request',
-      message: 'Image pasting',
-      includeLogs: false,
-      featureRequestChoice: 'image-paste',
-      featureRequestDetail: null,
-    });
-    expect(attachments).toHaveLength(0);
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]).toBeInstanceOf(File);
 
     hook.unmount();
   });

@@ -29,6 +29,7 @@ const FEATURE_REQUEST_CHOICES = new Set([
 const FEEDBACK_ATTACHMENT_BUCKET = 'feedback-attachments';
 const FEEDBACK_ATTACHMENT_LIMIT = 3;
 const FEEDBACK_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+const FEEDBACK_ENVIRONMENT_MAX_BYTES = 8 * 1024;
 const FEEDBACK_ATTACHMENT_TYPES = new Set([
   'image/png',
   'image/jpeg',
@@ -86,6 +87,41 @@ function normalizeExtensionVersion(value: unknown): string | null {
 
   const normalized = value.trim().slice(0, 32);
   return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeEnvironment(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  try {
+    const serialized = JSON.stringify(value);
+    if (new TextEncoder().encode(serialized).length > FEEDBACK_ENVIRONMENT_MAX_BYTES) {
+      return null;
+    }
+
+    return JSON.parse(serialized) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeHeaderString(value: string | null, maxLength = 128): string | null {
+  const normalized = value?.trim().slice(0, maxLength) ?? '';
+  return normalized.length > 0 ? normalized : null;
+}
+
+function getRequestIp(request: Request): string | null {
+  const forwardedFor = normalizeHeaderString(request.headers.get('x-forwarded-for'));
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0]?.trim().slice(0, 128) || null;
+  }
+
+  return (
+    normalizeHeaderString(request.headers.get('cf-connecting-ip')) ??
+    normalizeHeaderString(request.headers.get('x-real-ip')) ??
+    normalizeHeaderString(request.headers.get('fly-client-ip'))
+  );
 }
 
 function normalizeProviderList(value: unknown): string[] {
@@ -346,12 +382,13 @@ async function handleProviderStats() {
   });
 }
 
-async function handleFeedback(body: unknown, attachmentFiles: File[]) {
+async function handleFeedback(body: unknown, attachmentFiles: File[], request: Request) {
   const input = body as {
     kind?: unknown;
     message?: unknown;
     includeLogs?: unknown;
     logs?: unknown;
+    environment?: unknown;
     featureRequestChoice?: unknown;
     featureRequestDetail?: unknown;
     extensionVersion?: unknown;
@@ -368,12 +405,7 @@ async function handleFeedback(body: unknown, attachmentFiles: File[]) {
     return json({ ok: false, error: 'message is required' }, 400);
   }
 
-  if (kind === 'feature-request' && attachmentFiles.length > 0) {
-    return json({ ok: false, error: 'Attachments are not supported for feature requests' }, 400);
-  }
-
-  const { attachments, error: attachmentError } =
-    kind === 'feature-request' ? { attachments: [], error: null } : normalizeAttachmentFiles(attachmentFiles);
+  const { attachments, error: attachmentError } = normalizeAttachmentFiles(attachmentFiles);
 
   if (attachmentError) {
     return json({ ok: false, error: attachmentError }, 400);
@@ -381,6 +413,13 @@ async function handleFeedback(body: unknown, attachmentFiles: File[]) {
 
   const includeLogs = kind === 'bug-report' && Boolean(input.includeLogs);
   const logs = includeLogs ? normalizeLogs(input.logs) : [];
+  const environment =
+    kind === 'bug-report'
+      ? {
+          ...(normalizeEnvironment(input.environment) ?? {}),
+          requestIp: getRequestIp(request),
+        }
+      : null;
   const featureRequestChoice =
     typeof input.featureRequestChoice === 'string' && FEATURE_REQUEST_CHOICES.has(input.featureRequestChoice)
       ? input.featureRequestChoice
@@ -399,6 +438,7 @@ async function handleFeedback(body: unknown, attachmentFiles: File[]) {
       include_logs: includeLogs,
       log_count: logs.length,
       attachment_count: attachments.length,
+      environment_json: environment,
       feature_request_choice: featureRequestChoice,
       feature_request_detail: featureRequestDetail,
       extension_version: extensionVersion,
@@ -464,7 +504,7 @@ Deno.serve(async (request) => {
       return parsed.error;
     }
 
-    return await handleFeedback(parsed.input, parsed.attachments);
+    return await handleFeedback(parsed.input, parsed.attachments, request);
   }
 
   let body: unknown = null;

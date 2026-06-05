@@ -70,8 +70,6 @@ export default function App() {
     feedbackConfigured,
     feedbackStep,
     feedbackKind,
-    featureRequestChoice,
-    customFeatureRequestText,
     feedbackText,
     includeLogs,
     attachments,
@@ -84,8 +82,6 @@ export default function App() {
     goBack,
     addAttachmentFiles,
     removeAttachment,
-    setFeatureRequestChoice,
-    setCustomFeatureRequestText,
     setFeedbackText,
     setIncludeLogs,
     resetFeedback,
@@ -226,8 +222,6 @@ export default function App() {
         feedbackConfigured={feedbackConfigured}
         feedbackStep={feedbackStep}
         feedbackKind={feedbackKind}
-        featureRequestChoice={featureRequestChoice}
-        customFeatureRequestText={customFeatureRequestText}
         feedbackText={feedbackText}
         includeLogs={includeLogs}
         attachments={attachments}
@@ -240,8 +234,6 @@ export default function App() {
         onBack={goBack}
         onSelectFeedbackKind={selectFeedbackKind}
         onAddAttachments={addAttachmentFiles}
-        onFeatureRequestChoiceChange={setFeatureRequestChoice}
-        onCustomFeatureRequestTextChange={setCustomFeatureRequestText}
         onFeedbackTextChange={setFeedbackText}
         onIncludeLogsChange={setIncludeLogs}
         onRemoveAttachment={removeAttachment}

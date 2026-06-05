@@ -2,22 +2,27 @@ import {
   FEEDBACK_ATTACHMENT_ACCEPT,
   FEEDBACK_ATTACHMENT_LIMIT,
   FEEDBACK_KIND_OPTIONS,
-  FEATURE_REQUEST_OPTIONS,
   type FeedbackKind,
   type FeedbackStep,
-  type FeatureRequestChoice,
 } from '../feedback';
 import type { FeedbackAttachmentDraft } from '../hooks/use-feedback';
 
 function getMessagePageCopy(kind: FeedbackKind | null) {
+  if (kind === 'feature-request') {
+    return {
+      heading: 'Feature Request',
+      fieldLabel: 'Request',
+      placeholder: 'What should ask\'em build next?',
+      submitLabel: 'Send Request',
+    };
+  }
+
   if (kind === 'say-something-nice') {
     return {
       heading: 'Say Something Nice',
       fieldLabel: 'Message',
       placeholder: 'What did ask\'em get right? What felt unusually good?',
       submitLabel: 'Send Note',
-      successLine: 'Thanks. The note is in.',
-      successSubline: 'We appreciate the encouragement.',
     };
   }
 
@@ -26,24 +31,95 @@ function getMessagePageCopy(kind: FeedbackKind | null) {
     fieldLabel: 'Report',
     placeholder: 'What happened? What felt wrong? What should change?',
     submitLabel: 'Send Report',
-    successLine: 'Thanks. Your report is in.',
-    successSubline: 'We\'ll review it together with any screenshots and logs you attached.',
   };
 }
 
-function getFeatureRequestSubmitDisabled(
-  choice: FeatureRequestChoice | null,
-  customText: string,
-): boolean {
-  if (!choice) {
-    return true;
+function getAttachmentCopy(kind: FeedbackKind | null) {
+  if (kind === 'feature-request') {
+    return {
+      title: 'Reference images',
+      description: `Add up to ${FEEDBACK_ATTACHMENT_LIMIT} images that help explain the request.`,
+      action: 'Add images',
+    };
   }
 
-  if (choice === 'custom') {
-    return customText.trim().length === 0;
+  if (kind === 'say-something-nice') {
+    return {
+      title: 'Images',
+      description: `Add up to ${FEEDBACK_ATTACHMENT_LIMIT} images you want to share with your note.`,
+      action: 'Add images',
+    };
   }
 
-  return false;
+  return {
+    title: 'Screenshots',
+    description: `Paste or add up to ${FEEDBACK_ATTACHMENT_LIMIT} images to show what you saw.`,
+    action: 'Add screenshots',
+  };
+}
+
+function FeedbackAttachments(props: {
+  feedbackKind: FeedbackKind | null;
+  feedbackConfigured: boolean;
+  feedbackSubmitting: boolean;
+  attachments: FeedbackAttachmentDraft[];
+  attachmentError: string | null;
+  onAddAttachments: (files: FileList | File[] | null) => void;
+  onRemoveAttachment: (attachmentId: string) => void;
+}) {
+  const copy = getAttachmentCopy(props.feedbackKind);
+
+  return (
+    <>
+      <div className="askem-feedback-attachments">
+        <div className="askem-feedback-attachments-top">
+          <div className="askem-feedback-attachments-copy">
+            <span className="askem-feedback-attachments-kicker">{copy.title}</span>
+            <p>{copy.description}</p>
+          </div>
+          {props.attachments.length < FEEDBACK_ATTACHMENT_LIMIT ? (
+            <label className="askem-feedback-upload">
+              <input
+                type="file"
+                accept={FEEDBACK_ATTACHMENT_ACCEPT}
+                multiple
+                onChange={(event) => {
+                  props.onAddAttachments(event.currentTarget.files);
+                  event.currentTarget.value = '';
+                }}
+                disabled={props.feedbackSubmitting || !props.feedbackConfigured}
+              />
+              {copy.action}
+            </label>
+          ) : (
+            <span className="askem-feedback-upload-cap">
+              {props.attachments.length}/{FEEDBACK_ATTACHMENT_LIMIT}
+            </span>
+          )}
+        </div>
+        {props.attachments.length ? (
+          <div className="askem-feedback-attachment-grid">
+            {props.attachments.map((attachment) => (
+              <div className="askem-feedback-attachment-card" key={attachment.id}>
+                <img className="askem-feedback-attachment-image" src={attachment.previewUrl} alt="" />
+                <button
+                  className="askem-feedback-attachment-remove"
+                  onClick={() => props.onRemoveAttachment(attachment.id)}
+                  type="button"
+                  disabled={props.feedbackSubmitting}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {props.attachmentError ? (
+        <p className="askem-feedback-error">{props.attachmentError}</p>
+      ) : null}
+    </>
+  );
 }
 
 export function FeedbackModal(props: {
@@ -51,8 +127,6 @@ export function FeedbackModal(props: {
   feedbackConfigured: boolean;
   feedbackStep: FeedbackStep;
   feedbackKind: FeedbackKind | null;
-  featureRequestChoice: FeatureRequestChoice | null;
-  customFeatureRequestText: string;
   feedbackText: string;
   includeLogs: boolean;
   attachments: FeedbackAttachmentDraft[];
@@ -64,8 +138,6 @@ export function FeedbackModal(props: {
   onClose: () => void;
   onBack: () => void;
   onSelectFeedbackKind: (kind: FeedbackKind) => void;
-  onFeatureRequestChoiceChange: (value: FeatureRequestChoice) => void;
-  onCustomFeatureRequestTextChange: (value: string) => void;
   onFeedbackTextChange: (value: string) => void;
   onIncludeLogsChange: (checked: boolean) => void;
   onAddAttachments: (files: FileList | File[] | null) => void;
@@ -152,105 +224,6 @@ export function FeedbackModal(props: {
               ))}
             </div>
           </>
-        ) : props.feedbackStep === 'feature-request' ? (
-          <>
-            <div className="askem-modal-top">
-              <div>
-                <p className="askem-card-label">Feedback</p>
-                <h2>Feature Request</h2>
-              </div>
-              <button
-                className="askem-modal-close"
-                onClick={props.onClose}
-                type="button"
-                disabled={props.feedbackSubmitting}
-              >
-                Close
-              </button>
-            </div>
-            <button
-              className="askem-feedback-back"
-              onClick={props.onBack}
-              type="button"
-              disabled={props.feedbackSubmitting}
-            >
-              ← Back
-            </button>
-            <div
-              className="askem-feedback-choice-list askem-feedback-choice-list-compact"
-              role="radiogroup"
-              aria-label="Feature request options"
-            >
-              {FEATURE_REQUEST_OPTIONS.map((option) => {
-                const checked = props.featureRequestChoice === option.choice;
-
-                return (
-                  <label
-                    key={option.choice}
-                    className={`askem-feedback-choice-card askem-feedback-radio-card ${checked ? 'is-active' : ''}`}
-                  >
-                    <input
-                      type="radio"
-                      name="askem-feature-request"
-                      checked={checked}
-                      onChange={() => props.onFeatureRequestChoiceChange(option.choice)}
-                      disabled={props.feedbackSubmitting}
-                    />
-                    <span className="askem-feedback-radio-copy">
-                      <strong>{option.label}</strong>
-                      <span>{option.description}</span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-            {props.featureRequestChoice === 'custom' ? (
-              <div className="askem-feedback-field">
-                <label className="askem-feedback-label" htmlFor="askem-custom-feature-request">
-                  Custom request
-                </label>
-                <textarea
-                  id="askem-custom-feature-request"
-                  className="askem-feedback-textarea"
-                  placeholder="Describe the feature you want."
-                  value={props.customFeatureRequestText}
-                  onChange={(event) => props.onCustomFeatureRequestTextChange(event.target.value)}
-                  rows={4}
-                  disabled={props.feedbackSubmitting}
-                />
-              </div>
-            ) : null}
-            {props.feedbackError ? (
-              <p className="askem-feedback-error">{props.feedbackError}</p>
-            ) : !props.feedbackConfigured ? (
-              <p className="askem-feedback-error">Feedback endpoint is not configured.</p>
-            ) : null}
-            <div className="askem-modal-actions">
-              <button
-                className="askem-provider-clear"
-                onClick={props.onBack}
-                type="button"
-                disabled={props.feedbackSubmitting}
-              >
-                Back
-              </button>
-              <button
-                className="askem-clear-workspace"
-                onClick={props.onSubmit}
-                disabled={
-                  props.feedbackSubmitting ||
-                  !props.feedbackConfigured ||
-                  getFeatureRequestSubmitDisabled(
-                    props.featureRequestChoice,
-                    props.customFeatureRequestText,
-                  )
-                }
-                type="button"
-              >
-                {props.feedbackSubmitting ? 'Sending' : 'Send Request'}
-              </button>
-            </div>
-          </>
         ) : (
           <>
             <div className="askem-modal-top">
@@ -300,59 +273,15 @@ export function FeedbackModal(props: {
                 disabled={props.feedbackSubmitting}
               />
             </div>
-            <div className="askem-feedback-attachments">
-              <div className="askem-feedback-attachments-top">
-                <div className="askem-feedback-attachments-copy">
-                  <span className="askem-feedback-attachments-kicker">Screenshots</span>
-                  <p>
-                    Paste or add up to {FEEDBACK_ATTACHMENT_LIMIT} images to show what you saw.
-                  </p>
-                </div>
-                {props.attachments.length < FEEDBACK_ATTACHMENT_LIMIT ? (
-                  <label className="askem-feedback-upload">
-                    <input
-                      type="file"
-                      accept={FEEDBACK_ATTACHMENT_ACCEPT}
-                      multiple
-                      onChange={(event) => {
-                        props.onAddAttachments(event.currentTarget.files);
-                        event.currentTarget.value = '';
-                      }}
-                      disabled={props.feedbackSubmitting || !props.feedbackConfigured}
-                    />
-                    Add screenshots
-                  </label>
-                ) : (
-                  <span className="askem-feedback-upload-cap">
-                    {props.attachments.length}/{FEEDBACK_ATTACHMENT_LIMIT}
-                  </span>
-                )}
-              </div>
-              {props.attachments.length ? (
-                <div className="askem-feedback-attachment-grid">
-                  {props.attachments.map((attachment) => (
-                    <div className="askem-feedback-attachment-card" key={attachment.id}>
-                      <img
-                        className="askem-feedback-attachment-image"
-                        src={attachment.previewUrl}
-                        alt=""
-                      />
-                      <button
-                        className="askem-feedback-attachment-remove"
-                        onClick={() => props.onRemoveAttachment(attachment.id)}
-                        type="button"
-                        disabled={props.feedbackSubmitting}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-            {props.attachmentError ? (
-              <p className="askem-feedback-error">{props.attachmentError}</p>
-            ) : null}
+            <FeedbackAttachments
+              feedbackKind={props.feedbackKind}
+              feedbackConfigured={props.feedbackConfigured}
+              feedbackSubmitting={props.feedbackSubmitting}
+              attachments={props.attachments}
+              attachmentError={props.attachmentError}
+              onAddAttachments={props.onAddAttachments}
+              onRemoveAttachment={props.onRemoveAttachment}
+            />
             {props.feedbackKind === 'bug-report' ? (
               <div className={`askem-feedback-log-note ${props.includeLogs ? 'is-attached' : 'is-detached'}`}>
                 <div className="askem-feedback-log-copy">

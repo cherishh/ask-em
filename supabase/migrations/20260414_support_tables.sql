@@ -7,6 +7,7 @@ create table if not exists public.feedback_submissions (
   include_logs boolean not null default false,
   log_count integer not null default 0,
   attachment_count integer not null default 0,
+  environment_json jsonb null,
   feature_request_choice text null check (
     feature_request_choice in (
       'multilingual',
