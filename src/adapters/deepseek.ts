@@ -1,4 +1,10 @@
-import { getVisibleButtonTexts, getVisibleInputDescriptors, isElementWithin, isVisible, normalizeWhitespace } from './dom';
+import {
+  detectHardErrorPage,
+  getVisibleButtonTexts,
+  getVisibleInputDescriptors,
+  isVisible,
+  normalizeWhitespace,
+} from './dom';
 import { createDomProviderAdapter } from './factory';
 import { readAttachmentFiles, setFileInputFiles } from './attachment-delivery';
 import { fileInputAcceptsAttachments, preferFileInputForAttachmentCount } from './file-input';
@@ -251,7 +257,29 @@ export const deepseekAdapter = createDomProviderAdapter({
 
     return primaryButton ?? buttons.at(-1) ?? null;
   },
-  errorKeywords: ['network error', 'something went wrong'],
+  isErrorPage() {
+    return detectHardErrorPage({
+      surfaceKeywords: [
+        'server is busy',
+        'server busy',
+        'please try again later',
+        'network error',
+        'technical issues',
+        'temporarily unavailable',
+        'message limit reached',
+        '服务器繁忙',
+        '服务繁忙',
+        '请稍后再试',
+        '请稍后重试',
+        '网络错误',
+        '网络异常',
+        '技术问题',
+        '暂时不可用',
+        '消息上限',
+        '已达到消息上限',
+      ],
+    });
+  },
   async setComposerPayload(payload, context) {
     await context.setComposerText(payload.text);
 

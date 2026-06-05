@@ -1,4 +1,4 @@
-import { getVisibleButtonTexts, isVisible, normalizeWhitespace } from './dom';
+import { detectHardErrorPage, getVisibleButtonTexts, isVisible, normalizeWhitespace } from './dom';
 import { createDomProviderAdapter } from './factory';
 import { dispatchPasteFiles, readAttachmentFiles } from './attachment-delivery';
 import { PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef } from '../runtime/protocol';
@@ -272,7 +272,21 @@ export const geminiAdapter = createDomProviderAdapter({
     'gem-icon-button.send-button',
   ],
   isSendButtonEnabled: isGeminiSendButtonEnabled,
-  errorKeywords: ['something went wrong', 'try again in a bit'],
+  isErrorPage() {
+    return detectHardErrorPage({
+      surfaceKeywords: [
+        'something went wrong',
+        'try again later',
+        'try again in a bit',
+        'please try again',
+        '出了点问题',
+        '出现错误',
+        '请稍后再试',
+        '请稍后重试',
+        '请重试',
+      ],
+    });
+  },
   async setComposerPayload(payload, context) {
     if (payload.attachments.length === 0) {
       await context.setComposerText(payload.text);

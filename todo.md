@@ -4,6 +4,7 @@
 
 - 隐身模式不fanout
 - 多语言稳定性
+- 先发文字再发附件 ，附件不同步
 - feedback feature request 也让主动填，只保留more provider 并可写
 - bug report 增加浏览器语言
 - 更好的error 检测（现在靠文案关键字扫描+简单策略）

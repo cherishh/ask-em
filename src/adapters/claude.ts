@@ -1,4 +1,4 @@
-import { getVisibleButtonTexts, isVisible, normalizeWhitespace } from './dom';
+import { detectHardErrorPage, getVisibleButtonTexts, isVisible, normalizeWhitespace } from './dom';
 import { createDomProviderAdapter } from './factory';
 import { readAttachmentFiles, setFileInputFiles } from './attachment-delivery';
 import { fileInputAcceptsAttachments, preferFileInputForAttachmentCount } from './file-input';
@@ -348,7 +348,27 @@ export const claudeAdapter = createDomProviderAdapter({
   composerSelectors: ['[data-testid="chat-input"]', '[aria-label="Write your prompt to Claude"]'],
   sendButtonSelectors: ['button[aria-label*="send" i]', 'button[data-testid*="send" i]', 'button[type="submit"]'],
   findSendButton: findClaudeSendButton,
-  errorKeywords: ['conversation not found', 'something went wrong'],
+  isErrorPage() {
+    return detectHardErrorPage({
+      pageKeywords: ['conversation not found'],
+      surfaceKeywords: [
+        'This conversation could not be found',
+        'conversation not found',
+        'something went wrong',
+        'service is temporarily busy',
+        'service temporarily busy',
+        'temporarily busy',
+        'capacity',
+        '找不到对话',
+        '对话不存在',
+        '出了点问题',
+        '出现错误',
+        '服务繁忙',
+        '服务暂时繁忙',
+        '容量不足',
+      ],
+    });
+  },
   async setComposerPayload(payload, context) {
     await context.setComposerText(payload.text);
 

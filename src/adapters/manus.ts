@@ -1,5 +1,6 @@
 import {
   findClickableByText,
+  detectHardErrorPage,
   getVisibleButtonTexts,
   isVisible,
   normalizeWhitespace,
@@ -415,7 +416,26 @@ export const manusAdapter = createDomProviderAdapter({
 
     return buttons.at(-1) ?? findManusSendButtonByComposerLayout(composer, container);
   },
-  errorKeywords: ['something went wrong', 'failed to load', 'try again'],
+  isErrorPage() {
+    return detectHardErrorPage({
+      surfaceKeywords: [
+        'network error',
+        'try again',
+        'failed to load',
+        'something went wrong',
+        'unable to process',
+        '网络错误',
+        '网络异常',
+        '请重试',
+        '请稍后重试',
+        '加载失败',
+        '加载出错',
+        '出了点问题',
+        '出现错误',
+        '无法处理',
+      ],
+    });
+  },
   async prepareForDelivery(payload, context) {
     await prepareManusBlankDeliverySurface({
       expectedSessionId: payload.expectedSessionId,

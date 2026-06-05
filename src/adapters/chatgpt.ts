@@ -1,4 +1,4 @@
-import { getVisibleButtonTexts, getVisibleHeadingTexts, isVisible, normalizeWhitespace } from './dom';
+import { detectHardErrorPage, getVisibleButtonTexts, getVisibleHeadingTexts, isVisible, normalizeWhitespace } from './dom';
 import { createDomProviderAdapter } from './factory';
 import { dispatchPasteFiles, readAttachmentFiles, setFileInputFiles } from './attachment-delivery';
 import { fileInputAcceptsAttachments, preferFileInputForAttachmentCount } from './file-input';
@@ -247,7 +247,24 @@ export const chatgptAdapter = createDomProviderAdapter({
     'button[aria-label="Send prompt"]',
     'form[aria-label="Chat with ChatGPT"] button[class*="composer-submit-button"]',
   ],
-  errorKeywords: ['unable to load conversation', 'conversation not found'],
+  isErrorPage() {
+    return detectHardErrorPage({
+      pageKeywords: ['unable to load conversation', 'conversation not found'],
+      surfaceKeywords: [
+        'unable to load conversation',
+        'conversation not found',
+        'conversation key not found',
+        'something seems to have gone wrong',
+        'something went wrong',
+        '无法加载对话',
+        '无法载入对话',
+        '找不到对话',
+        '对话不存在',
+        '出了点问题',
+        '出现错误',
+      ],
+    });
+  },
   async setComposerPayload(payload, context) {
     await context.setComposerText(payload.text);
 

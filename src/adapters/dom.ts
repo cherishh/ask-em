@@ -291,6 +291,114 @@ export function detectObviousErrorPage(keywords: string[] = []): boolean {
   );
 }
 
+type HardErrorPageOptions = {
+  pageKeywords?: string[];
+  surfaceKeywords?: string[];
+  surfaceSelectors?: string[];
+};
+
+const DEFAULT_HARD_PAGE_KEYWORDS = [
+  '404',
+  'not found',
+  'page not found',
+  'http error',
+  'this page isn’t working',
+  "this page isn't working",
+  'this site can’t be reached',
+  "this site can't be reached",
+  'aw, snap',
+  'err_',
+  'service unavailable',
+  '页面未找到',
+  '找不到页面',
+  '找不到网页',
+  '找不到此页面',
+  '网页无法打开',
+  '此网页无法正常运作',
+  '服务不可用',
+  '服务暂时不可用',
+];
+
+const DEFAULT_ERROR_SURFACE_SELECTORS = [
+  '[role="alert"]',
+  '[role="alertdialog"]',
+  '[role="dialog"]',
+  '[aria-live]',
+  '[aria-modal="true"]',
+  '[data-testid*="error" i]',
+  '[data-test-id*="error" i]',
+  '[class*="error" i]',
+  '[class*="toast" i]',
+  '[class*="snackbar" i]',
+  '[class*="notification" i]',
+  '[class*="banner" i]',
+];
+
+function textIncludesAny(text: string, keywords: string[]): boolean {
+  const normalized = normalizeWhitespace(text).toLowerCase();
+  return keywords.some((keyword) => normalized.includes(keyword.toLowerCase()));
+}
+
+function getElementDetectionText(element: HTMLElement): string {
+  return normalizeWhitespace(
+    [
+      element.getAttribute('aria-label'),
+      element.getAttribute('title'),
+      element.innerText || element.textContent,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+}
+
+function isLikelyChatContent(element: HTMLElement): boolean {
+  return Boolean(
+    element.closest(
+      [
+        'table',
+        'pre',
+        'code',
+        'textarea',
+        'input',
+        '[contenteditable="true"]',
+        '[data-message-author-role]',
+        '[data-testid*="conversation" i]',
+        '[data-testid*="message" i]',
+        '[class*="markdown" i]',
+        '[class*="prose" i]',
+      ].join(', '),
+    ),
+  );
+}
+
+function getVisibleHeadingDetectionText(): string {
+  return Array.from(document.querySelectorAll<HTMLElement>('h1, h2, [role="heading"]'))
+    .filter((element) => isVisible(element) && !shouldIgnoreDetectionSubtree(element))
+    .map(getElementDetectionText)
+    .filter(Boolean)
+    .join(' ');
+}
+
+export function detectHardErrorPage(options: HardErrorPageOptions = {}): boolean {
+  const pageKeywords = [...DEFAULT_HARD_PAGE_KEYWORDS, ...(options.pageKeywords ?? [])];
+  if (textIncludesAny(getVisibleHeadingDetectionText(), pageKeywords)) {
+    return true;
+  }
+
+  const surfaceKeywords = [...pageKeywords, ...(options.surfaceKeywords ?? [])];
+  const selectors = [...DEFAULT_ERROR_SURFACE_SELECTORS, ...(options.surfaceSelectors ?? [])];
+  const surfaces = selectors
+    .flatMap((selector) => Array.from(document.querySelectorAll<HTMLElement>(selector)))
+    .filter((element, index, elements) => elements.indexOf(element) === index)
+    .filter((element) =>
+      isVisible(element) &&
+      !shouldIgnoreDetectionSubtree(element) &&
+      !isLikelyChatContent(element)
+    );
+
+  return surfaces.some((element) => textIncludesAny(getElementDetectionText(element), surfaceKeywords));
+}
+
 export async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }

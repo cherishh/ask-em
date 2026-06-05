@@ -21,7 +21,6 @@ import {
   getPlainTextFromDataTransfer,
 } from './attachment-capture';
 import {
-  detectObviousErrorPage,
   detectLoginRequired,
   dispatchEnterKey,
   getEditableText,
@@ -55,7 +54,7 @@ type DomProviderAdapterConfig = {
   sendButtonSelectors?: string[];
   findSendButton?: (findComposer: () => HTMLElement | null) => HTMLElement | null;
   loginKeywords?: string[];
-  errorKeywords?: string[];
+  isErrorPage?: () => boolean;
   submitWaitMs?: number;
   submitTimeoutMs?: number;
   pastedTextAttachmentMinChars?: number;
@@ -283,13 +282,13 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
         : { isLoginRequired: detectLoginRequired(config.loginKeywords ?? []) };
     const isLoginRequired = authClassification.isLoginRequired;
     const isPrivateMode = config.isPrivateMode?.() ?? false;
-    const hasObviousError = detectObviousErrorPage(config.errorKeywords ?? []);
-    const isReady = Boolean(findComposer()) && !hasObviousError;
+    const hasHardError = config.isErrorPage?.() ?? false;
+    const isReady = Boolean(findComposer());
     const pageState = isPrivateMode
       ? 'private-mode'
       : isLoginRequired
         ? 'login-required'
-        : hasObviousError
+        : hasHardError
           ? 'error'
           : isReady
             ? 'ready'
