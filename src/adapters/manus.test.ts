@@ -49,7 +49,7 @@ function mockManusComposerLayout(rectSpy: ReturnType<typeof vi.spyOn>) {
   });
 }
 
-function renderManusComposer(input?: { newTaskText?: string }) {
+function renderManusComposer(input?: { newTaskText?: string; localFilesText?: string }) {
   document.body.innerHTML = `
     <button id="new-task" type="button">
       <svg class="lucide lucide-square-pen"></svg>
@@ -85,7 +85,7 @@ function renderManusComposer(input?: { newTaskText?: string }) {
     menu.setAttribute('role', 'dialog');
     const addLocalFiles = document.createElement('div');
     addLocalFiles.className = 'cursor-pointer';
-    addLocalFiles.textContent = 'Add from local files';
+    addLocalFiles.textContent = input?.localFilesText ?? 'Add from local files';
     addLocalFiles.addEventListener('click', () => {
       const input = document.createElement('input');
       input.type = 'file';
@@ -183,6 +183,39 @@ describe('Manus attachment delivery adapter', () => {
 
   it('sets text and injects files through the Manus local-files transient input flow', async () => {
     renderManusComposer();
+
+    await manusAdapter.composer?.setComposerPayload?.({
+      text: 'hello',
+      attachments: [
+        {
+          id: 'a1',
+          name: 'sample.pdf',
+          mime: 'application/pdf',
+          size: 3,
+        },
+      ],
+    });
+
+    expect(document.querySelector('.tiptap')?.textContent).toBe('hello');
+    expect(document.getElementById('attachments')?.textContent).toContain('sample.pdf');
+    expect(document.getElementById('manus-menu')).toBeNull();
+  });
+
+  it.each([
+    '从本地文件添加',
+    'Aus lokalen Dateien hinzufügen',
+    'Agregar desde archivos locales',
+    'Ajouter depuis les fichiers locaux',
+    'Aggiungi da file locali',
+    'Adicionar de arquivos locais',
+    'Adicionar a partir de ficheiros locais',
+    'Thêm từ tệp cục bộ',
+    '从本机档案新增',
+    'ローカルファイルから追加',
+    '로컬 파일에서 추가',
+    'أضف من الملفات المحلية',
+  ])('sets text and injects files through the localized Manus local-files flow: %s', async (localFilesText) => {
+    renderManusComposer({ localFilesText });
 
     await manusAdapter.composer?.setComposerPayload?.({
       text: 'hello',

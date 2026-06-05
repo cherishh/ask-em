@@ -274,6 +274,79 @@ describe('ChatGPT attachment delivery adapter', () => {
     });
   });
 
+  it('counts multiple ChatGPT image thumbnails inside one source preview container', () => {
+    document.body.innerHTML = `
+      <form data-type="unified-composer">
+        <input id="upload-files" type="file" multiple />
+        <div id="prompt-textarea" role="textbox" aria-label="Chat with ChatGPT" contenteditable="true"></div>
+        <div data-testid="composer-image-preview">
+          <img alt="Uploaded image" src="blob:https://chatgpt.com/image-1" />
+          <img alt="Uploaded image" src="blob:https://chatgpt.com/image-2" />
+          <button type="button" aria-label="Remove attachment"></button>
+        </div>
+      </form>
+    `;
+
+    expect(chatgptAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: 'first.jpg',
+        mime: 'image/jpeg',
+        size: 3,
+        source: 'file-input',
+        file: new File(['abc'], 'first.jpg', { type: 'image/jpeg' }),
+      },
+      {
+        id: 'a2',
+        name: 'second.jpg',
+        mime: 'image/jpeg',
+        size: 3,
+        source: 'file-input',
+        file: new File(['def'], 'second.jpg', { type: 'image/jpeg' }),
+      },
+    ])).toEqual({
+      count: 2,
+      items: [],
+    });
+  });
+
+  it('uses count-only source snapshots when ChatGPT mixes named files and filename-less images', () => {
+    document.body.innerHTML = `
+      <form data-type="unified-composer">
+        <input id="upload-files" type="file" multiple />
+        <div id="prompt-textarea" role="textbox" aria-label="Chat with ChatGPT" contenteditable="true"></div>
+        <div role="group" aria-label="report.pdf" class="group/file-tile">
+          <div>report.pdf</div>
+        </div>
+        <div data-testid="composer-image-preview">
+          <img alt="Uploaded image" src="blob:https://chatgpt.com/image-1" />
+        </div>
+      </form>
+    `;
+
+    expect(chatgptAdapter.composer?.getComposerAttachmentSnapshot?.([
+      {
+        id: 'a1',
+        name: 'report.pdf',
+        mime: 'application/pdf',
+        size: 3,
+        source: 'file-input',
+        file: new File(['abc'], 'report.pdf', { type: 'application/pdf' }),
+      },
+      {
+        id: 'a2',
+        name: 'photo.jpg',
+        mime: 'image/jpeg',
+        size: 3,
+        source: 'file-input',
+        file: new File(['def'], 'photo.jpg', { type: 'image/jpeg' }),
+      },
+    ])).toEqual({
+      count: 2,
+      items: [],
+    });
+  });
+
   it('counts ChatGPT provider-generated pasted text as one source attachment', () => {
     document.body.innerHTML = `
       <form data-type="unified-composer">

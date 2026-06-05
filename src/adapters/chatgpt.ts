@@ -126,6 +126,11 @@ function getExpectedAttachmentElements(
 }
 
 function getGenericAttachmentElementRoot(element: HTMLElement): HTMLElement {
+  const tagName = element.tagName.toLowerCase();
+  if (tagName === 'img') {
+    return element;
+  }
+
   return (
     element.closest<HTMLElement>(
       '[role="group"][aria-label], [class*="group/file-tile" i], [data-testid*="file-preview" i], [data-testid*="attachment" i], [data-testid*="image" i]',
@@ -176,6 +181,22 @@ function getGenericAttachmentElements(container: ParentNode): HTMLElement[] {
   return candidates.filter(
     (candidate) => !candidates.some((other) => other !== candidate && candidate.contains(other)),
   );
+}
+
+function getCurrentChatgptAttachmentElements(
+  container: ParentNode,
+  expectedAttachments: AttachmentRef[],
+): HTMLElement[] {
+  const expectedElements = getExpectedAttachmentElements(container, expectedAttachments);
+  const expectedSet = new Set(expectedElements);
+  const filenamelessGeneric = getGenericAttachmentElements(container).filter(
+    (element) =>
+      !exposesFilename(element) &&
+      !expectedSet.has(element) &&
+      !expectedElements.some((expected) => expected.contains(element) || element.contains(expected)),
+  );
+
+  return [...expectedElements, ...filenamelessGeneric];
 }
 
 function detectChatgptUploadErrorText(): string | null {
@@ -306,15 +327,7 @@ export const chatgptAdapter = createDomProviderAdapter({
     // only one set would leave the other uploaded file forever short of the delta
     // and time out. A NAMED tile that does not match an expected filename is a
     // different/stale draft, so it lands in neither set and is correctly excluded.
-    const expectedElements = getExpectedAttachmentElements(container, expectedAttachments);
-    const expectedSet = new Set(expectedElements);
-    const filenamelessGeneric = getGenericAttachmentElements(container).filter(
-      (element) =>
-        !exposesFilename(element) &&
-        !expectedSet.has(element) &&
-        !expectedElements.some((expected) => expected.contains(element) || element.contains(expected)),
-    );
-    const elements = [...expectedElements, ...filenamelessGeneric];
+    const elements = getCurrentChatgptAttachmentElements(container, expectedAttachments);
     const keys = Array.from(new Set(elements.map(getElementAccessibleText).filter(Boolean)));
 
     return {
@@ -324,12 +337,14 @@ export const chatgptAdapter = createDomProviderAdapter({
   },
   getComposerAttachmentSnapshot({ findComposer, findSendButton }, capturedAttachments) {
     const container = findChatgptComposerRoot(findComposer(), findSendButton());
-    const elements = getExpectedAttachmentElements(container, capturedAttachments);
+    const elements = getCurrentChatgptAttachmentElements(container, capturedAttachments);
 
     if (elements.length > 0) {
+      const hasFilenamelessElement = elements.some((element) => !exposesFilename(element));
+
       return {
         count: elements.length,
-        items: elements.map(getElementAccessibleText).filter(Boolean),
+        items: hasFilenamelessElement ? [] : elements.map(getElementAccessibleText).filter(Boolean),
       };
     }
 

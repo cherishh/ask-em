@@ -305,10 +305,30 @@ function findManusToolButton(container: ParentNode): HTMLElement | null {
     .find((element) => element.querySelector('svg.lucide-plus')) ?? null;
 }
 
+const MANUS_LOCAL_FILES_LABELS = new Set([
+  'add from local files',
+  '从本地文件添加',
+  'aus lokalen dateien hinzufügen',
+  'agregar desde archivos locales',
+  'ajouter depuis les fichiers locaux',
+  'aggiungi da file locali',
+  'adicionar de arquivos locais',
+  'adicionar a partir de ficheiros locais',
+  'thêm từ tệp cục bộ',
+  '从本机档案新增',
+  '從本機檔案新增',
+  'ローカルファイルから追加',
+  '로컬 파일에서 추가',
+  'أضف من الملفات المحلية',
+]);
+
 function findManusAddLocalFilesItem(): HTMLElement | null {
   const candidates = Array.from(document.querySelectorAll<HTMLElement>('button, [role="button"], [role="menuitem"], div, span'))
     .filter(isVisible)
-    .filter((element) => getElementAccessibleText(element).toLowerCase() === 'add from local files');
+    .filter((element) => {
+      const text = getElementAccessibleText(element).toLowerCase();
+      return MANUS_LOCAL_FILES_LABELS.has(text) || Boolean(element.querySelector('svg.lucide-paperclip'));
+    });
 
   const clickableCandidates = candidates
     .map((element) => element.closest<HTMLElement>('[role="menuitem"], button, [role="button"], [class*="cursor-pointer"]') ?? element)

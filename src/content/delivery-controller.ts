@@ -22,6 +22,15 @@ function getDeliveryWarningLabel(error: unknown): string {
   return reason.toLowerCase().includes('upload failed') ? 'upload failed' : 'Delivery failed';
 }
 
+function getDeliveryDiagnostic(error: unknown): string | null {
+  if (!(error instanceof Error)) {
+    return null;
+  }
+
+  const diagnostic = (error as Error & { askEmDiagnostic?: unknown }).askEmDiagnostic;
+  return typeof diagnostic === 'string' && diagnostic.trim() ? diagnostic : null;
+}
+
 async function waitForAttachmentPresence(
   composer: NonNullable<ProviderAdapter['composer']>,
   expectedAttachments: AttachmentRef[],
@@ -280,6 +289,16 @@ export function createDeliveryController(
         sendResponse({ ok: true, accepted: true, confirmed: true });
         void dependencies.reportPresence('HELLO');
       } catch (error) {
+        const diagnostic = getDeliveryDiagnostic(error);
+        if (diagnostic) {
+          await dependencies.logDebug({
+            level: 'warn',
+            message: 'Attachment delivery diagnostic',
+            detail: diagnostic,
+            workspaceId: message.workspaceId,
+          });
+        }
+
         await dependencies.logDebug({
           level: 'error',
           message: 'Content delivery failed',

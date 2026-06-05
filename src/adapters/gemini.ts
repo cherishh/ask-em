@@ -3,9 +3,13 @@ import { createDomProviderAdapter } from './factory';
 import { dispatchPasteFiles, readAttachmentFiles } from './attachment-delivery';
 import { PROVIDER_UPLOAD_CAPABILITIES, type AttachmentRef } from '../runtime/protocol';
 
-const GEMINI_ATTACHMENT_READY_TIMEOUT_MS = 30_000;
+const GEMINI_ATTACHMENT_READY_TIMEOUT_MS = 60_000;
 const GEMINI_ATTACHMENT_READY_POLL_MS = 250;
 const GEMINI_ATTACHMENT_READY_STABLE_MS = 5_000;
+
+type DiagnosticError = Error & {
+  askEmDiagnostic?: string;
+};
 
 export function isGeminiLoginRequiredPage(input: {
   pathname: string;
@@ -157,6 +161,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 }
 
+function createGeminiUploadFailedError(diagnostic: string): DiagnosticError {
+  const error = new Error('upload failed') as DiagnosticError;
+  error.askEmDiagnostic = diagnostic;
+  return error;
+}
+
 function isGeminiSendButtonEnabled(button: HTMLElement | null): boolean {
   if (!button || !isVisible(button)) {
     return false;
@@ -178,6 +188,24 @@ function isGeminiSendButtonEnabled(button: HTMLElement | null): boolean {
   );
 }
 
+function describeGeminiContainer(container: ParentNode): string {
+  if (container instanceof Document) {
+    return 'document';
+  }
+
+  if (!(container instanceof HTMLElement)) {
+    return 'unknown';
+  }
+
+  const id = container.id ? `#${container.id}` : '';
+  const className = typeof container.className === 'string'
+    ? container.className.trim().split(/\s+/).slice(0, 4).join('.')
+    : '';
+  const classes = className ? `.${className}` : '';
+
+  return `${container.tagName.toLowerCase()}${id}${classes}`;
+}
+
 async function waitForGeminiAttachmentOnlySubmitReady(
   context: {
     findComposer: () => HTMLElement | null;
@@ -189,16 +217,32 @@ async function waitForGeminiAttachmentOnlySubmitReady(
   const deadline = Date.now() + GEMINI_ATTACHMENT_READY_TIMEOUT_MS;
   const expectedCount = baselineCount + expectedAttachments.length;
   let readySince: number | null = null;
+  let lastDiagnostic = `expected=${expectedCount}; baseline=${baselineCount}; current=0`;
 
   while (Date.now() <= deadline) {
+    const composer = context.findComposer();
+    const sendButton = context.findSendButton();
+    const container = findGeminiComposerRoot(composer, sendButton);
+    const items = getGeminiAttachmentItems(container, expectedAttachments);
+    const sendReady = isGeminiSendButtonEnabled(sendButton);
+    lastDiagnostic = [
+      `expected=${expectedCount}`,
+      `baseline=${baselineCount}`,
+      `current=${items.length}`,
+      `sendReady=${sendReady}`,
+      `composer=${Boolean(composer)}`,
+      `sendButton=${Boolean(sendButton)}`,
+      `root=${describeGeminiContainer(container)}`,
+      `keys=${items.slice(0, 3).join(' | ')}`,
+      `url=${window.location.href.slice(0, 160)}`,
+    ].join('; ');
+
     const uploadError = detectGeminiUploadErrorText();
     if (uploadError) {
-      throw new Error(uploadError);
+      throw createGeminiUploadFailedError(`gemini upload error surfaced; ${lastDiagnostic}`);
     }
 
-    const container = findGeminiComposerRoot(context.findComposer(), context.findSendButton());
-    const items = getGeminiAttachmentItems(container, expectedAttachments);
-    const isReady = items.length >= expectedCount && isGeminiSendButtonEnabled(context.findSendButton());
+    const isReady = items.length >= expectedCount && sendReady;
     if (!isReady) {
       readySince = null;
     } else {
@@ -211,7 +255,7 @@ async function waitForGeminiAttachmentOnlySubmitReady(
     await sleep(GEMINI_ATTACHMENT_READY_POLL_MS);
   }
 
-  throw new Error('upload failed');
+  throw createGeminiUploadFailedError(`gemini attachment ready timeout; ${lastDiagnostic}`);
 }
 
 function detectGeminiUploadErrorText(): string | null {

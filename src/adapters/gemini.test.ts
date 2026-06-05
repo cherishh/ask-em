@@ -272,6 +272,64 @@ describe('Gemini attachment delivery adapter', () => {
     }
   });
 
+  it('waits past 30 seconds for slow existing-session Gemini attachment readiness', async () => {
+    vi.useFakeTimers({
+      toFake: ['Date', 'setTimeout', 'clearTimeout'],
+    });
+    try {
+      document.body.innerHTML = `
+        <div class="text-input-field">
+          <rich-textarea>
+            <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true"></div>
+          </rich-textarea>
+          <button aria-label="Send message"></button>
+        </div>
+      `;
+
+      const composer = document.querySelector<HTMLElement>('.ql-editor');
+      composer?.addEventListener('paste', () => {
+        window.setTimeout(() => {
+          document.querySelector('.text-input-field')?.insertAdjacentHTML('afterbegin', `
+            <uploader-file-preview class="file-preview-chip">
+              <div class="file-preview-container" aria-describedby="tooltip-file-1">
+                <gem-attachment class="gem-attachment gds-label-l gem-attachment-tile">
+                  <span class="gem-attachment-text">潜规则-中国古代官民互动</span>
+                </gem-attachment>
+              </div>
+            </uploader-file-preview>
+          `);
+          document.body.insertAdjacentHTML(
+            'beforeend',
+            '<div id="tooltip-file-1" role="tooltip">潜规则-中国古代官民互动.md</div>',
+          );
+        }, 35_000);
+      });
+
+      const delivery = geminiAdapter.composer?.setComposerPayload?.({
+        text: 'hello',
+        attachments: [
+          {
+            id: 'a1',
+            name: '潜规则-中国古代官民互动.md',
+            mime: 'text/markdown',
+            size: 3,
+          },
+        ],
+      });
+
+      await flushMicrotasks();
+      await vi.advanceTimersByTimeAsync(30_500);
+      expect(composer?.textContent).not.toContain('hello');
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      await delivery;
+
+      expect(composer?.textContent).toContain('hello');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('fails closed when Gemini reports upload failure before readiness', async () => {
     document.body.innerHTML = `
       <div class="text-input-field">
@@ -306,6 +364,53 @@ describe('Gemini attachment delivery adapter', () => {
       ],
     })).rejects.toThrow('upload failed');
     expect(composer?.textContent).not.toContain('hello');
+  });
+
+  it('attaches Gemini readiness diagnostics when upload wait times out', async () => {
+    vi.useFakeTimers({
+      toFake: ['Date', 'setTimeout', 'clearTimeout'],
+    });
+    try {
+      document.body.innerHTML = `
+        <div class="text-input-field">
+          <rich-textarea>
+            <div class="ql-editor textarea" role="textbox" aria-label="Enter a prompt for Gemini" contenteditable="true"></div>
+          </rich-textarea>
+          <button aria-label="Send message" disabled></button>
+        </div>
+      `;
+
+      const composer = document.querySelector<HTMLElement>('.ql-editor');
+      const delivery = geminiAdapter.composer?.setComposerPayload?.({
+        text: 'hello',
+        attachments: [
+          {
+            id: 'a1',
+            name: 'notes.md',
+            mime: 'text/markdown',
+            size: 3,
+          },
+        ],
+      });
+      const rejection = Promise.resolve(delivery).then(
+        () => null,
+        (error: Error & { askEmDiagnostic?: string }) => error,
+      );
+
+      await flushMicrotasks();
+      await vi.advanceTimersByTimeAsync(60_500);
+
+      await expect(rejection).resolves.toMatchObject({
+        message: 'upload failed',
+        askEmDiagnostic: expect.stringContaining('gemini attachment ready timeout'),
+      });
+      await expect(rejection).resolves.toMatchObject({
+        askEmDiagnostic: expect.stringContaining('sendReady=false'),
+      });
+      expect(composer?.textContent).not.toContain('hello');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reports attachment presence from Gemini file preview chips', async () => {
