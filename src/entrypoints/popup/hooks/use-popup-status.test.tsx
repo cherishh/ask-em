@@ -282,14 +282,14 @@ describe('usePopupStatus', () => {
     const hook = renderHookHarness(() => usePopupStatus());
     await flushMicrotasks();
 
-    expect(hook.current.enabledProviders).toEqual(['claude', 'chatgpt']);
+    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'deepseek', 'manus']);
     expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude', 'chatgpt']);
 
     await act(async () => {
       await hook.current.toggleDefaultFanOutProvider('chatgpt');
     });
 
-    expect(hook.current.enabledProviders).toEqual(['claude', 'chatgpt']);
+    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'deepseek', 'manus']);
     expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude']);
     expect(sendMessage).toHaveBeenCalledWith(
       { type: 'SET_DEFAULT_FAN_OUT_PROVIDERS', providers: ['claude'] },
@@ -341,62 +341,7 @@ describe('usePopupStatus', () => {
     hook.unmount();
   });
 
-  it('keeps default fan-out selection when changing enabled providers', async () => {
-    const initialStatus = {
-      type: 'STATUS_RESPONSE',
-      workspaces: [],
-      globalSyncEnabled: true,
-      autoSyncNewChatsEnabled: true,
-      defaultEnabledProviders: {
-        claude: true,
-        chatgpt: true,
-        gemini: true,
-        deepseek: false,
-        manus: false,
-      },
-      defaultFanOutProviders: ['claude', 'chatgpt'],
-      shortcuts: undefined,
-      debugLoggingEnabled: true,
-      showDiagnostics: false,
-      closeTabsOnDeleteSet: false,
-      workspaceLimit: 3,
-      recentLogs: [],
-    };
-    popupRuntimeMocks.requestStatus
-      .mockResolvedValueOnce(initialStatus)
-      .mockResolvedValueOnce({
-        ...initialStatus,
-        defaultEnabledProviders: {
-          ...initialStatus.defaultEnabledProviders,
-          gemini: false,
-        },
-      });
-
-    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
-    vi.stubGlobal('chrome', {
-      runtime: {
-        sendMessage,
-      },
-    });
-
-    const hook = renderHookHarness(() => usePopupStatus());
-    await flushMicrotasks();
-
-    await act(async () => {
-      await hook.current.toggleEnabledProvider('gemini');
-      await flushMicrotasks();
-    });
-
-    expect(hook.current.enabledProviders).toEqual(['claude', 'chatgpt']);
-    expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude', 'chatgpt']);
-    expect(sendMessage).toHaveBeenCalledWith({
-      type: 'SET_DEFAULT_ENABLED_PROVIDERS',
-      providers: ['claude', 'chatgpt'],
-    });
-    hook.unmount();
-  });
-
-  it('selects a newly enabled provider for default fan-out', async () => {
+  it('selects a provider outside the fallback defaults for default fan-out', async () => {
     const initialStatus = {
       type: 'STATUS_RESPONSE',
       workspaces: [],
@@ -421,11 +366,7 @@ describe('usePopupStatus', () => {
       .mockResolvedValueOnce(initialStatus)
       .mockResolvedValueOnce({
         ...initialStatus,
-        defaultEnabledProviders: {
-          ...initialStatus.defaultEnabledProviders,
-          gemini: true,
-        },
-        defaultFanOutProviders: ['claude', 'gemini'],
+        defaultFanOutProviders: ['claude', 'deepseek'],
       });
 
     const sendMessage = vi.fn().mockResolvedValue({ ok: true });
@@ -439,15 +380,15 @@ describe('usePopupStatus', () => {
     await flushMicrotasks();
 
     await act(async () => {
-      await hook.current.toggleEnabledProvider('gemini');
+      await hook.current.toggleDefaultFanOutProvider('deepseek');
       await flushMicrotasks();
     });
 
-    expect(hook.current.enabledProviders).toEqual(['claude', 'chatgpt', 'gemini']);
-    expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude', 'gemini']);
+    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'deepseek', 'manus']);
+    expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude', 'deepseek']);
     expect(sendMessage).toHaveBeenCalledWith({
-      type: 'SET_DEFAULT_ENABLED_PROVIDERS',
-      providers: ['claude', 'chatgpt', 'gemini'],
+      type: 'SET_DEFAULT_FAN_OUT_PROVIDERS',
+      providers: ['claude', 'deepseek'],
     });
     hook.unmount();
   });

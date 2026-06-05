@@ -9,8 +9,8 @@ export function HomeView(props: {
   atLimit: boolean;
   workspaceCount: number;
   workspaces: WorkspaceSummary[];
-  enabledProviders: Provider[];
-  defaultFanOutProviders: Provider[];
+  providerOptions: Provider[];
+  selectedProviders: Provider[];
   version: string;
   globalSyncEnabled: boolean;
   loading: boolean;
@@ -51,8 +51,8 @@ export function HomeView(props: {
           ))
         ) : (
           <OnboardingCard
-            providers={props.enabledProviders}
-            enabledProviders={props.defaultFanOutProviders}
+            providers={props.providerOptions}
+            selectedProviders={props.selectedProviders}
             loading={props.loading}
             onToggleProvider={props.onToggleDefaultFanOutProvider}
           />

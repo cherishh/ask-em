@@ -52,9 +52,14 @@ export function getDefaultEnabledProviderList(state: LocalState, sourceProvider?
 
 export function getDefaultFanOutSelectedProviderList(state: LocalState): Provider[] {
   const defaultProviders = getDefaultEnabledProviderList(state);
-  return state.defaultFanOutProviders
-    ? state.defaultFanOutProviders.filter((provider) => defaultProviders.includes(provider))
-    : defaultProviders;
+  if (!state.defaultFanOutProviders) {
+    return defaultProviders;
+  }
+
+  const selectedProviders = ALL_PROVIDERS.filter((provider) =>
+    state.defaultFanOutProviders?.includes(provider),
+  );
+  return selectedProviders.length > 0 ? selectedProviders : defaultProviders;
 }
 
 export function getDefaultFanOutTargetProviderList(

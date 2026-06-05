@@ -341,15 +341,15 @@ describe('workspace state', () => {
     expect(getDefaultEnabledProviderList(state, 'gemini')).toEqual(['gemini', 'chatgpt', 'deepseek']);
   });
 
-  it('builds default fan-out providers as a subset of default enabled providers', () => {
+  it('builds explicit default fan-out providers across all supported providers', () => {
     const state: LocalState = {
       ...createEmptyState(),
       defaultEnabledProviders: createDefaultEnabledProviders(['claude', 'chatgpt', 'deepseek']),
       defaultFanOutProviders: ['chatgpt', 'manus'],
     };
 
-    expect(getDefaultFanOutEnabledProviderList(state, 'gemini')).toEqual(['gemini', 'chatgpt']);
-    expect(getDefaultFanOutTargetProviderList(state, 'gemini')).toEqual(['chatgpt']);
+    expect(getDefaultFanOutEnabledProviderList(state, 'gemini')).toEqual(['gemini', 'chatgpt', 'manus']);
+    expect(getDefaultFanOutTargetProviderList(state, 'gemini')).toEqual(['chatgpt', 'manus']);
   });
 
   it('does not build a source-only default fan-out provider list', () => {

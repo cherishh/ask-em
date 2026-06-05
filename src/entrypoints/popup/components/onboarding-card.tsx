@@ -2,12 +2,12 @@ import type { Provider } from '../../../runtime/protocol';
 
 export function OnboardingCard({
   providers,
-  enabledProviders,
+  selectedProviders,
   loading,
   onToggleProvider,
 }: {
   providers: Provider[];
-  enabledProviders: Provider[];
+  selectedProviders: Provider[];
   loading: boolean;
   onToggleProvider: (provider: Provider) => void;
 }) {
@@ -38,8 +38,8 @@ export function OnboardingCard({
         <div className="askem-onboarding-providers">
           {providers.length > 0 ? (
             providers.map((provider) => {
-              const active = enabledProviders.includes(provider);
-              const locked = active && enabledProviders.length <= 1;
+              const active = selectedProviders.includes(provider);
+              const locked = active && selectedProviders.length <= 1;
 
               return (
                 <button

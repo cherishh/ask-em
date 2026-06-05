@@ -31,13 +31,12 @@ export default function App() {
     status,
     loading,
     busyKey,
-    enabledProviders,
+    providerOptions,
     defaultFanOutSelectedProviders,
     resolvedShortcuts,
     refresh,
     clearWorkspace,
     clearProvider,
-    toggleEnabledProvider,
     toggleDefaultFanOutProvider,
     toggleGlobalSync,
     togglePauseAfterFirstFanOut,
@@ -166,8 +165,8 @@ export default function App() {
             atLimit={atLimit}
             workspaceCount={workspaceCount}
             workspaces={status?.workspaces ?? []}
-            enabledProviders={enabledProviders}
-            defaultFanOutProviders={defaultFanOutSelectedProviders}
+            providerOptions={providerOptions}
+            selectedProviders={defaultFanOutSelectedProviders}
             version={popupVersion}
             globalSyncEnabled={globalSyncEnabled}
             loading={loading}
@@ -181,13 +180,14 @@ export default function App() {
           <AdvancedView
             status={status}
             loading={loading}
-            enabledProviders={enabledProviders}
+            providerOptions={providerOptions}
+            selectedProviders={defaultFanOutSelectedProviders}
             resolvedShortcuts={resolvedShortcuts}
             recordingShortcutId={recordingShortcutId}
             logActionBusy={logActionBusy}
             showDiagnostics={status?.showDiagnostics ?? DEFAULT_SHOW_DIAGNOSTICS}
             onOpenRequestModal={openRequestModal}
-            onToggleEnabledProvider={(provider) => void toggleEnabledProvider(provider)}
+            onToggleProvider={(provider) => void toggleDefaultFanOutProvider(provider)}
             onTogglePauseAfterFirstFanOut={() => void togglePauseAfterFirstFanOut()}
             onToggleCloseTabsOnDeleteSet={() => void toggleCloseTabsOnDeleteSet()}
             onResetIndicatorPositions={() => void resetIndicatorPositions()}

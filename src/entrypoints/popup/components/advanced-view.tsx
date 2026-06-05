@@ -7,7 +7,7 @@ import type {
   ShortcutId,
   StatusResponseMessage,
 } from '../../../runtime/protocol';
-import { ALL_PROVIDERS, DEFAULT_SHORTCUTS } from '../../../runtime/protocol';
+import { DEFAULT_SHORTCUTS } from '../../../runtime/protocol';
 import { ShortcutRecorder } from './shortcut-recorder';
 
 const SHORTCUT_ROWS = [
@@ -45,13 +45,14 @@ function LogRow({ log }: { log: DebugLogEntry }) {
 export function AdvancedView(props: {
   status: StatusResponseMessage | null;
   loading: boolean;
-  enabledProviders: Provider[];
+  providerOptions: Provider[];
+  selectedProviders: Provider[];
   resolvedShortcuts: ShortcutConfig;
   recordingShortcutId: ShortcutId | null;
   logActionBusy: boolean;
   showDiagnostics: boolean;
   onOpenRequestModal: () => void;
-  onToggleEnabledProvider: (provider: Provider) => void;
+  onToggleProvider: (provider: Provider) => void;
   onTogglePauseAfterFirstFanOut: () => void;
   onToggleCloseTabsOnDeleteSet: () => void;
   onResetIndicatorPositions: () => void;
@@ -64,11 +65,11 @@ export function AdvancedView(props: {
   onOpenTerms: () => void;
   onOpenPrivacy: () => void;
 }) {
-  const [enabledProvidersExpanded, setEnabledProvidersExpanded] = useState(false);
-  const hasProviderOverflow = ALL_PROVIDERS.length > ENABLED_PROVIDER_COLLAPSED_LIMIT;
-  const visibleProviderOptions = enabledProvidersExpanded
-    ? ALL_PROVIDERS
-    : ALL_PROVIDERS.slice(0, ENABLED_PROVIDER_COLLAPSED_LIMIT);
+  const [providerOptionsExpanded, setProviderOptionsExpanded] = useState(false);
+  const hasProviderOverflow = props.providerOptions.length > ENABLED_PROVIDER_COLLAPSED_LIMIT;
+  const visibleProviderOptions = providerOptionsExpanded
+    ? props.providerOptions
+    : props.providerOptions.slice(0, ENABLED_PROVIDER_COLLAPSED_LIMIT);
 
   return (
     <>
@@ -84,31 +85,31 @@ export function AdvancedView(props: {
         <div className="askem-us-group">
           <div className="askem-us-row-header askem-ep-header">
             <div>
-              <span className="askem-us-row-title">Enabled providers</span>
-              <span className="askem-us-row-sub">Choose which providers can join new sets.</span>
+              <span className="askem-us-row-title">Default providers</span>
+              <span className="askem-us-row-sub">Choose which providers new sets sync to.</span>
             </div>
             <div className="askem-ep-header-actions">
-              <span className="askem-ep-count">{props.enabledProviders.length} shown</span>
+              <span className="askem-ep-count">{props.selectedProviders.length} selected</span>
               <button className="askem-request-link" onClick={props.onOpenRequestModal} type="button">
                 + more
               </button>
             </div>
           </div>
-          <div className={`askem-ep-list ${enabledProvidersExpanded ? 'is-expanded' : ''}`}>
+          <div className={`askem-ep-list ${providerOptionsExpanded ? 'is-expanded' : ''}`}>
             {visibleProviderOptions.map((provider) => {
-              const active = props.enabledProviders.includes(provider);
-              const locked = active && props.enabledProviders.length <= 1;
+              const active = props.selectedProviders.includes(provider);
+              const locked = active && props.selectedProviders.length <= 1;
               return (
                 <button
                   key={provider}
                   className={`askem-ep-row ${active ? 'is-active' : ''}`}
-                  onClick={() => props.onToggleEnabledProvider(provider)}
+                  onClick={() => props.onToggleProvider(provider)}
                   disabled={props.loading || locked}
                   aria-pressed={active}
                   aria-label={
                     locked
-                      ? `Keep ${provider} visible on Home`
-                      : `${active ? 'Hide' : 'Show'} ${provider} on Home`
+                      ? `Keep ${provider} selected for new sets`
+                      : `${active ? 'Remove' : 'Add'} ${provider} from new set defaults`
                   }
                   type="button"
                 >
@@ -116,7 +117,7 @@ export function AdvancedView(props: {
                   <span className="askem-ep-copy">
                     <span className="askem-ep-name">{provider}</span>
                     <span className="askem-ep-state">
-                      {active ? 'Shown on Home' : 'Hidden from Home'}
+                      {active ? 'Used in new sets' : 'Off by default'}
                     </span>
                   </span>
                 </button>
@@ -127,9 +128,9 @@ export function AdvancedView(props: {
             <button
               type="button"
               className="askem-ep-expand"
-              onClick={() => setEnabledProvidersExpanded((expanded) => !expanded)}
+              onClick={() => setProviderOptionsExpanded((expanded) => !expanded)}
             >
-              {enabledProvidersExpanded ? 'Show fewer' : `Show ${ALL_PROVIDERS.length - ENABLED_PROVIDER_COLLAPSED_LIMIT} more`}
+              {providerOptionsExpanded ? 'Show fewer' : `Show ${props.providerOptions.length - ENABLED_PROVIDER_COLLAPSED_LIMIT} more`}
             </button>
           ) : null}
         </div>

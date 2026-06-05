@@ -38,4 +38,22 @@ describe('settings handlers', () => {
       defaultFanOutProviders: ['claude', 'gemini'],
     }));
   });
+
+  it('stores default fan-out providers outside the legacy enabled-provider fallback', async () => {
+    storageMocks.getLocalState.mockResolvedValue(makeLocalState({
+      defaultEnabledProviders: createDefaultEnabledProviders(['claude', 'chatgpt']),
+      defaultFanOutProviders: null,
+    }));
+
+    const { handleSetDefaultFanOutProviders } = await import('./settings');
+    const result = await handleSetDefaultFanOutProviders({
+      type: 'SET_DEFAULT_FAN_OUT_PROVIDERS',
+      providers: ['claude', 'deepseek'],
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(storageMocks.setLocalState).toHaveBeenCalledWith(expect.objectContaining({
+      defaultFanOutProviders: ['claude', 'deepseek'],
+    }));
+  });
 });

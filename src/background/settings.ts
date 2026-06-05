@@ -155,9 +155,8 @@ export async function handleSetDefaultFanOutProviders(
   message: Extract<RuntimeMessage, { type: 'SET_DEFAULT_FAN_OUT_PROVIDERS' }>,
 ) {
   const localState = await getLocalState();
-  const enabledProviders = toEnabledProviderList(localState.defaultEnabledProviders);
   const providers = message.providers
-    ? message.providers.filter((provider) => enabledProviders.includes(provider))
+    ? ALL_PROVIDERS.filter((provider) => message.providers?.includes(provider))
     : null;
 
   if (message.providers && providers?.length === 0) {

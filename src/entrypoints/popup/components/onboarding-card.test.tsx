@@ -25,14 +25,14 @@ describe('OnboardingCard', () => {
 
   function renderCard(
     providers: Provider[],
-    enabledProviders: Provider[],
+    selectedProviders: Provider[],
     onToggleProvider = vi.fn(),
   ) {
     act(() => {
       root.render(
         <OnboardingCard
           providers={providers}
-          enabledProviders={enabledProviders}
+          selectedProviders={selectedProviders}
           loading={false}
           onToggleProvider={onToggleProvider}
         />,
@@ -42,7 +42,7 @@ describe('OnboardingCard', () => {
     return onToggleProvider;
   }
 
-  it('renders only default-enabled providers with default fan-out state', () => {
+  it('renders provider options with default fan-out state', () => {
     renderCard(['claude', 'chatgpt', 'gemini'], ['claude', 'chatgpt']);
 
     const buttons = Array.from(
