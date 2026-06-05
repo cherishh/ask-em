@@ -22,11 +22,38 @@ function mockVisibleLayout() {
     }));
 }
 
-function renderManusComposer() {
+function rectFromAttribute(element: HTMLElement) {
+  const value = element.getAttribute('data-rect');
+  const [x, y, width, height] = value
+    ? value.split(',').map((part) => Number(part.trim()))
+    : [0, 0, 160, 36];
+
+  return {
+    width,
+    height,
+    top: y,
+    left: x,
+    right: x + width,
+    bottom: y + height,
+    x,
+    y,
+    toJSON() {
+      return {};
+    },
+  };
+}
+
+function mockManusComposerLayout(rectSpy: ReturnType<typeof vi.spyOn>) {
+  rectSpy.mockImplementation(function (this: HTMLElement) {
+    return rectFromAttribute(this);
+  });
+}
+
+function renderManusComposer(input?: { newTaskText?: string }) {
   document.body.innerHTML = `
     <button id="new-task" type="button">
       <svg class="lucide lucide-square-pen"></svg>
-      New task
+      ${input?.newTaskText ?? 'New task'}
     </button>
     <div class="flex flex-col gap-3 rounded-[22px] relative bg-[var(--background-menu-white)]">
       <div id="attachments"></div>
@@ -226,6 +253,31 @@ describe('Manus attachment delivery adapter', () => {
     expect(document.querySelectorAll('[class*="group/attach"]')).toHaveLength(0);
   });
 
+  it('prepares a clean new-chat delivery surface from the localized Manus new-task button', async () => {
+    renderManusComposer({ newTaskText: 'Nueva tarea' });
+    document.querySelector('.tiptap')!.textContent = 'restored draft';
+    document.getElementById('attachments')?.insertAdjacentHTML('beforeend', `
+      <div class="group/attach">persisted.pdf PDF · 3 B</div>
+    `);
+
+    await manusAdapter.composer?.prepareForDelivery?.({
+      text: 'hello',
+      attachments: [
+        {
+          id: 'a1',
+          name: 'sample.pdf',
+          mime: 'application/pdf',
+          size: 3,
+        },
+      ],
+      expectedSessionId: null,
+      expectedUrl: null,
+    });
+
+    expect(document.querySelector('.tiptap')?.textContent).toBe('restored draft');
+    expect(document.querySelectorAll('[class*="group/attach"]')).toHaveLength(0);
+  });
+
   it('does not leave an existing Manus session when the delivery surface is dirty', async () => {
     renderManusComposer();
     document.getElementById('attachments')?.insertAdjacentHTML('beforeend', `
@@ -383,6 +435,33 @@ describe('Manus attachment delivery adapter', () => {
   it('clicks the current Manus send button style', async () => {
     renderManusComposer();
     const send = document.getElementById('send') as HTMLButtonElement;
+    let clicked = false;
+    send.addEventListener('click', () => {
+      clicked = true;
+    });
+
+    await manusAdapter.composer?.submit({ timeoutMs: 250 });
+
+    expect(clicked).toBe(true);
+  });
+
+  it('clicks the rightmost Manus composer control when send styling is not present', async () => {
+    mockManusComposerLayout(rectSpy);
+    document.body.innerHTML = `
+      <div class="flex flex-col gap-3 rounded-[22px]" data-rect="606,327,768,128">
+        <div class="tiptap ProseMirror" contenteditable="true" data-rect="623,341,742,24">hola</div>
+        <button type="button" data-rect="619,410,32,32">
+          <svg class="lucide lucide-plus"></svg>
+        </button>
+        <button type="button" data-rect="659,410,91,32">+2</button>
+        <button type="button" data-rect="758,410,237,32">Computadoras en la nube</button>
+        <div data-rect="1289,410,32,32">
+          <svg class="lucide lucide-mic"></svg>
+        </div>
+        <button id="localized-send" type="button" class="inline-flex rounded-full" data-rect="1329,410,32,32"></button>
+      </div>
+    `;
+    const send = document.getElementById('localized-send') as HTMLButtonElement;
     let clicked = false;
     send.addEventListener('click', () => {
       clicked = true;

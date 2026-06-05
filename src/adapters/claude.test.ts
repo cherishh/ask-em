@@ -22,6 +22,33 @@ function mockVisibleLayout() {
     }));
 }
 
+function rectFromAttribute(element: HTMLElement) {
+  const value = element.getAttribute('data-rect');
+  const [x, y, width, height] = value
+    ? value.split(',').map((part) => Number(part.trim()))
+    : [0, 0, 160, 36];
+
+  return {
+    width,
+    height,
+    top: y,
+    left: x,
+    right: x + width,
+    bottom: y + height,
+    x,
+    y,
+    toJSON() {
+      return {};
+    },
+  };
+}
+
+function mockClaudeComposerLayout(rectSpy: ReturnType<typeof vi.spyOn>) {
+  rectSpy.mockImplementation(function (this: HTMLElement) {
+    return rectFromAttribute(this);
+  });
+}
+
 describe('Claude attachment delivery adapter', () => {
   let rectSpy: ReturnType<typeof vi.spyOn>;
   let uninstallFileInputDeliveryBridge: () => void;
@@ -476,5 +503,55 @@ describe('Claude attachment delivery adapter', () => {
     await claudeAdapter.composer?.submit({ timeoutMs: 250 });
 
     expect(clicked).toBe(true);
+  });
+
+  it('clicks localized Claude send buttons from the composer control row', async () => {
+    mockClaudeComposerLayout(rectSpy);
+    document.body.innerHTML = `
+      <fieldset data-rect="648,335,672,122">
+        <input data-testid="file-upload" aria-label="Subir archivos" type="file" />
+        <div data-testid="chat-input" contenteditable="true" data-rect="669,356,638,22">hola</div>
+        <button type="button" aria-label="Agregar archivos" data-rect="665,410,32,32"></button>
+        <button type="button" data-testid="model-selector-dropdown" data-rect="1057,410,170,32"></button>
+        <button type="button" aria-label="Configuracion" data-rect="1235,410,32,32"></button>
+        <button type="button" aria-label="Mantener para grabar" data-rect="1235,410,32,32"></button>
+        <button type="button" aria-label="Enviar mensaje" data-rect="1286,421,10,10"></button>
+      </fieldset>
+    `;
+    const button = document.querySelector<HTMLButtonElement>('button[aria-label="Enviar mensaje"]');
+    let clicked = false;
+    button?.addEventListener('click', () => {
+      clicked = true;
+    });
+
+    await claudeAdapter.composer?.submit({ timeoutMs: 250 });
+
+    expect(clicked).toBe(true);
+  });
+
+  it('captures localized Claude send button clicks from the composer control row', () => {
+    mockClaudeComposerLayout(rectSpy);
+    document.body.innerHTML = `
+      <fieldset data-rect="648,335,672,122">
+        <input data-testid="file-upload" aria-label="Subir archivos" type="file" />
+        <div data-testid="chat-input" contenteditable="true" data-rect="669,356,638,22">hola</div>
+        <button type="button" aria-label="Agregar archivos" data-rect="665,410,32,32"></button>
+        <button type="button" data-testid="model-selector-dropdown" data-rect="1057,410,170,32"></button>
+        <button type="button" aria-label="Configuracion" data-rect="1235,410,32,32"></button>
+        <button type="button" aria-label="Mantener para grabar" data-rect="1235,410,32,32"></button>
+        <button type="button" aria-label="Enviar mensaje" data-rect="1286,421,10,10"></button>
+      </fieldset>
+    `;
+    const onSubmit = vi.fn();
+    const unsubscribe = claudeAdapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+
+    document.querySelector<HTMLButtonElement>('button[aria-label="Enviar mensaje"]')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'hola',
+    }));
+    unsubscribe?.();
   });
 });

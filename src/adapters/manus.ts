@@ -65,6 +65,76 @@ function findManusComposerRoot(composer: HTMLElement | null): ParentNode {
   );
 }
 
+function hasManusSubmittableContent(
+  composer: HTMLElement | null,
+  container: ParentNode,
+): boolean {
+  if (normalizeWhitespace(composer?.innerText || composer?.textContent || '').length > 0) {
+    return true;
+  }
+
+  return getManusAttachmentPresence(container).count > 0;
+}
+
+function isManusSendButtonStyle(button: HTMLElement): boolean {
+  const className = typeof button.className === 'string' ? button.className : '';
+  return (
+    className.includes('Button-primary-black') ||
+    className.includes('bg-[var(--Button-primary-black)]') ||
+    className.includes('bg-[var(--Button-black)]')
+  );
+}
+
+function isManusSubmitCandidateButton(button: HTMLElement): boolean {
+  if (!isVisible(button) || button.hasAttribute('disabled') || button.getAttribute('aria-disabled') === 'true') {
+    return false;
+  }
+
+  if (button.closest("[id^='ask-em-'], .ask-em-sync-shell")) {
+    return false;
+  }
+
+  const rect = button.getBoundingClientRect();
+  return rect.width <= 72 && rect.height <= 72;
+}
+
+function findManusSendButtonByComposerLayout(
+  composer: HTMLElement | null,
+  container: ParentNode,
+): HTMLElement | null {
+  if (
+    !composer ||
+    !(container instanceof Element || container instanceof Document) ||
+    !hasManusSubmittableContent(composer, container)
+  ) {
+    return null;
+  }
+
+  const composerRect = composer.getBoundingClientRect();
+  const containerRect = container instanceof Element ? container.getBoundingClientRect() : null;
+  const buttons = Array.from(container.querySelectorAll<HTMLElement>('button'))
+    .filter(isManusSubmitCandidateButton)
+    .filter((button) => {
+      const rect = button.getBoundingClientRect();
+      if (rect.top < composerRect.bottom - 12) {
+        return false;
+      }
+
+      if (containerRect && (rect.left < containerRect.left - 4 || rect.right > containerRect.right + 4)) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((left, right) => {
+      const leftRect = left.getBoundingClientRect();
+      const rightRect = right.getBoundingClientRect();
+      return rightRect.right - leftRect.right || rightRect.left - leftRect.left;
+    });
+
+  return buttons[0] ?? null;
+}
+
 function getElementAccessibleText(element: HTMLElement): string {
   return normalizeWhitespace(
     [
@@ -181,10 +251,7 @@ function dismissManusUploadLimitDialog(): boolean {
 function findManusNewTaskButton(): HTMLElement | null {
   return Array.from(document.querySelectorAll<HTMLElement>('button, [role="button"], [class*="clickable"]'))
     .filter(isVisible)
-    .find((element) =>
-      getElementAccessibleText(element).toLowerCase() === 'new task' &&
-      Boolean(element.querySelector('svg.lucide-square-pen')),
-    ) ?? null;
+    .find((element) => Boolean(element.querySelector('svg.lucide-square-pen'))) ?? null;
 }
 
 async function prepareManusBlankDeliverySurface(input: {
@@ -342,20 +409,11 @@ export const manusAdapter = createDomProviderAdapter({
       return null;
     }
 
-    const buttons = Array.from(container.querySelectorAll<HTMLElement>('button')).filter((button) => {
-      if (!isVisible(button)) {
-        return false;
-      }
+    const buttons = Array.from(container.querySelectorAll<HTMLElement>('button'))
+      .filter(isVisible)
+      .filter(isManusSendButtonStyle);
 
-      const className = typeof button.className === 'string' ? button.className : '';
-      return (
-        className.includes('Button-primary-black') ||
-        className.includes('bg-[var(--Button-primary-black)]') ||
-        className.includes('bg-[var(--Button-black)]')
-      );
-    });
-
-    return buttons.at(-1) ?? null;
+    return buttons.at(-1) ?? findManusSendButtonByComposerLayout(composer, container);
   },
   errorKeywords: ['something went wrong', 'failed to load', 'try again'],
   async prepareForDelivery(payload, context) {

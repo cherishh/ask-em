@@ -112,6 +112,74 @@ function findClaudeComposerRoot(composer: HTMLElement | null): ParentNode {
   return sendButtonRoot ?? composer?.closest('form') ?? composer?.parentElement?.parentElement ?? document;
 }
 
+function hasClaudeSubmittableContent(
+  composer: HTMLElement | null,
+  container: ParentNode,
+): boolean {
+  if (normalizeWhitespace(composer?.innerText || composer?.textContent || '').length > 0) {
+    return true;
+  }
+
+  return (
+    (container instanceof Element || container instanceof Document) &&
+    container.querySelector('[data-testid="file-thumbnail"]') !== null
+  );
+}
+
+function isClaudeSubmitCandidateButton(button: HTMLElement): boolean {
+  if (!isVisible(button) || button.hasAttribute('disabled') || button.getAttribute('aria-disabled') === 'true') {
+    return false;
+  }
+
+  if (button.closest("[id^='ask-em-'], .ask-em-sync-shell")) {
+    return false;
+  }
+
+  if (button.getAttribute('data-testid') === 'model-selector-dropdown') {
+    return false;
+  }
+
+  const rect = button.getBoundingClientRect();
+  return rect.width <= 72 && rect.height <= 72;
+}
+
+function findClaudeSendButtonByComposerLayout(
+  composer: HTMLElement | null,
+  container: ParentNode,
+): HTMLElement | null {
+  if (
+    !composer ||
+    !(container instanceof Element || container instanceof Document) ||
+    !hasClaudeSubmittableContent(composer, container)
+  ) {
+    return null;
+  }
+
+  const composerRect = composer.getBoundingClientRect();
+  const containerRect = container instanceof Element ? container.getBoundingClientRect() : null;
+  const buttons = Array.from(container.querySelectorAll<HTMLElement>('button'))
+    .filter(isClaudeSubmitCandidateButton)
+    .filter((button) => {
+      const rect = button.getBoundingClientRect();
+      if (rect.top < composerRect.bottom - 12) {
+        return false;
+      }
+
+      if (containerRect && (rect.left < containerRect.left - 4 || rect.right > containerRect.right + 4)) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((left, right) => {
+      const leftRect = left.getBoundingClientRect();
+      const rightRect = right.getBoundingClientRect();
+      return rightRect.right - leftRect.right || rightRect.left - leftRect.left;
+    });
+
+  return buttons[0] ?? null;
+}
+
 function getElementAccessibleText(element: HTMLElement): string {
   return normalizeWhitespace(
     [
@@ -222,7 +290,7 @@ function findClaudeSendButton(findComposer: () => HTMLElement | null): HTMLEleme
     }
   }
 
-  return null;
+  return findClaudeSendButtonByComposerLayout(composer, container);
 }
 
 function getClaudeFileThumbnailItems(container: ParentNode): string[] {

@@ -3,6 +3,10 @@
 
 
 - 隐身模式不fanout
+- 多语言稳定性
+- feedback feature request 也让主动填，只保留more provider 并可写
+- bug report 增加浏览器语言
+- 更好的error 检测（现在靠文案关键字扫描+简单策略）
 - 用户可能直接从已有的session 开始；
 - 用户可能开了很多tab，所以意识不到插件开了tab；
 - 部分provider 没有登录，发送follow up question 时不停开新的未登录tab；
