@@ -56,11 +56,13 @@ export default function App() {
   const {
     requestModalOpen,
     requestedProviders,
+    otherProviderText,
     requestSubmitting,
     requestSubmitted,
     requestEndpointNotConfigured,
     requestCooldownUntil,
     toggleRequestedProvider,
+    setOtherProviderText,
     openRequestModal,
     closeRequestModal,
     submitRequestModal,
@@ -208,11 +210,13 @@ export default function App() {
       <RequestProvidersModal
         open={requestModalOpen}
         requestedProviders={requestedProviders}
+        otherProviderText={otherProviderText}
         requestSubmitting={requestSubmitting}
         requestSubmitted={requestSubmitted}
         requestEndpointNotConfigured={requestEndpointNotConfigured}
         requestCooldownUntil={requestCooldownUntil}
         onToggleProvider={toggleRequestedProvider}
+        onOtherProviderTextChange={setOtherProviderText}
         onClose={closeRequestModal}
         onSubmit={() => void submitRequestModal()}
       />

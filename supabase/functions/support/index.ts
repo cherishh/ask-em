@@ -134,9 +134,9 @@ function normalizeProviderList(value: unknown): string[] {
       value
         .filter((provider): provider is string => typeof provider === 'string')
         .map((provider) => provider.trim())
-        .filter((provider) => ALLOWED_PROVIDER_REQUESTS.has(provider)),
+        .filter((provider) => ALLOWED_PROVIDER_REQUESTS.has(provider) || /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,79}$/u.test(provider)),
     ),
-  ).slice(0, ALLOWED_PROVIDER_REQUESTS.size);
+  ).slice(0, ALLOWED_PROVIDER_REQUESTS.size + 1);
 }
 
 function normalizeLogs(value: unknown) {

@@ -35,6 +35,17 @@ export function formatCooldownRemaining(cooldownUntil: number): string {
   return `in ${remainingDays} days`;
 }
 
+function normalizeOtherProvider(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').slice(0, 80);
+}
+
+function createProviderRequestList(requestedProviders: string[], otherProviderText: string): string[] {
+  const otherProvider = normalizeOtherProvider(otherProviderText);
+  const providers = otherProvider ? [...requestedProviders, otherProvider] : requestedProviders;
+
+  return Array.from(new Set(providers));
+}
+
 async function submitMoreProviderRequest(
   requestedProviders: string[],
 ): Promise<'submitted' | 'not-configured'> {
@@ -65,6 +76,7 @@ async function submitMoreProviderRequest(
 export function useProviderRequest() {
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [requestedProviders, setRequestedProviders] = useState<string[]>([]);
+  const [otherProviderText, setOtherProviderText] = useState('');
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [requestSubmitted, setRequestSubmitted] = useState(false);
   const [requestEndpointNotConfigured, setRequestEndpointNotConfigured] = useState(false);
@@ -80,6 +92,7 @@ export function useProviderRequest() {
 
   const openRequestModal = useCallback(() => {
     setRequestedProviders([]);
+    setOtherProviderText('');
     setRequestSubmitted(false);
     setRequestEndpointNotConfigured(false);
     setRequestCooldownUntil(getMoreProvidersCooldownUntil());
@@ -95,14 +108,16 @@ export function useProviderRequest() {
   }, [requestSubmitting]);
 
   const submitRequestModal = useCallback(async () => {
-    if (requestSubmitting || requestedProviders.length === 0 || requestCooldownUntil) {
+    const providerRequestList = createProviderRequestList(requestedProviders, otherProviderText);
+
+    if (requestSubmitting || providerRequestList.length === 0 || requestCooldownUntil) {
       return;
     }
 
     setRequestSubmitting(true);
 
     try {
-      const status = await submitMoreProviderRequest(requestedProviders);
+      const status = await submitMoreProviderRequest(providerRequestList);
       if (status === 'not-configured') {
         setRequestEndpointNotConfigured(true);
         return;
@@ -116,7 +131,7 @@ export function useProviderRequest() {
     } finally {
       setRequestSubmitting(false);
     }
-  }, [requestCooldownUntil, requestSubmitting, requestedProviders]);
+  }, [otherProviderText, requestCooldownUntil, requestSubmitting, requestedProviders]);
 
   const resetRequestCooldownForDev = useCallback(() => {
     window.localStorage.removeItem(MORE_PROVIDERS_REQUEST_STORAGE_KEY);
@@ -126,11 +141,13 @@ export function useProviderRequest() {
   return {
     requestModalOpen,
     requestedProviders,
+    otherProviderText,
     requestSubmitting,
     requestSubmitted,
     requestEndpointNotConfigured,
     requestCooldownUntil,
     toggleRequestedProvider,
+    setOtherProviderText,
     openRequestModal,
     closeRequestModal,
     submitRequestModal,

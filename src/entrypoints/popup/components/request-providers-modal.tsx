@@ -14,17 +14,22 @@ const MORE_PROVIDER_REQUEST_OPTIONS = [
 export function RequestProvidersModal(props: {
   open: boolean;
   requestedProviders: string[];
+  otherProviderText: string;
   requestSubmitting: boolean;
   requestSubmitted: boolean;
   requestEndpointNotConfigured: boolean;
   requestCooldownUntil: number | null;
   onToggleProvider: (provider: string) => void;
+  onOtherProviderTextChange: (value: string) => void;
   onClose: () => void;
   onSubmit: () => void;
 }) {
   if (!props.open) {
     return null;
   }
+
+  const hasCustomProvider = props.otherProviderText.trim().length > 0;
+  const canSubmit = props.requestedProviders.length > 0 || hasCustomProvider;
 
   return (
     <div className="askem-modal-overlay" onClick={props.onClose} role="presentation">
@@ -98,6 +103,20 @@ export function RequestProvidersModal(props: {
                 );
               })}
             </div>
+            <div className="askem-request-other">
+              <label className="askem-feedback-label" htmlFor="askem-other-provider-input">
+                Other
+              </label>
+              <input
+                id="askem-other-provider-input"
+                className="askem-request-other-input"
+                value={props.otherProviderText}
+                onChange={(event) => props.onOtherProviderTextChange(event.target.value)}
+                placeholder="Provider name"
+                maxLength={80}
+                disabled={props.requestSubmitting}
+              />
+            </div>
             <div className="askem-modal-actions">
               <button className="askem-provider-clear" onClick={props.onClose} type="button">
                 Cancel
@@ -105,7 +124,7 @@ export function RequestProvidersModal(props: {
               <button
                 className="askem-clear-workspace"
                 onClick={props.onSubmit}
-                disabled={props.requestSubmitting || props.requestedProviders.length === 0}
+                disabled={props.requestSubmitting || !canSubmit}
                 type="button"
               >
                 {props.requestSubmitting ? 'Sending' : 'Send Request'}

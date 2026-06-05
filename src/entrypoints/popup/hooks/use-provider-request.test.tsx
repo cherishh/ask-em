@@ -9,10 +9,18 @@ describe('useProviderRequest', () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    globalThis.fetch = vi.fn(async () => ({ ok: true } as Response)) as unknown as typeof fetch;
+    globalThis.chrome = {
+      runtime: {
+        getManifest: () => ({ version: '0.1.0' }),
+      },
+    } as unknown as typeof chrome;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('surfaces endpoint-not-configured when no request endpoint is available', async () => {
@@ -35,6 +43,50 @@ describe('useProviderRequest', () => {
     expect(window.localStorage.getItem('askem-more-providers-last-submitted-at')).toBeNull();
 
     errorSpy.mockRestore();
+    hook.unmount();
+  });
+
+  it('submits a custom provider request from the Other input', async () => {
+    vi.stubEnv('WXT_MORE_PROVIDERS_REQUEST_ENDPOINT', 'https://support.example.com/requests/providers');
+    const hook = renderHookHarness(() => useProviderRequest());
+
+    await act(async () => {
+      hook.current.openRequestModal();
+      hook.current.setOtherProviderText('  You.com   AI  ');
+    });
+    await act(async () => {
+      await hook.current.submitRequestModal();
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      requestedProviders: ['You.com AI'],
+      extensionVersion: '0.1.0',
+    });
+    expect(hook.current.requestSubmitted).toBe(true);
+
+    hook.unmount();
+  });
+
+  it('deduplicates preset and custom provider requests before submitting', async () => {
+    vi.stubEnv('WXT_MORE_PROVIDERS_REQUEST_ENDPOINT', 'https://support.example.com/requests/providers');
+    const hook = renderHookHarness(() => useProviderRequest());
+
+    await act(async () => {
+      hook.current.openRequestModal();
+      hook.current.toggleRequestedProvider('Perplexity');
+      hook.current.setOtherProviderText('Perplexity');
+    });
+    await act(async () => {
+      await hook.current.submitRequestModal();
+    });
+
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      requestedProviders: ['Perplexity'],
+    });
+
     hook.unmount();
   });
 });

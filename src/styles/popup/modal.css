@@ -72,6 +72,27 @@
   box-shadow: var(--askem-card-inset);
 }
 
+.askem-request-other {
+  margin-top: 16px;
+}
+
+.askem-request-other-input {
+  width: 100%;
+  margin-top: 7px;
+  border: 1px solid var(--askem-border);
+  border-radius: var(--askem-radius-pill);
+  background: var(--askem-white-surface);
+  padding: 11px 13px;
+  color: var(--askem-ink);
+  font: 700 12px/1.2 var(--askem-font-sans);
+}
+
+.askem-request-other-input:focus {
+  border-color: var(--askem-border-accent);
+  outline: none;
+  box-shadow: var(--askem-card-inset);
+}
+
 .askem-modal-actions {
   margin-top: 18px;
 }
