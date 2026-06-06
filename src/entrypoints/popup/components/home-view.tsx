@@ -32,7 +32,7 @@ export function HomeView(props: {
 
       <section className="askem-section-heading">
         <div>
-          <h2>Running Sets</h2>
+          <h2>Active Sync Sets</h2>
         </div>
         <span className="askem-section-meta">{props.workspaceCount}</span>
       </section>

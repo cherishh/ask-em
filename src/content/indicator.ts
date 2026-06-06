@@ -115,7 +115,7 @@ function getCurrentTabLabel(input: ContentIndicatorInput): string {
     return 'current model is private';
   }
 
-  return 'current model is in sync';
+  return 'This chat is in sync';
 }
 
 function getStandaloneSyncStatus(input: ContentIndicatorInput) {
@@ -255,7 +255,7 @@ function getWorkspaceSyncStatus(input: ContentIndicatorInput) {
   }
 
   return {
-    label: 'all models synced',
+    label: 'All selected chats will receive your next prompt.',
     tone: 'neutral' as const,
   };
 }

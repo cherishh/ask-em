@@ -13,7 +13,7 @@ import { ShortcutRecorder } from './shortcut-recorder';
 const SHORTCUT_ROWS = [
   {
     id: 'togglePageParticipation',
-    label: 'Current page sync on/off',
+    label: 'Pause/resume sync for this tab',
   },
   {
     id: 'previousProviderTab',
@@ -85,8 +85,8 @@ export function AdvancedView(props: {
         <div className="askem-us-group">
           <div className="askem-us-row-header askem-ep-header">
             <div>
-              <span className="askem-us-row-title">Default providers</span>
-              <span className="askem-us-row-sub">Choose which providers a new set syncs to.</span>
+              <span className="askem-us-row-title">Default chats</span>
+              <span className="askem-us-row-sub">Choose which AI chats are included in new sync sets.</span>
             </div>
             <div className="askem-ep-header-actions">
               <span className="askem-ep-count">{props.selectedProviders.length} selected</span>
@@ -117,7 +117,7 @@ export function AdvancedView(props: {
                   <span className="askem-ep-copy">
                     <span className="askem-ep-name">{provider}</span>
                     <span className="askem-ep-state">
-                      {active ? 'Enabled' : 'Off'}
+                      {active ? 'Included' : 'Not included'}
                     </span>
                   </span>
                 </button>
@@ -140,7 +140,7 @@ export function AdvancedView(props: {
         <div className="askem-us-group">
           <div className="askem-us-toggle-row">
             <div>
-              <span className="askem-us-row-title">Pause syncing after first message</span>
+              <span className="askem-us-row-title">Sync first prompt only</span>
               <span className="askem-us-row-sub">
                 Only the first message syncs, then ask each model its own follow-up.
               </span>
@@ -165,9 +165,9 @@ export function AdvancedView(props: {
         <div className="askem-us-group">
           <div className="askem-us-toggle-row">
             <div>
-              <span className="askem-us-row-title">Auto close tabs</span>
+              <span className="askem-us-row-title">Close tabs with set</span>
               <span className="askem-us-row-sub">
-                Deleting a set also closes its tabs.
+                When you delete an active sync set, closes its tabs too.
               </span>
             </div>
             <button
@@ -192,7 +192,7 @@ export function AdvancedView(props: {
             <div>
               <span className="askem-us-row-title">Indicator position</span>
               <span className="askem-us-row-sub">
-                Drag the page indicator anywhere. Reset it here.
+                Drag the indicator anywhere. Reset it here.
               </span>
             </div>
             <button

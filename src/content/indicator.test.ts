@@ -182,8 +182,8 @@ describe('content indicator presentation', () => {
       ),
     ).toEqual({
       state: 'idle',
-      label: 'current model is in sync',
-      syncLabel: 'all models synced',
+      label: 'This chat is in sync',
+      syncLabel: 'All selected chats will receive your next prompt.',
       syncTone: 'neutral',
       alertLevel: 'normal',
     });
@@ -327,7 +327,7 @@ describe('content indicator presentation', () => {
       ),
     ).toEqual({
       state: 'idle',
-      label: 'current model is in sync',
+      label: 'This chat is in sync',
       syncLabel: '2 models need attention',
       syncTone: 'warning',
       alertLevel: 'set-warning',
@@ -353,8 +353,8 @@ describe('content indicator presentation', () => {
       ),
     ).toEqual({
       state: 'idle',
-      label: 'current model is in sync',
-      syncLabel: 'all models synced',
+      label: 'This chat is in sync',
+      syncLabel: 'All selected chats will receive your next prompt.',
       syncTone: 'neutral',
       alertLevel: 'normal',
     });
@@ -384,7 +384,7 @@ describe('content indicator presentation', () => {
       ),
     ).toEqual({
       state: 'idle',
-      label: 'current model is in sync',
+      label: 'This chat is in sync',
       syncLabel: '1 model needs attention',
       syncTone: 'warning',
       alertLevel: 'set-warning',
@@ -480,7 +480,7 @@ describe('content indicator presentation', () => {
       ),
     ).toEqual({
       state: 'syncing',
-      label: 'current model is in sync',
+      label: 'This chat is in sync',
       syncLabel: 'syncing 3 models',
       syncTone: 'neutral',
       alertLevel: 'normal',
@@ -504,7 +504,7 @@ describe('content indicator presentation', () => {
       ),
     ).toEqual({
       state: 'syncing',
-      label: 'current model is in sync',
+      label: 'This chat is in sync',
       syncLabel: '2 of 3 synced',
       syncTone: 'neutral',
       alertLevel: 'normal',
@@ -528,7 +528,7 @@ describe('content indicator presentation', () => {
       ),
     ).toEqual({
       state: 'syncing',
-      label: 'current model is in sync',
+      label: 'This chat is in sync',
       syncLabel: '1 of 3 synced',
       syncTone: 'warning',
       alertLevel: 'set-warning',

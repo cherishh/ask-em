@@ -122,7 +122,7 @@ export function WorkspaceCard({
                   onClick={() => void onClearProvider(workspace.id, provider)}
                   disabled={busyKey === `${workspace.id}:${provider}`}
                 >
-                  Remove from set
+                  Remove
                 </button>
               </div>
             </div>

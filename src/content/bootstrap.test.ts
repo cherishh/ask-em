@@ -186,7 +186,7 @@ describe('content bootstrap wiring', () => {
 
     await bootstrap();
 
-    expect(ui.setState).toHaveBeenLastCalledWith('idle', 'current model is in sync');
+    expect(ui.setState).toHaveBeenLastCalledWith('idle', 'This chat is in sync');
     expect(ui.setSyncStatus).toHaveBeenLastCalledWith('1 model needs attention', 'warning');
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('set-warning');
   });
@@ -255,7 +255,7 @@ describe('content bootstrap wiring', () => {
     await flushMicrotasks();
 
     expect(sendResponse).toHaveBeenCalledWith({ ok: true });
-    expect(ui.setState).toHaveBeenLastCalledWith('syncing', 'current model is in sync');
+    expect(ui.setState).toHaveBeenLastCalledWith('syncing', 'This chat is in sync');
     expect(ui.setSyncStatus).toHaveBeenLastCalledWith('1 of 3 synced', 'neutral');
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('normal');
   });
@@ -336,7 +336,7 @@ describe('content bootstrap wiring', () => {
     );
     await flushMicrotasks();
 
-    expect(ui.setState).toHaveBeenLastCalledWith('syncing', 'current model is in sync');
+    expect(ui.setState).toHaveBeenLastCalledWith('syncing', 'This chat is in sync');
     expect(ui.setSyncStatus).toHaveBeenLastCalledWith('1 of 3 synced', 'warning');
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('set-warning');
   });
@@ -356,10 +356,10 @@ describe('content bootstrap wiring', () => {
     submitHandler?.({ text: 'hello world', attachments: [] });
     await flushMicrotasks();
 
-    expect(ui.setState).toHaveBeenCalledWith('syncing', 'current model is in sync');
+    expect(ui.setState).toHaveBeenCalledWith('syncing', 'This chat is in sync');
     expect(ui.setSyncStatus).toHaveBeenCalledWith('syncing…', 'neutral');
-    expect(ui.setState).toHaveBeenLastCalledWith('idle', 'current model is in sync');
-    expect(ui.setSyncStatus).toHaveBeenLastCalledWith('all models synced', 'neutral');
+    expect(ui.setState).toHaveBeenLastCalledWith('idle', 'This chat is in sync');
+    expect(ui.setSyncStatus).toHaveBeenLastCalledWith('All selected chats will receive your next prompt.', 'neutral');
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('normal');
   });
 

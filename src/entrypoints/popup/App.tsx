@@ -115,7 +115,7 @@ export default function App() {
         <header className="askem-hero">
           <div className="askem-brand-block">
             <h1>ask&apos;em</h1>
-            <p className="askem-slogan">One prompt. Every official AI chat. — full features, zero compromise.</p>
+            <p className="askem-slogan">Use the real ChatGPT, Claude, Gemini and more all at once — full features, zero compromise.</p>
           </div>
           <div className="askem-hero-actions">
             {showDevControl ? (

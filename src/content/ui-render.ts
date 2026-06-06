@@ -161,7 +161,7 @@ export function renderWorkspacePanelHtml(input: {
         .join('')}
     </div>
     <div class="ask-em-panel-shortcut">
-      <span class="ask-em-panel-shortcut-label">Pause/restart sync for this tab</span>
+      <span class="ask-em-panel-shortcut-label">Pause/resume sync for this tab</span>
       ${renderShortcutKeysHtml(input.toggleShortcutKeys)}
     </div>
     <div class="ask-em-panel-shortcut">

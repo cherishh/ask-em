@@ -21,19 +21,21 @@ export function OnboardingCard({
         <div className="askem-onboarding-steps">
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">1</span>
-            <span>Pick models you want to sync with</span>
+            <span>Choose the AI chats you want to ask</span>
           </div>
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">2</span>
-            <span>Open any AI chat as usual</span>
+            <span>Open any one as usual</span>
           </div>
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">3</span>
-            <span>Send prompt as usual. It auto-syncs to other models</span>
+            <span>
+              Send your prompt as usual. ask&apos;em opens the other chats in new tabs and syncs it across
+            </span>
           </div>
         </div>
         <p className="askem-onboarding-hint">
-          Make sure you&apos;re logged in to each selected website first.
+          Make sure you&apos;re signed in to each selected AI chat first.
         </p>
         <div className="askem-onboarding-providers">
           {providers.length > 0 ? (
