@@ -89,18 +89,6 @@ describe('useFeedback', () => {
       languages: ['zh-CN', 'en-US'],
       userAgent:
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
-      geolocation: {
-        getCurrentPosition: vi.fn((success: PositionCallback) => {
-          success({
-            coords: {
-              latitude: 1.23,
-              longitude: 4.56,
-              accuracy: 7,
-            },
-            timestamp: 12345,
-          } as GeolocationPosition);
-        }),
-      },
     });
     requestFullLogs.mockClear();
     requestStatus.mockClear();
@@ -234,12 +222,6 @@ describe('useFeedback', () => {
         browserVersion: '142.0.0.0',
         os: 'mac',
         activeTabTitle: 'Ask\'em test tab title',
-        geolocation: {
-          latitude: 1.23,
-          longitude: 4.56,
-          accuracy: 7,
-          timestamp: 12345,
-        },
       },
     });
     expect(attachments).toHaveLength(1);

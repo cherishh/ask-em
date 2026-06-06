@@ -31,7 +31,7 @@ export default defineConfig({
     name: "ask'em",
     description: 'Sync prompts across AI chat providers',
     version: '0.1.0',
-    permissions: ['storage', 'tabs', 'geolocation'],
+    permissions: ['storage', 'tabs'],
     host_permissions: getSupportHostPermissions(),
     icons: {
       16: 'icon/16.png',

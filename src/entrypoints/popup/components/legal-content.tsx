@@ -39,8 +39,7 @@ export function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => 
             submit is sent to an ask&apos;em-operated support service. Feedback can include the
             message you write, screenshots you choose to attach, and bug-report context such as
             browser language and version, client timestamp, timezone, operating system, active tab
-            title, IP address, and location when available. Bug reports can also include optional
-            debug logs when you explicitly choose to include them.
+            title, and optional debug logs when you explicitly choose to include them.
           </p>
 
           <h3>5. User Responsibilities</h3>
@@ -81,8 +80,8 @@ export function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => 
             If you choose to send feedback or request more providers, that submission is sent to an
             ask&apos;em-operated support endpoint. Feedback can include the message you write,
             screenshots you attach, and, for bug reports, browser language, browser version, client
-            timestamp, timezone, operating system, active tab title, IP address, and location when
-            available. Bug reports can also include a snapshot of local debug logs if you opt in.
+            timestamp, timezone, operating system, and active tab title. Bug reports can also
+            include a snapshot of local debug logs if you opt in.
           </p>
 
           <h3>3. What Stays Out of Our Servers</h3>

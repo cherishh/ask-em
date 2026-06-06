@@ -106,24 +106,6 @@ function normalizeEnvironment(value: unknown): Record<string, unknown> | null {
   }
 }
 
-function normalizeHeaderString(value: string | null, maxLength = 128): string | null {
-  const normalized = value?.trim().slice(0, maxLength) ?? '';
-  return normalized.length > 0 ? normalized : null;
-}
-
-function getRequestIp(request: Request): string | null {
-  const forwardedFor = normalizeHeaderString(request.headers.get('x-forwarded-for'));
-  if (forwardedFor) {
-    return forwardedFor.split(',')[0]?.trim().slice(0, 128) || null;
-  }
-
-  return (
-    normalizeHeaderString(request.headers.get('cf-connecting-ip')) ??
-    normalizeHeaderString(request.headers.get('x-real-ip')) ??
-    normalizeHeaderString(request.headers.get('fly-client-ip'))
-  );
-}
-
 function normalizeProviderList(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -382,7 +364,7 @@ async function handleProviderStats() {
   });
 }
 
-async function handleFeedback(body: unknown, attachmentFiles: File[], request: Request) {
+async function handleFeedback(body: unknown, attachmentFiles: File[]) {
   const input = body as {
     kind?: unknown;
     message?: unknown;
@@ -413,13 +395,7 @@ async function handleFeedback(body: unknown, attachmentFiles: File[], request: R
 
   const includeLogs = kind === 'bug-report' && Boolean(input.includeLogs);
   const logs = includeLogs ? normalizeLogs(input.logs) : [];
-  const environment =
-    kind === 'bug-report'
-      ? {
-          ...(normalizeEnvironment(input.environment) ?? {}),
-          requestIp: getRequestIp(request),
-        }
-      : null;
+  const environment = kind === 'bug-report' ? normalizeEnvironment(input.environment) : null;
   const featureRequestChoice =
     typeof input.featureRequestChoice === 'string' && FEATURE_REQUEST_CHOICES.has(input.featureRequestChoice)
       ? input.featureRequestChoice
@@ -504,7 +480,7 @@ Deno.serve(async (request) => {
       return parsed.error;
     }
 
-    return await handleFeedback(parsed.input, parsed.attachments, request);
+    return await handleFeedback(parsed.input, parsed.attachments);
   }
 
   let body: unknown = null;

@@ -13,7 +13,7 @@ import { ShortcutRecorder } from './shortcut-recorder';
 const SHORTCUT_ROWS = [
   {
     id: 'togglePageParticipation',
-    label: 'Single tab sync on/off',
+    label: 'Current page sync on/off',
   },
   {
     id: 'previousProviderTab',
@@ -86,7 +86,7 @@ export function AdvancedView(props: {
           <div className="askem-us-row-header askem-ep-header">
             <div>
               <span className="askem-us-row-title">Default providers</span>
-              <span className="askem-us-row-sub">Choose which providers new sets sync to.</span>
+              <span className="askem-us-row-sub">Choose which providers a new set syncs to.</span>
             </div>
             <div className="askem-ep-header-actions">
               <span className="askem-ep-count">{props.selectedProviders.length} selected</span>
@@ -117,7 +117,7 @@ export function AdvancedView(props: {
                   <span className="askem-ep-copy">
                     <span className="askem-ep-name">{provider}</span>
                     <span className="askem-ep-state">
-                      {active ? 'Used in new sets' : 'Off by default'}
+                      {active ? 'Enabled' : 'Off'}
                     </span>
                   </span>
                 </button>
@@ -140,11 +140,11 @@ export function AdvancedView(props: {
         <div className="askem-us-group">
           <div className="askem-us-toggle-row">
             <div>
-              <span className="askem-us-row-title">Pause after first fan-out</span>
+              <span className="askem-us-row-title">Pause syncing after first message</span>
               <span className="askem-us-row-sub">
                 {props.status?.pauseAfterFirstFanOutEnabled ?? false
-                  ? 'Compare first answers, then ask each model its own follow-up.'
-                  : 'Keep off when you want the same follow-up sent to every model.'}
+                  ? 'Only the first prompt syncs, then ask each model its own follow-up.'
+                  : 'Every prompt you send gets synced when off.'}
               </span>
             </div>
             <button
@@ -170,8 +170,8 @@ export function AdvancedView(props: {
               <span className="askem-us-row-title">Close tabs used by this set</span>
               <span className="askem-us-row-sub">
                 {props.status?.closeTabsOnDeleteSet
-                  ? 'Deleting a set also closes its provider tabs.'
-                  : 'Deleting a set keeps provider tabs open.'}
+                  ? 'Deleting a set also closes its tabs.'
+                  : 'Deleting a set keeps tabs open.'}
               </span>
             </div>
             <button
@@ -182,8 +182,8 @@ export function AdvancedView(props: {
               disabled={props.loading}
               aria-label={
                 props.status?.closeTabsOnDeleteSet
-                  ? 'Disable closing provider tabs when deleting a set'
-                  : 'Enable closing provider tabs when deleting a set'
+                  ? 'Disable closing tabs when deleting a set'
+                  : 'Enable closing tabs when deleting a set'
               }
             />
           </div>

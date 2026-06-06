@@ -31,12 +31,6 @@ type BugReportEnvironment = {
   browserVersion: string | null;
   os: string | null;
   activeTabTitle: string | null;
-  geolocation: {
-    latitude: number;
-    longitude: number;
-    accuracy: number | null;
-    timestamp: number | null;
-  } | null;
 };
 
 function normalizeMessage(value: string): string {
@@ -110,43 +104,12 @@ async function getActiveTabTitle(): Promise<string | null> {
   }
 }
 
-async function getCurrentGeolocation(): Promise<BugReportEnvironment['geolocation']> {
-  if (!navigator.geolocation) {
-    return null;
-  }
-
-  return await new Promise((resolve) => {
-    const timeoutId = window.setTimeout(() => resolve(null), 3000);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        window.clearTimeout(timeoutId);
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
-          timestamp: Number.isFinite(position.timestamp) ? position.timestamp : null,
-        });
-      },
-      () => {
-        window.clearTimeout(timeoutId);
-        resolve(null);
-      },
-      {
-        maximumAge: 5 * 60 * 1000,
-        timeout: 2500,
-      },
-    );
-  });
-}
-
 async function createBugReportEnvironment(): Promise<BugReportEnvironment> {
   const userAgent = normalizeEnvironmentString(navigator.userAgent, 1000) ?? '';
   const browser = parseBrowserFromUserAgent(userAgent);
-  const [os, activeTabTitle, geolocation] = await Promise.all([
+  const [os, activeTabTitle] = await Promise.all([
     getPlatformOs(),
     getActiveTabTitle(),
-    getCurrentGeolocation(),
   ]);
 
   return {
@@ -163,7 +126,6 @@ async function createBugReportEnvironment(): Promise<BugReportEnvironment> {
     browserVersion: browser.browserVersion,
     os,
     activeTabTitle,
-    geolocation,
   };
 }
 
