@@ -142,9 +142,7 @@ export function AdvancedView(props: {
             <div>
               <span className="askem-us-row-title">Pause syncing after first message</span>
               <span className="askem-us-row-sub">
-                {props.status?.pauseAfterFirstFanOutEnabled ?? false
-                  ? 'Only the first prompt syncs, then ask each model its own follow-up.'
-                  : 'Every prompt you send gets synced when off.'}
+                Only the first message syncs, then ask each model its own follow-up.
               </span>
             </div>
             <button
@@ -167,11 +165,9 @@ export function AdvancedView(props: {
         <div className="askem-us-group">
           <div className="askem-us-toggle-row">
             <div>
-              <span className="askem-us-row-title">Close tabs used by this set</span>
+              <span className="askem-us-row-title">Auto close tabs</span>
               <span className="askem-us-row-sub">
-                {props.status?.closeTabsOnDeleteSet
-                  ? 'Deleting a set also closes its tabs.'
-                  : 'Deleting a set keeps tabs open.'}
+                Deleting a set also closes its tabs.
               </span>
             </div>
             <button

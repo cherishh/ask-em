@@ -29,7 +29,7 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
     name: "ask'em",
-    description: 'Sync prompts across AI chat providers',
+    description: 'Sync chat messages across AI apps',
     version: '0.1.0',
     permissions: ['storage', 'tabs'],
     host_permissions: getSupportHostPermissions(),

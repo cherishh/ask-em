@@ -11,6 +11,7 @@ import { stageSubmitAttachments } from './attachment-staging';
 import type { ContentStateController, SubmitResponse } from './state';
 
 type SubmitInput = string | UserSubmissionPayload;
+type SubmitUiContext = ReturnType<ContentStateController['getUiContext']>;
 
 const PROVIDER_LABELS: Record<Provider, string> = {
   claude: 'Claude',
@@ -66,6 +67,26 @@ function buildAttachmentLimitToast(
   }
 
   return `${skippedPrefix}: this prompt has ${formatFileCount(attachmentCount)}; those models support fewer files.${successSuffix}`;
+}
+
+function canAttemptAttachmentFanOut(
+  status: ReturnType<ProviderAdapter['session']['getStatus']>,
+  uiContext: SubmitUiContext,
+): boolean {
+  if (!uiContext.globalSyncEnabled) {
+    return false;
+  }
+
+  if (uiContext.workspaceId) {
+    return uiContext.providerEnabled;
+  }
+
+  return (
+    status.pageKind === 'new-chat' &&
+    status.sessionId === null &&
+    uiContext.standaloneCreateSetEnabled &&
+    (uiContext.standaloneFanOutTargetCount ?? 0) > 0
+  );
 }
 
 export function createSubmitController(
@@ -152,8 +173,10 @@ export function createSubmitController(
 
     const submitId = createSubmitId();
     let attachments: AttachmentRef[] = [];
+    const canFanOutAttachments = canAttemptAttachmentFanOut(status, uiContext);
 
     if (
+      canFanOutAttachments &&
       payload.attachmentResolution &&
       payload.attachmentResolution.capturedCount > 0 &&
       payload.attachmentResolution.submittedCount === 0 &&
@@ -179,7 +202,7 @@ export function createSubmitController(
     }
 
     try {
-      if (payload.attachments.length > 0) {
+      if (payload.attachments.length > 0 && canFanOutAttachments) {
         await dependencies.logDebug({
           level: 'info',
           message: 'Staging submit attachments',
@@ -187,7 +210,9 @@ export function createSubmitController(
         });
       }
 
-      attachments = await stageSubmitAttachments(submitId, payload.attachments);
+      attachments = canFanOutAttachments
+        ? await stageSubmitAttachments(submitId, payload.attachments)
+        : [];
 
       if (attachments.length > 0) {
         await dependencies.logDebug({
@@ -203,15 +228,17 @@ export function createSubmitController(
         : error instanceof Error && reason.includes('large')
           ? 'attachment too large'
           : 'attachment sync skipped';
-      state.showCurrentWarning(warningLabel);
-      // The pill warning is overwritten by applyIndicatorPresentation() below, so
-      // surface a durable toast for the staging-failure drop reasons too.
-      state.showToast(
-        warningLabel === 'attachment sync skipped'
-          ? 'Attachment sync skipped.'
-          : `Attachment sync skipped: ${warningLabel}.`,
-        'warning',
-      );
+      if (canFanOutAttachments) {
+        state.showCurrentWarning(warningLabel);
+        // The pill warning is overwritten by applyIndicatorPresentation() below, so
+        // surface a durable toast for the staging-failure drop reasons too.
+        state.showToast(
+          warningLabel === 'attachment sync skipped'
+            ? 'Attachment sync skipped.'
+            : `Attachment sync skipped: ${warningLabel}.`,
+          'warning',
+        );
+      }
       await dependencies.logDebug({
         level: 'warn',
         message: 'Skipped attachment fan-out',

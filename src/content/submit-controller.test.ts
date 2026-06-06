@@ -37,8 +37,17 @@ function createState() {
     applyIndicatorPresentation: vi.fn(),
     getUiContext: vi.fn(() => ({
       workspaceId: 'w1',
+      providerEnabled: true,
+      globalSyncEnabled: true,
+      standaloneReady: false,
       standaloneCreateSetEnabled: true,
       standaloneFanOutTargetCount: 1,
+      canStartNewSet: true,
+      shortcuts: {
+        togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false },
+        nextProviderTab: { key: '.', meta: false, ctrl: true, shift: true, alt: false },
+        previousProviderTab: { key: ',', meta: false, ctrl: true, shift: true, alt: false },
+      },
     })),
     setSyncing: vi.fn(),
     applySubmitResponse: vi.fn(),
@@ -314,6 +323,123 @@ describe('submit controller attachment staging', () => {
     expect(state.showCurrentWarning).toHaveBeenCalledWith('attachment sync skipped');
     expect(state.showToast).toHaveBeenCalledWith(
       'Attachment sync skipped: current files could not be confirmed.',
+      'warning',
+    );
+  });
+
+  it('does not show attachment skipped toast when current provider sync is disabled', async () => {
+    const sendMessage = vi.fn(async (_message: unknown) => ({
+      ok: true,
+      synced: false,
+      workspaceId: 'w1',
+      providerEnabled: false,
+      globalSyncEnabled: true,
+      canStartNewSet: true,
+      workspaceSummary: null,
+    }));
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const state = createState();
+    state.getUiContext.mockReturnValue({
+      workspaceId: 'w1',
+      providerEnabled: false,
+      globalSyncEnabled: true,
+      standaloneReady: false,
+      standaloneCreateSetEnabled: true,
+      standaloneFanOutTargetCount: 0,
+      canStartNewSet: true,
+      shortcuts: {
+        togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false },
+        nextProviderTab: { key: '.', meta: false, ctrl: true, shift: true, alt: false },
+        previousProviderTab: { key: ',', meta: false, ctrl: true, shift: true, alt: false },
+      },
+    });
+    const controller = createSubmitController(createAdapter(), state as any, {
+      reportPresence: vi.fn(),
+      logDebug: vi.fn(),
+    });
+
+    await controller.reportUserSubmit({
+      text: 'hello',
+      attachments: [],
+      attachmentResolution: {
+        attachments: [],
+        capturedCount: 1,
+        currentCount: 1,
+        submittedCount: 0,
+        reason: 'unmatched-current-attachments',
+      },
+    });
+
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(state.showCurrentWarning).not.toHaveBeenCalledWith('attachment sync skipped');
+    expect(state.showToast).not.toHaveBeenCalledWith(
+      expect.stringContaining('Attachment sync skipped'),
+      'warning',
+    );
+  });
+
+  it('does not stage attachments when current provider sync is disabled', async () => {
+    const sendMessage = vi.fn(async (_message: unknown) => ({
+      ok: true,
+      synced: false,
+      workspaceId: 'w1',
+      providerEnabled: false,
+      globalSyncEnabled: true,
+      canStartNewSet: true,
+      workspaceSummary: null,
+    }));
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const state = createState();
+    state.getUiContext.mockReturnValue({
+      workspaceId: 'w1',
+      providerEnabled: false,
+      globalSyncEnabled: true,
+      standaloneReady: false,
+      standaloneCreateSetEnabled: true,
+      standaloneFanOutTargetCount: 0,
+      canStartNewSet: true,
+      shortcuts: {
+        togglePageParticipation: { key: '.', meta: false, ctrl: true, shift: false, alt: false },
+        nextProviderTab: { key: '.', meta: false, ctrl: true, shift: true, alt: false },
+        previousProviderTab: { key: ',', meta: false, ctrl: true, shift: true, alt: false },
+      },
+    });
+    const controller = createSubmitController(createAdapter(), state as any, {
+      reportPresence: vi.fn(),
+      logDebug: vi.fn(),
+    });
+
+    await controller.reportUserSubmit({
+      text: 'hello',
+      attachments: [
+        {
+          id: 'a1',
+          name: 'sample.pdf',
+          mime: 'application/pdf',
+          size: 3,
+          source: 'file-input',
+          file: new File(['abc'], 'sample.pdf', { type: 'application/pdf' }),
+        },
+      ],
+    });
+
+    expect(sendMessage.mock.calls.map(([message]) => (message as { type: string }).type)).toEqual(['USER_SUBMIT']);
+    expect(sendMessage.mock.calls[0]?.[0]).toMatchObject({
+      type: 'USER_SUBMIT',
+      attachments: [],
+    });
+    expect(state.showToast).not.toHaveBeenCalledWith(
+      expect.stringContaining('Attachment sync skipped'),
       'warning',
     );
   });

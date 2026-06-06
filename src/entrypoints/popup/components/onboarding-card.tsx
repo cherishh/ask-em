@@ -33,7 +33,7 @@ export function OnboardingCard({
           </div>
         </div>
         <p className="askem-onboarding-hint">
-          Make sure you&apos;re logged in to each selected AI chat first.
+          Make sure you&apos;re logged in to each selected website first.
         </p>
         <div className="askem-onboarding-providers">
           {providers.length > 0 ? (
