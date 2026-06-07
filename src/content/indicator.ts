@@ -35,8 +35,8 @@ export type ContentIndicatorPresentation = {
   alertLevel: IndicatorAlertLevel;
 };
 
-function formatModelCount(count: number): string {
-  return `${count} ${count === 1 ? 'model' : 'models'}`;
+function formatChatCount(count: number): string {
+  return `${count} ${count === 1 ? 'chat' : 'chats'}`;
 }
 
 function formatAttentionCount(count: number): string {
@@ -172,7 +172,7 @@ function getStandaloneSyncStatus(input: ContentIndicatorInput) {
     label: input.standaloneCreateSetEnabled
       ? input.standaloneFanOutTargetCount === null
         ? 'next prompt will fan out'
-        : `next prompt will fan out to ${formatModelCount(input.standaloneFanOutTargetCount)}`
+        : `next prompt will fan out to ${formatChatCount(input.standaloneFanOutTargetCount)}`
       : 'next prompt stays here',
     tone: 'neutral' as const,
   };
@@ -185,7 +185,7 @@ function hasActiveProgress(input: ContentIndicatorInput) {
 function getProgressSyncStatus(progress: SyncProgressSnapshot) {
   if (progress.completed === 0) {
     return {
-      label: `syncing ${formatModelCount(progress.total)}`,
+      label: `syncing ${formatChatCount(progress.total)}`,
       tone: 'neutral' as const,
     };
   }
@@ -255,7 +255,7 @@ function getWorkspaceSyncStatus(input: ContentIndicatorInput) {
   }
 
   return {
-    label: 'All selected chats will receive your next prompt.',
+    label: 'Other chats will receive your next prompt.',
     tone: 'neutral' as const,
   };
 }

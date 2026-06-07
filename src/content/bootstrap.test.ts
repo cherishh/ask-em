@@ -233,7 +233,7 @@ describe('content bootstrap wiring', () => {
     expect(routingMocks.sendRuntimeMessage).toHaveBeenCalledWith({ type: 'HEARTBEAT' });
     expect(ui.setVisible).toHaveBeenLastCalledWith(true);
     expect(ui.setState).toHaveBeenLastCalledWith('idle', 'ready');
-    expect(ui.setSyncStatus).toHaveBeenLastCalledWith('next prompt will fan out to 2 models', 'neutral');
+    expect(ui.setSyncStatus).toHaveBeenLastCalledWith('next prompt will fan out to 2 chats', 'neutral');
   });
 
   it('updates indicator progress when SYNC_PROGRESS arrives for the current workspace', async () => {
@@ -359,7 +359,7 @@ describe('content bootstrap wiring', () => {
     expect(ui.setState).toHaveBeenCalledWith('syncing', 'This chat is in sync');
     expect(ui.setSyncStatus).toHaveBeenCalledWith('syncing…', 'neutral');
     expect(ui.setState).toHaveBeenLastCalledWith('idle', 'This chat is in sync');
-    expect(ui.setSyncStatus).toHaveBeenLastCalledWith('All selected chats will receive your next prompt.', 'neutral');
+    expect(ui.setSyncStatus).toHaveBeenLastCalledWith('Other chats will receive your next prompt.', 'neutral');
     expect(ui.setAlertLevel).toHaveBeenLastCalledWith('normal');
   });
 

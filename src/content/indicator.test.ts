@@ -54,7 +54,7 @@ describe('content indicator presentation', () => {
     expect(getContentIndicatorPresentation(createInput())).toEqual({
       state: 'idle',
       label: 'ready',
-      syncLabel: 'next prompt will fan out to 2 models',
+      syncLabel: 'next prompt will fan out to 2 chats',
       syncTone: 'neutral',
       alertLevel: 'normal',
     });
@@ -183,7 +183,7 @@ describe('content indicator presentation', () => {
     ).toEqual({
       state: 'idle',
       label: 'This chat is in sync',
-      syncLabel: 'All selected chats will receive your next prompt.',
+      syncLabel: 'Other chats will receive your next prompt.',
       syncTone: 'neutral',
       alertLevel: 'normal',
     });
@@ -354,7 +354,7 @@ describe('content indicator presentation', () => {
     ).toEqual({
       state: 'idle',
       label: 'This chat is in sync',
-      syncLabel: 'All selected chats will receive your next prompt.',
+      syncLabel: 'Other chats will receive your next prompt.',
       syncTone: 'neutral',
       alertLevel: 'normal',
     });
@@ -481,7 +481,7 @@ describe('content indicator presentation', () => {
     ).toEqual({
       state: 'syncing',
       label: 'This chat is in sync',
-      syncLabel: 'syncing 3 models',
+      syncLabel: 'syncing 3 chats',
       syncTone: 'neutral',
       alertLevel: 'normal',
     });
