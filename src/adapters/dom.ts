@@ -236,7 +236,7 @@ export function dispatchEnterKey(element: HTMLElement): void {
 export function waitForUrlChange(
   extractSessionId: (url: string) => string | null,
   baselineUrl: string,
-  timeoutMs = 15_000,
+  timeoutMs = 20_000,
 ): Promise<{ sessionId: string | null; url: string }> {
   const startedAt = Date.now();
 
