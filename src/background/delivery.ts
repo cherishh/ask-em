@@ -12,7 +12,11 @@ import {
 } from '../runtime/storage';
 import { bindAttachments, releaseSubmitAttachments } from '../runtime/attachment-store';
 import { formatAttachmentSummary, shortSubmitId } from '../runtime/attachment-log';
-import { setWorkspaceEnabledProviders, type WorkspaceLookupResult } from '../runtime/workspace';
+import {
+  rebuildWorkspaceIndex,
+  setWorkspaceEnabledProviders,
+  type WorkspaceLookupResult,
+} from '../runtime/workspace';
 import { canCreateWorkspaceFromSubmit, isProviderEnabled, shouldSyncWorkspaceProvider } from '../runtime/guards';
 import {
   persistSourceSubmitContext,
@@ -72,6 +76,53 @@ export async function deliverPromptToWorkspaceTargets(
       message: 'Recovered fan-out from routed workspace snapshot',
       detail: `Stored workspace missing during delivery; enabled providers: ${workspace.enabledProviders.join(', ')}`,
     });
+
+    const restoreOutcome: { value: 'restored' | 'already-present' | 'not-pending' } = {
+      value: 'not-pending',
+    };
+    await updateLocalState((currentState) => {
+      if (currentState.workspaces[workspaceId]) {
+        restoreOutcome.value = 'already-present';
+        return currentState;
+      }
+
+      if (!workspace.pendingSource) {
+        restoreOutcome.value = 'not-pending';
+        return currentState;
+      }
+
+      restoreOutcome.value = 'restored';
+      const workspaces = {
+        ...currentState.workspaces,
+        [workspaceId]: workspace,
+      };
+
+      return {
+        ...currentState,
+        workspaces,
+        workspaceIndex: rebuildWorkspaceIndex(workspaces),
+      };
+    });
+
+    if (restoreOutcome.value === 'restored') {
+      await logDebug({
+        level: 'warn',
+        scope: 'background',
+        provider: message.provider,
+        workspaceId,
+        message: 'Restored missing pending workspace from routed snapshot',
+        detail: `pendingSource=${workspace.pendingSource}; enabledProviders=${workspace.enabledProviders.join(', ')}`,
+      });
+    } else if (restoreOutcome.value === 'not-pending') {
+      await logDebug({
+        level: 'warn',
+        scope: 'background',
+        provider: message.provider,
+        workspaceId,
+        message: 'Skipped restoring missing routed workspace snapshot',
+        detail: 'snapshot was not a pending workspace; possible explicit clear or stale workspace',
+      });
+    }
   }
 
   await cancelScheduledGroupGc(workspaceId);

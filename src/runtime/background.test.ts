@@ -1020,6 +1020,96 @@ describe('background submit routing', () => {
     );
   });
 
+  it('restores a missing pending workspace from the routed snapshot during delivery', async () => {
+    let currentLocalState = makeLocalState();
+    const workspace = makeWorkspace({
+      id: 'w1',
+      members: {
+        claude: makeConversationRef('claude', null, 'https://claude.ai/new'),
+        chatgpt: makeConversationRef('chatgpt', 'g-1', 'https://chatgpt.com/c/g-1'),
+      },
+      enabledProviders: ['claude', 'chatgpt'],
+      pendingSource: 'claude',
+    });
+    const sessionState = makeSessionState({
+      'w1:chatgpt': makeClaimedTab({
+        provider: 'chatgpt',
+        workspaceId: 'w1',
+        tabId: 10,
+        currentUrl: 'https://chatgpt.com/c/g-1',
+        sessionId: 'g-1',
+      }),
+    });
+
+    storageMocks.getLocalState.mockImplementation(async () => currentLocalState);
+    storageMocks.getSessionState.mockResolvedValue(sessionState);
+    storageMocks.setLocalState.mockImplementation(async (state: LocalState) => {
+      currentLocalState = state;
+      return state;
+    });
+    storageMocks.updateLocalState.mockImplementation(
+      async (updater: (state: LocalState) => LocalState | Promise<LocalState>) => {
+        const next = await updater(currentLocalState);
+        currentLocalState = next;
+        return next;
+      },
+    );
+
+    const sendMessage = vi.fn().mockImplementation((tabId: number, message: { type: string }) => {
+      if (tabId === 10 && message.type === 'PING') {
+        return Promise.resolve({
+          type: 'PING_RESPONSE',
+          provider: 'chatgpt',
+          currentUrl: 'https://chatgpt.com/c/g-1',
+          sessionId: 'g-1',
+          pageState: 'ready',
+          pageKind: 'existing-session',
+        });
+      }
+
+      return Promise.resolve({ ok: true, accepted: true, confirmed: true });
+    });
+
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 10 }),
+        sendMessage,
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { deliverPromptToWorkspaceTargets } = await import('../entrypoints/background');
+    const result = await deliverPromptToWorkspaceTargets(
+      'w1',
+      makeSubmitMessage({
+        provider: 'claude',
+        currentUrl: 'https://claude.ai/new',
+        sessionId: null,
+        pageKind: 'new-chat',
+        content: 'from claude',
+      }),
+      9,
+      workspace,
+    );
+
+    expect(result).toEqual([
+      expect.objectContaining({ provider: 'chatgpt', ok: true }),
+    ]);
+    expect(currentLocalState.workspaces.w1).toEqual(workspace);
+    expect(storageMocks.appendDebugLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        message: 'Restored missing pending workspace from routed snapshot',
+        workspaceId: 'w1',
+      }),
+    );
+  });
+
   it('does not create a source-only workspace when there are no fan-out targets', async () => {
     storageMocks.getLocalState.mockResolvedValue(makeLocalState({
       defaultEnabledProviders: createDefaultEnabledProviders(['claude']),

@@ -36,6 +36,16 @@ export type WorkspaceLookupResult = {
 export type PendingWorkspaceCleanupResult = {
   localState: LocalState;
   removedWorkspaceIds: string[];
+  removedWorkspaces: PendingWorkspaceCleanupRemoval[];
+};
+
+export type PendingWorkspaceCleanupRemoval = {
+  workspaceId: string;
+  pendingSource: Provider;
+  reason: 'timed-out';
+  ageMs: number;
+  hasClaimedSourceTab: boolean;
+  hasBoundTargets: boolean;
 };
 
 export function getDefaultEnabledProviderList(state: LocalState, sourceProvider?: Provider): Provider[] {
@@ -407,7 +417,7 @@ export function cleanupPendingWorkspaces(
   timeoutMs = PENDING_WORKSPACE_TIMEOUT_MS,
 ): PendingWorkspaceCleanupResult {
   let nextState = state;
-  const removedWorkspaceIds: string[] = [];
+  const removedWorkspaces: PendingWorkspaceCleanupRemoval[] = [];
 
   for (const workspace of Object.values(state.workspaces)) {
     if (!workspace.pendingSource) {
@@ -431,17 +441,26 @@ export function cleanupPendingWorkspaces(
 
       return provider !== workspace.pendingSource && Boolean(member.sessionId);
     });
-    const isTimedOut = now - workspace.createdAt > timeoutMs;
+    const ageMs = now - workspace.createdAt;
+    const isTimedOut = ageMs > timeoutMs;
 
-    if (isTimedOut || (!hasClaimedSourceTab && !hasBoundTargets)) {
+    if (isTimedOut) {
       nextState = clearWorkspace(nextState, workspace.id);
-      removedWorkspaceIds.push(workspace.id);
+      removedWorkspaces.push({
+        workspaceId: workspace.id,
+        pendingSource: workspace.pendingSource,
+        reason: 'timed-out',
+        ageMs,
+        hasClaimedSourceTab,
+        hasBoundTargets,
+      });
     }
   }
 
   return {
     localState: nextState,
-    removedWorkspaceIds,
+    removedWorkspaceIds: removedWorkspaces.map((workspace) => workspace.workspaceId),
+    removedWorkspaces,
   };
 }
 

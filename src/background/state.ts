@@ -26,6 +26,22 @@ export async function refreshPendingState() {
 
   if (cleanupResult.removedWorkspaceIds.length > 0) {
     await setLocalState(cleanupResult.localState);
+
+    for (const removedWorkspace of cleanupResult.removedWorkspaces) {
+      await logDebug({
+        level: 'warn',
+        scope: 'background',
+        workspaceId: removedWorkspace.workspaceId,
+        provider: removedWorkspace.pendingSource,
+        message: 'Cleaned pending workspace',
+        detail: [
+          `reason=${removedWorkspace.reason}`,
+          `ageMs=${removedWorkspace.ageMs}`,
+          `hasClaimedSourceTab=${removedWorkspace.hasClaimedSourceTab}`,
+          `hasBoundTargets=${removedWorkspace.hasBoundTargets}`,
+        ].join('; '),
+      });
+    }
   }
 
   return {

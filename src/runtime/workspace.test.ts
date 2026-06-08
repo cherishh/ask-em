@@ -312,7 +312,32 @@ describe('workspace state', () => {
     const result = cleanupPendingWorkspaces(state, createEmptySessionState(), 31_500);
 
     expect(result.removedWorkspaceIds).toEqual(['w1']);
+    expect(result.removedWorkspaces).toEqual([
+      expect.objectContaining({
+        workspaceId: 'w1',
+        pendingSource: 'deepseek',
+        reason: 'timed-out',
+        ageMs: 31_400,
+        hasClaimedSourceTab: false,
+        hasBoundTargets: false,
+      }),
+    ]);
     expect(result.localState.workspaces.w1).toBeUndefined();
+  });
+
+  it('keeps a fresh pending workspace while its source tab is being claimed', () => {
+    const state = createPendingWorkspace(createEmptyState(), {
+      sourceProvider: 'claude',
+      sourceUrl: 'https://claude.ai/new',
+      now: 100,
+      workspaceId: 'w1',
+    });
+
+    const result = cleanupPendingWorkspaces(state, createEmptySessionState(), 1_000);
+
+    expect(result.removedWorkspaceIds).toEqual([]);
+    expect(result.removedWorkspaces).toEqual([]);
+    expect(result.localState.workspaces.w1).toBeDefined();
   });
 
   it('marks stale claimed tabs using the heartbeat threshold', () => {
