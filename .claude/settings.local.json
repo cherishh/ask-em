@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/zhongxi/code/fe/ask-em-mkt/**)",
+      "Bash(pnpm -v)",
+      "Bash(npm i:*)",
+      "Bash(corepack enable:*)",
+      "Bash(corepack prepare:*)",
+      "Read(//Users/zhongxi/code/fe/**)",
+      "Bash(rmdir ask-em-mkt:*)",
+      "Bash(pnpm create:*)",
+      "Bash(pnpm exec:*)"
+    ]
+  }
+}
