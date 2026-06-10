@@ -1,4 +1,4 @@
-# 方案 3 计划：结构化 Workspace Issue Metadata
+# 结构化 Workspace Issue Metadata
 
 ## 目标
 
