@@ -43,6 +43,10 @@ export async function persistPresenceObservation({
   });
 
   let nextLocalState = localState;
+  const previousMemberSessionId =
+    nextLocalState.workspaces[workspaceId]?.members[message.provider]?.sessionId ?? null;
+  const previousIssue =
+    nextLocalState.workspaces[workspaceId]?.memberIssues?.[message.provider] ?? null;
 
   if (message.sessionId) {
     nextLocalState = bindWorkspaceMember(nextLocalState, {
@@ -60,8 +64,25 @@ export async function persistPresenceObservation({
     workspaceId,
     message.provider,
     message.pageState,
+    {
+      sessionId: message.sessionId,
+      previousMemberSessionId,
+    },
   );
   nextLocalState = issueUpdate.localState;
+  const nextIssue =
+    nextLocalState.workspaces[workspaceId]?.memberIssues?.[message.provider] ?? null;
+
+  if (previousIssue === 'delivery-failed' && nextIssue === null && message.sessionId) {
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      workspaceId,
+      provider: message.provider,
+      message: 'Recovered unconfirmed delivery from provider presence',
+      detail: `${previousMemberSessionId ?? 'unbound'} -> ${message.sessionId} @ ${message.currentUrl}`,
+    });
+  }
 
   if (message.sessionId || issueUpdate.shouldPersist) {
     await setLocalState(nextLocalState);

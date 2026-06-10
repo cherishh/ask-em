@@ -30,7 +30,7 @@ export function OnboardingCard({
           <div className="askem-onboarding-step-item">
             <span className="askem-onboarding-num">3</span>
             <span>
-              Send your prompt as usual. ask&apos;em opens the other chats in new tabs and syncs it across
+              Send your prompt as usual. ask&apos;em opens new tabs and syncs it across
             </span>
           </div>
         </div>

@@ -37,15 +37,24 @@ export function applyPresenceWorkspaceIssue(
   workspaceId: string,
   provider: Provider,
   pageState: PageState,
+  options: {
+    sessionId?: string | null;
+    previousMemberSessionId?: string | null;
+  } = {},
 ): {
   localState: LocalState;
   shouldPersist: boolean;
 } {
   const issue = getWorkspaceIssueForPageState(pageState);
   const existingIssue = localState.workspaces[workspaceId]?.memberIssues?.[provider] ?? null;
+  const recoveredUnconfirmedDelivery =
+    existingIssue === 'delivery-failed' &&
+    issue === null &&
+    Boolean(options.sessionId) &&
+    options.previousMemberSessionId !== options.sessionId;
 
   if (issue === null) {
-    if (!isPresenceIssue(existingIssue)) {
+    if (!isPresenceIssue(existingIssue) && !recoveredUnconfirmedDelivery) {
       return {
         localState,
         shouldPersist: false,
