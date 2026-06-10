@@ -1,20 +1,20 @@
-# Plan: Structured Workspace Issue Metadata
+# 方案 3 计划：结构化 Workspace Issue Metadata
 
-## Goal
+## 目标
 
-Replace flat workspace issue strings with structured issue metadata so delivery, presence, attachment, and auth failures can be classified, recovered, displayed, and debugged without losing important context.
+把现在的扁平字符串 issue 改成结构化 metadata，让 delivery、presence、attachment、auth 这些来源不同的异常可以被准确分类、恢复、展示和诊断。
 
-The immediate bug class is: a provider accepts a delivered prompt, but session confirmation times out. Later provider presence proves the delivery succeeded. With the current string-only `delivery-failed` state, the app cannot distinguish that recoverable timeout from a real failed delivery.
+这次 bug 的本质是：目标 provider 已经接受了 prompt 投递，但等待 session 确认超时；后续 provider presence 又证明投递其实成功了。当前只有一个字符串 `delivery-failed`，无法区分“可恢复的确认超时”和“真实投递失败”，所以 indicator 会产生假阳性。
 
-## Current State
+## 当前状态
 
-Workspace issues are stored as:
+Workspace issue 现在存成：
 
 ```ts
 memberIssues?: Partial<Record<Provider, WorkspaceIssue>>;
 ```
 
-`WorkspaceIssue` is a string union:
+`WorkspaceIssue` 是字符串 union：
 
 ```ts
 type WorkspaceIssue =
@@ -28,19 +28,19 @@ type WorkspaceIssue =
   | 'unsupported-attachment';
 ```
 
-This is simple, but it collapses separate facts into one value:
+这个模型很简单，但它把很多关键事实压扁了：
 
-- Whether the provider accepted the prompt.
-- Whether the provider confirmed the session.
-- Whether the issue came from presence, delivery, attachment upload, or capability checks.
-- Whether the issue should clear automatically on `ready`, on a new session id, on a future successful delivery, or only by user action.
-- Which submit attempt created the issue.
-- Which URL/session was expected.
-- Which reason was logged.
+- provider 是否已经接受 prompt。
+- provider 是否已经确认 session。
+- issue 来自 presence、delivery、attachment upload 还是 capability check。
+- issue 应该在 `ready` 时自动清理，还是在新 session 出现时清理，还是等下一次成功投递，还是只能手动清理。
+- 哪一次 submit attempt 创建了 issue。
+- 当时期待的 URL/session 是什么。
+- 原始失败 reason 是什么。
 
-## Target Model
+## 目标模型
 
-Introduce a structured issue record while keeping legacy strings readable during migration.
+新增结构化 issue record，同时在迁移期继续兼容旧字符串。
 
 ```ts
 export type WorkspaceIssueType =
@@ -92,57 +92,59 @@ export type WorkspaceIssueRecord = {
 export type WorkspaceIssueValue = WorkspaceIssueType | WorkspaceIssueRecord;
 ```
 
-During rollout, storage should tolerate both legacy string values and v2 records:
+迁移期 storage 允许两种形态共存：
 
 ```ts
 memberIssues?: Partial<Record<Provider, WorkspaceIssueValue>>;
 ```
 
-After migration is proven stable, legacy strings can be removed from storage writes, but read compatibility should remain for at least one release.
+稳定后，新写入都应该写 v2 record；读取路径继续兼容旧字符串至少一个版本，避免用户升级时丢状态或报错。
 
-## Recovery Semantics
+## 恢复语义
 
-Centralize recovery decisions in one module instead of spreading conditionals across presence and delivery code.
+把 issue 的恢复判断集中到一个模块，避免 presence、delivery、indicator 各自维护一套条件。
 
-Proposed helper:
+建议核心 helper：
 
 ```ts
 shouldClearIssueOnPresence(issue, observation): boolean
 ```
 
-Rules:
+规则：
 
-- Presence issue with `recoveryMode: 'clear-on-ready'` clears when page state becomes `ready`.
-- `needs-login` clears when page state becomes `ready`.
-- Recoverable unconfirmed delivery clears when:
-  - issue type is `delivery-failed`,
-  - issue source is `delivery`,
-  - `accepted === true`,
-  - `confirmed === false`,
-  - `recoveryMode === 'clear-on-new-session'`,
-  - current presence has a non-null `sessionId`,
-  - current `sessionId` differs from `previousSessionId` or matches an expected post-delivery session when available.
-- Upload and attachment capability issues do not clear from passive `ready` presence.
-- A later successful delivery to the same provider clears old delivery/upload issues for that provider.
-- Manual issues clear only through explicit workspace/provider removal or user action.
+- `source: 'presence'` 且 `recoveryMode: 'clear-on-ready'` 的 issue，在页面变成 `ready` 时清理。
+- `needs-login` 在页面变成 `ready` 时清理。
+- 可恢复的 unconfirmed delivery 在以下条件全部满足时清理：
+  - `type === 'delivery-failed'`
+  - `source === 'delivery'`
+  - `accepted === true`
+  - `confirmed === false`
+  - `recoveryMode === 'clear-on-new-session'`
+  - 当前 presence 有非空 `sessionId`
+  - 当前 `sessionId` 不等于 `previousSessionId`，或者能匹配预期的 post-delivery session
+- `upload-failed`、`attachment-limit`、`unsupported-attachment` 不因为页面 passive `ready` 就清理。
+- 同一个 provider 后续成功投递时，可以清理旧的 delivery/upload issue。
+- `manual` recovery 的 issue 只通过用户显式操作或 workspace/provider 清理移除。
 
-## Implementation Phases
+## 实施阶段
 
-### Phase 1: Add issue metadata helpers
+### Phase 1：新增 issue metadata helper
 
-Create `src/runtime/workspace-issues.ts`.
+新增文件：
 
-Responsibilities:
+- `src/runtime/workspace-issues.ts`
 
-- Define v2 issue types.
-- Normalize legacy string issues to v2 records for read paths.
-- Convert v2 records to compact labels for UI.
-- Classify delivery results into issue records.
-- Classify page state into presence issue records.
-- Decide whether an issue counts as "needs attention".
-- Decide whether presence or successful delivery clears an issue.
+职责：
 
-Key functions:
+- 定义 v2 issue 类型。
+- 把旧字符串 normalize 成 v2 record，供读取路径统一消费。
+- 把 v2 record 映射成 UI 需要的紧凑 label。
+- 把 delivery result 分类成 issue record。
+- 把 page state 分类成 presence issue record。
+- 判断某个 issue 是否应该算作 needs attention。
+- 判断 presence 或成功 delivery 是否应该清理某个 issue。
+
+建议函数：
 
 ```ts
 normalizeWorkspaceIssue(value, now): WorkspaceIssueRecord | null
@@ -154,22 +156,22 @@ shouldClearIssueOnPresence(issue, observation): boolean
 shouldClearIssueOnDeliverySuccess(issue): boolean
 ```
 
-### Phase 2: Update storage and workspace helpers
+### Phase 2：更新 storage 和 workspace helper
 
-Files:
+涉及文件：
 
 - `src/runtime/types.ts`
 - `src/runtime/workspace.ts`
 - `src/runtime/workspace.test.ts`
 
-Changes:
+改动：
 
-- Update `Workspace.memberIssues` type to accept `WorkspaceIssueValue`.
-- Update `setWorkspaceProviderIssue` to accept either a legacy type or a v2 record.
-- Update `clearWorkspaceProviderIssue` without behavior changes.
-- Keep `WorkspaceSummary.memberIssues` backward compatible at first, or introduce `memberIssueRecords` alongside it for a staged UI migration.
+- 把 `Workspace.memberIssues` 类型改成支持 `WorkspaceIssueValue`。
+- 让 `setWorkspaceProviderIssue` 接受旧字符串或 v2 record。
+- `clearWorkspaceProviderIssue` 行为保持不变。
+- `WorkspaceSummary` 先保持向后兼容，推荐新增 `memberIssueRecords`，让 UI 可以分阶段迁移。
 
-Recommended staged summary shape:
+建议 summary 形态：
 
 ```ts
 type WorkspaceSummary = {
@@ -180,11 +182,11 @@ type WorkspaceSummary = {
 };
 ```
 
-This lets old UI logic keep working while new UI logic moves to metadata.
+这样旧的 indicator 逻辑还能继续读 `memberIssues`，新的诊断和 UI 可以读 `memberIssueRecords`。
 
-### Phase 3: Update issue writers
+### Phase 3：更新 issue 写入路径
 
-Files:
+涉及文件：
 
 - `src/background/presence-issues.ts`
 - `src/background/presence-persistence.ts`
@@ -192,15 +194,15 @@ Files:
 - `src/background/delivery.ts`
 - `src/background/delivery-executor.ts`
 
-Presence:
+Presence 侧：
 
-- Replace string creation in `getWorkspaceIssueForPageState` with `createPresenceIssue`.
-- Use `shouldClearIssueOnPresence` to clear existing records.
-- Log clear events when a structured recoverable issue is resolved.
+- 用 `createPresenceIssue` 替代现在的字符串创建。
+- 用 `shouldClearIssueOnPresence` 判断是否清理已有 issue。
+- 当结构化 recoverable issue 被 presence 恢复时，写明确 debug log。
 
-Delivery:
+Delivery 侧：
 
-- Extend `ProviderDeliveryResult` or pass extra delivery context into issue classification:
+- 扩展 `ProviderDeliveryResult`，或者把额外 delivery context 传给 issue classifier：
   - `submitId`
   - source provider
   - target provider
@@ -211,97 +213,104 @@ Delivery:
   - confirmed
   - blocked
   - reason
-- For `accepted: true, confirmed: false`, write a recoverable v2 `delivery-failed` issue with `recoveryMode: 'clear-on-new-session'`.
-- For true injection failures, write non-recoverable or success-delivery-recoverable metadata depending on failure type.
-- For upload failures, write `source: 'attachment'`, `recoveryMode: 'clear-on-successful-delivery'` or `manual`.
-- For attachment capability failures, write `source: 'capability'`, `recoveryMode: 'manual'`.
+- 对 `accepted: true, confirmed: false` 写入可恢复的 v2 `delivery-failed`：
+  - `source: 'delivery'`
+  - `recoverable: true`
+  - `recoveryMode: 'clear-on-new-session'`
+- 对真实注入失败，根据原因写成 non-recoverable 或 `clear-on-successful-delivery`。
+- 对 upload 失败写：
+  - `source: 'attachment'`
+  - `recoveryMode: 'clear-on-successful-delivery'` 或 `manual`
+- 对 attachment capability 失败写：
+  - `source: 'capability'`
+  - `recoveryMode: 'manual'`
 
-### Phase 4: Update readers and UI
+### Phase 4：更新读取路径和 UI
 
-Files:
+涉及文件：
 
 - `src/background/status.ts`
 - `src/content/indicator.ts`
 - `src/content/ui-render.ts`
 - `src/content/view-runtime.ts`
-- `src/entrypoints/popup/*` if popup renders workspace issues directly
+- `src/entrypoints/popup/*`
 
-Changes:
+改动：
 
-- `buildWorkspaceSummary` should normalize both legacy and v2 issues.
-- Indicator issue count should use `isWorkspaceIssueWarning`.
-- Indicator labels can remain count-based first, then become more specific later.
-- Workspace panel can show issue details from metadata:
-  - "Delivery accepted, waiting for ChatGPT session confirmation"
-  - "Upload failed"
-  - "Login required"
-  - "Attachment count not supported"
+- `buildWorkspaceSummary` normalize 旧字符串和 v2 issue。
+- indicator 计数改用 `isWorkspaceIssueWarning`。
+- 第一阶段 indicator 文案可以继续保持 count-based，避免 UI 一次改太多。
+- workspace panel 可以逐步展示结构化详情：
+  - “Delivery accepted, waiting for ChatGPT session confirmation”
+  - “Upload failed”
+  - “Login required”
+  - “Attachment count not supported”
 
-Avoid adding too much visible text in the first migration. The first goal is correctness and debuggability.
+第一阶段不要加太多新可见文案。目标先是状态正确和诊断清楚。
 
-### Phase 5: Add migration and compatibility tests
+### Phase 5：增加迁移和兼容性测试
 
-No eager destructive migration is required. Prefer lazy normalization on read, with all new writes using v2 records.
+不建议做 eager destructive migration。优先做 lazy normalization：读取时兼容旧值，新写入统一写 v2 record。
 
-Tests:
+测试矩阵：
 
-- Legacy string `delivery-failed` still counts as warning.
-- Legacy string `loading` clears on ready.
-- V2 presence `loading` clears on ready.
-- V2 upload failure does not clear on ready.
-- V2 accepted/unconfirmed delivery clears on new session.
-- V2 accepted/unconfirmed delivery does not clear when ready has no session.
-- V2 accepted/unconfirmed delivery does not clear when already-bound session is unchanged.
-- Successful delivery clears previous delivery issue for the same provider.
-- `buildWorkspaceSummary` returns both legacy issue type and v2 record.
-- Indicator count is unchanged for legacy and v2 issues.
-- Debug logs include issue source and recovery mode for recovered issues.
+- 旧字符串 `delivery-failed` 仍然算 warning。
+- 旧字符串 `loading` 在 ready 时清理。
+- v2 presence `loading` 在 ready 时清理。
+- v2 `upload-failed` 不因为 ready 清理。
+- v2 accepted/unconfirmed delivery 在新 session 出现时清理。
+- v2 accepted/unconfirmed delivery 在 ready 但没有 session 时不清理。
+- v2 accepted/unconfirmed delivery 在已有 session 未变化时不清理。
+- 同 provider 后续成功 delivery 会清理旧 delivery issue。
+- `buildWorkspaceSummary` 同时返回 legacy issue type 和 v2 record。
+- legacy issue 和 v2 issue 对 indicator count 的结果一致。
+- recoverable issue 被清理时，debug log 包含 source 和 recovery mode。
 
-### Phase 6: Clean up old ad hoc logic
+### Phase 6：清理旧的 ad hoc 逻辑
 
-After all write paths produce v2 records:
+当所有写入路径都写 v2 record 后：
 
-- Remove issue-specific string conditionals from `presence-issues.ts`.
-- Move delivery reason parsing into `workspace-issues.ts`.
-- Keep legacy read compatibility.
-- Update docs in `docs/architecture/state-ownership.md` or add a short workspace issue architecture note.
+- 删除 `presence-issues.ts` 里零散的字符串条件判断。
+- 把 delivery reason parsing 集中到 `workspace-issues.ts`。
+- 继续保留 legacy read compatibility。
+- 在 `docs/architecture/state-ownership.md` 或新文档里补一段 workspace issue 架构说明。
 
-## Acceptance Criteria
+## 验收标准
 
-- All existing tests pass.
-- New tests cover legacy string issues and v2 records.
-- A provider that accepted a new-chat delivery but timed out waiting for session ref no longer leaves a permanent false `delivery-failed` once a new session is observed.
-- Upload failures and unsupported attachment issues are not cleared merely because the page becomes ready.
-- Indicator behavior remains stable for existing issue types.
-- Debug logs make it clear whether an issue was created by presence, delivery, attachment upload, or capability checks.
-- Stored state from old extension versions remains readable.
+- 所有现有测试通过。
+- 新测试覆盖旧字符串和 v2 record。
+- provider 已接受 new-chat delivery 但 session ref timeout 后，如果之后观察到新 session，不再留下永久 false `delivery-failed`。
+- upload failure 和 unsupported attachment issue 不会仅因为页面变 ready 就被清理。
+- indicator 对现有 issue 类型的行为保持稳定。
+- debug log 能看出 issue 是由 presence、delivery、attachment upload 还是 capability check 创建。
+- 老版本 extension 写入的 storage 状态仍然可读。
 
-## Risks
+## 风险
 
-- Changing storage shape can break old assumptions in popup/content code.
-- Over-eager recovery can hide true failed deliveries.
-- Keeping both legacy and v2 issue shapes temporarily increases type complexity.
-- More detailed issue metadata may expose noisy internal messages in UI if not carefully mapped.
+- storage shape 变化可能打破 popup/content 里的旧假设。
+- 恢复规则过宽会隐藏真实投递失败。
+- 迁移期同时支持旧字符串和 v2 record，会增加类型复杂度。
+- issue metadata 里的内部 reason 如果直接展示到 UI，可能会显得噪声很大。
 
-Mitigation:
+缓解方式：
 
-- Normalize through one helper module.
-- Keep UI labels conservative.
-- Write focused tests around recovery boundaries.
-- Avoid eager migration until v2 read/write paths are stable.
+- 所有读写都通过 `workspace-issues.ts` normalize。
+- UI 文案第一阶段保持保守，不直接展示原始 reason。
+- 对恢复边界写聚焦测试。
+- v2 读写稳定前不做 eager migration。
 
-## Recommended Commit Sequence
+## 推荐提交顺序
 
-1. Add `workspace-issues.ts` with types, normalization, and tests.
-2. Update runtime types and workspace helpers to accept v2 records.
-3. Update presence issue write and recovery paths.
-4. Update delivery issue classification to write v2 records.
-5. Update summary, indicator, and panel readers to use normalized metadata.
-6. Add migration compatibility tests and remove duplicated string parsing.
+1. 新增 `workspace-issues.ts`，包含类型、normalize、分类和测试。
+2. 更新 runtime types 和 workspace helper，让 storage 接受 v2 record。
+3. 更新 presence issue 写入和恢复路径。
+4. 更新 delivery issue classification，让 delivery 写 v2 record。
+5. 更新 summary、indicator、workspace panel 读取逻辑。
+6. 增加迁移兼容测试，删除重复字符串解析。
 
-## Open Questions
+## 待确认问题
 
-- Should `WorkspaceSummary` expose both `memberIssues` and `memberIssueRecords`, or should all consumers migrate in one commit?
-- Should `submitId` be stored in local state long term, or should it be reduced to a short diagnostic id?
-- Should recoverable unconfirmed delivery be shown as warning immediately, or as a lower-severity pending confirmation state?
-- Should old non-recoverable `delivery-failed` strings be treated as manual recovery only, or normalized as recoverable when the member had no previous session?
+- `WorkspaceSummary` 是同时暴露 `memberIssues` 和 `memberIssueRecords`，还是一次性迁移所有 consumer？
+- `submitId` 是否应该长期存入 local state，还是只存短 diagnostic id？
+- recoverable unconfirmed delivery 是否应该立刻显示 warning，还是显示低一级的 pending confirmation 状态？
+- 老的非结构化 `delivery-failed` 字符串应该按 manual recovery 处理，还是在 member 之前没有 session 时推断为 recoverable？
