@@ -109,6 +109,30 @@ describe('applyPresenceWorkspaceIssue', () => {
     expect(result.shouldPersist).toBe(false);
   });
 
+  it('does not let transient page issues overwrite durable delivery issues', () => {
+    const state = makeLocalState({
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          enabledProviders: ['chatgpt', 'deepseek'],
+          memberIssues: {
+            deepseek: 'delivery-failed',
+          },
+        }),
+      },
+    });
+
+    const errorResult = applyPresenceWorkspaceIssue(state, 'w1', 'deepseek', 'error');
+
+    expect(errorResult.localState.workspaces.w1.memberIssues?.deepseek).toBe('delivery-failed');
+    expect(errorResult.shouldPersist).toBe(false);
+
+    const readyResult = applyPresenceWorkspaceIssue(errorResult.localState, 'w1', 'deepseek', 'ready');
+
+    expect(readyResult.localState.workspaces.w1.memberIssues?.deepseek).toBe('delivery-failed');
+    expect(readyResult.shouldPersist).toBe(false);
+  });
+
   it('still clears transient presence issues when the provider becomes ready', () => {
     const state = makeLocalState({
       workspaces: {

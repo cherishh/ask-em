@@ -67,6 +67,13 @@ export function applyPresenceWorkspaceIssue(
     };
   }
 
+  if (existingIssue && !isPresenceIssue(existingIssue)) {
+    return {
+      localState,
+      shouldPersist: false,
+    };
+  }
+
   return {
     localState: setWorkspaceProviderIssue(localState, workspaceId, provider, issue),
     shouldPersist: true,
