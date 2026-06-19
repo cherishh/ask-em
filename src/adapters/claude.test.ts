@@ -529,6 +529,81 @@ describe('Claude attachment delivery adapter', () => {
     expect(clicked).toBe(true);
   });
 
+  it('does not click Claude voice or audio controls when no send button is visible', async () => {
+    mockClaudeComposerLayout(rectSpy);
+    document.body.innerHTML = `
+      <fieldset data-rect="648,335,672,122">
+        <input data-testid="file-upload" aria-label="Upload files" type="file" />
+        <div data-testid="chat-input" contenteditable="true" data-rect="669,356,638,22">ask-em ui probe</div>
+        <button type="button" aria-label="Add files, connectors, and more" data-rect="665,410,32,32"></button>
+        <button type="button" aria-label="Audio settings" data-rect="1235,410,32,32"></button>
+        <button type="button" aria-label="Turn off microphone" data-rect="1268,410,32,32"></button>
+        <button type="submit" aria-label="Use voice mode" data-rect="1286,410,32,32"></button>
+        <button type="button" aria-label="Stop" data-rect="1286,410,32,32"></button>
+      </fieldset>
+    `;
+    const clickedControls: string[] = [];
+    for (const button of document.querySelectorAll<HTMLButtonElement>('button')) {
+      button.addEventListener('click', () => {
+        clickedControls.push(button.getAttribute('aria-label') ?? '');
+      });
+    }
+    let enterDispatched = false;
+    document.querySelector<HTMLElement>('[data-testid="chat-input"]')?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        enterDispatched = true;
+      }
+    });
+
+    await claudeAdapter.composer?.submit({ timeoutMs: 10 });
+
+    expect(clickedControls).toEqual([]);
+    expect(enterDispatched).toBe(true);
+  });
+
+  it('does not capture Claude dictation done clicks until the real send button is clicked', () => {
+    mockClaudeComposerLayout(rectSpy);
+    document.body.innerHTML = `
+      <fieldset data-rect="648,335,672,122">
+        <div data-testid="chat-input" contenteditable="true" data-rect="669,356,638,22">dictated claude text</div>
+        <button type="button" aria-label="Cancel dictation" data-rect="1235,410,32,32"></button>
+        <button type="button" aria-label="Finish dictation" data-rect="1286,410,32,32"></button>
+        <button type="button" aria-label="Done" data-rect="1286,410,32,32"></button>
+      </fieldset>
+    `;
+    const onSubmit = vi.fn();
+    const unsubscribe = claudeAdapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+
+    document.querySelector<HTMLButtonElement>('button[aria-label="Finish dictation"]')?.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true }),
+    );
+    document.querySelector<HTMLButtonElement>('button[aria-label="Finish dictation"]')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
+    document.querySelector<HTMLButtonElement>('button[aria-label="Done"]')?.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true }),
+    );
+    document.querySelector<HTMLButtonElement>('button[aria-label="Done"]')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
+
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    document.querySelector('fieldset')?.insertAdjacentHTML(
+      'beforeend',
+      '<button type="button" aria-label="Send message" data-rect="1286,410,32,32"></button>',
+    );
+    document.querySelector<HTMLButtonElement>('button[aria-label="Send message"]')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'dictated claude text',
+      attachments: [],
+    }));
+    unsubscribe?.();
+  });
+
   it('captures localized Claude send button clicks from the composer control row', () => {
     mockClaudeComposerLayout(rectSpy);
     document.body.innerHTML = `

@@ -127,6 +127,15 @@ function hasClaudeSubmittableContent(
 }
 
 function isClaudeSubmitCandidateButton(button: HTMLElement): boolean {
+  if (!isClaudeExplicitSendButton(button)) {
+    return false;
+  }
+
+  const rect = button.getBoundingClientRect();
+  return rect.width <= 72 && rect.height <= 72;
+}
+
+function isClaudeExplicitSendButton(button: HTMLElement): boolean {
   if (!isVisible(button) || button.hasAttribute('disabled') || button.getAttribute('aria-disabled') === 'true') {
     return false;
   }
@@ -139,8 +148,63 @@ function isClaudeSubmitCandidateButton(button: HTMLElement): boolean {
     return false;
   }
 
-  const rect = button.getBoundingClientRect();
-  return rect.width <= 72 && rect.height <= 72;
+  if (isClaudeNonSendControlButton(button)) {
+    return false;
+  }
+
+  return true;
+}
+
+function isClaudeNonSendControlButton(button: HTMLElement): boolean {
+  const text = compactAttachmentText(getElementTreeAccessibleText(button));
+  const testId = compactAttachmentText(button.getAttribute('data-testid') ?? '');
+  const combined = `${text} ${testId}`;
+  const nonSendSignals = [
+    'addfiles',
+    'audio',
+    'connectors',
+    'configuracion',
+    'done',
+    'dictation',
+    'finish',
+    'finishdictation',
+    'grabar',
+    'microphone',
+    'model',
+    'record',
+    'settings',
+    'stop',
+    'turnoffmicrophone',
+    'usevoicemode',
+    'voicemode',
+    '录音',
+    '语音',
+    '麦克风',
+  ];
+
+  return nonSendSignals.some((signal) => combined.includes(signal));
+}
+
+function isClaudeDictationSubmitButton(button: HTMLElement): boolean {
+  const text = compactAttachmentText(getElementTreeAccessibleText(button));
+  const testId = compactAttachmentText(button.getAttribute('data-testid') ?? '');
+  const combined = `${text} ${testId}`;
+
+  return combined.includes('submitdictation');
+}
+
+function isBasicEnabledButton(button: HTMLElement): boolean {
+  return (
+    isVisible(button) &&
+    !button.hasAttribute('disabled') &&
+    button.getAttribute('aria-disabled') !== 'true'
+  );
+}
+
+function isClaudeUserSubmitButtonEnabled(button: HTMLElement): boolean {
+  return isClaudeDictationSubmitButton(button)
+    ? isBasicEnabledButton(button)
+    : isClaudeExplicitSendButton(button);
 }
 
 function findClaudeSendButtonByComposerLayout(
@@ -284,13 +348,56 @@ function findClaudeSendButton(findComposer: () => HTMLElement | null): HTMLEleme
   ];
 
   for (const selector of selectors) {
-    const button = Array.from(container.querySelectorAll<HTMLElement>(selector)).find(isVisible);
+    const button = Array.from(container.querySelectorAll<HTMLElement>(selector)).find(isClaudeExplicitSendButton);
     if (button) {
       return button;
     }
   }
 
   return findClaudeSendButtonByComposerLayout(composer, container);
+}
+
+function findClaudeUserSubmitButtons(context: {
+  findComposer: () => HTMLElement | null;
+  findSendButton: () => HTMLElement | null;
+}): HTMLElement[] {
+  const composer = context.findComposer();
+  const sendButton = context.findSendButton();
+  const container = findClaudeComposerRoot(composer);
+  const buttons = [
+    sendButton,
+    ...Array.from(
+      container instanceof Element || container instanceof Document
+        ? container.querySelectorAll<HTMLElement>('button')
+        : [],
+    ).filter(isClaudeDictationSubmitButton),
+  ].filter((button): button is HTMLElement => Boolean(button));
+
+  return buttons.filter((button, index) => buttons.indexOf(button) === index);
+}
+
+function getClaudeUserMessageTexts(): string[] {
+  const headingTexts = Array.from(document.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6'))
+    .filter(isVisible)
+    .map(getElementAccessibleText)
+    .filter((text) => /^you said:/i.test(text))
+    .map((text) => text.replace(/^you said:\s*/i, ''))
+    .filter((text) => text.length > 0);
+
+  if (headingTexts.length > 0) {
+    return headingTexts;
+  }
+
+  const messageTexts = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      '[data-testid*="user-message" i], [data-testid*="human-message" i], [data-testid*="message-user" i]',
+    ),
+  )
+    .filter(isVisible)
+    .map(getElementTreeAccessibleText)
+    .filter(Boolean);
+
+  return messageTexts;
 }
 
 function getClaudeFileThumbnailItems(container: ParentNode): string[] {
@@ -348,6 +455,9 @@ export const claudeAdapter = createDomProviderAdapter({
   composerSelectors: ['[data-testid="chat-input"]', '[aria-label="Write your prompt to Claude"]'],
   sendButtonSelectors: ['button[aria-label*="send" i]', 'button[data-testid*="send" i]', 'button[type="submit"]'],
   findSendButton: findClaudeSendButton,
+  findUserSubmitButtons: findClaudeUserSubmitButtons,
+  isUserSubmitButtonEnabled: isClaudeUserSubmitButtonEnabled,
+  getUserMessageTexts: getClaudeUserMessageTexts,
   isErrorPage() {
     return detectHardErrorPage({
       pageKeywords: ['conversation not found'],

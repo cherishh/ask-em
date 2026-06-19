@@ -53,12 +53,19 @@ type DomProviderAdapterConfig = {
   composerSelectors: string[];
   sendButtonSelectors?: string[];
   findSendButton?: (findComposer: () => HTMLElement | null) => HTMLElement | null;
+  findUserSubmitButtons?: (context: {
+    findComposer: () => HTMLElement | null;
+    findSendButton: () => HTMLElement | null;
+  }) => HTMLElement[];
+  getUserMessageTexts?: () => string[];
+  deferredUserSubmitTextTimeoutMs?: number;
   loginKeywords?: string[];
   isErrorPage?: () => boolean;
   submitWaitMs?: number;
   submitTimeoutMs?: number;
   pastedTextAttachmentMinChars?: number;
   isSendButtonEnabled?: (button: HTMLElement) => boolean;
+  isUserSubmitButtonEnabled?: (button: HTMLElement) => boolean;
   useGenericAttachmentSnapshot?: boolean;
   setComposerPayload?: (
     payload: ComposerPayload,
@@ -139,6 +146,10 @@ function containsCapturedAttachmentName(text: string, capturedAttachments: Attac
   });
 }
 
+function isDeferredSubmitLabelOnly(text: string): boolean {
+  return /^(you said|user said|你说|你发送了)[:：]?$/i.test(normalizeWhitespace(text));
+}
+
 function findGenericAttachmentSnapshotLabels(
   container: ParentNode,
   capturedAttachments: AttachmentRef[],
@@ -195,6 +206,17 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
   const isAttachmentCaptureSuppressed = () => Date.now() < suppressAttachmentCaptureUntil;
   const isSendButtonEnabled = (button: HTMLElement) =>
     config.isSendButtonEnabled ? config.isSendButtonEnabled(button) : !button.hasAttribute('disabled');
+  const isUserSubmitButtonEnabled = (button: HTMLElement) =>
+    config.isUserSubmitButtonEnabled ? config.isUserSubmitButtonEnabled(button) : isSendButtonEnabled(button);
+  const findUserSubmitButtons = (): HTMLElement[] => {
+    prepareDom();
+    if (config.findUserSubmitButtons) {
+      return config.findUserSubmitButtons({ findComposer, findSendButton });
+    }
+
+    const sendButton = findSendButton();
+    return sendButton ? [sendButton] : [];
+  };
   const isFileInputForComposer = (input: HTMLInputElement) => {
     if (input.type !== 'file') {
       return false;
@@ -343,6 +365,12 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     composer: {
       subscribeToUserSubmissions(onSubmit) {
         const attachmentBuffer = new ComposerAttachmentCaptureBuffer();
+        let pendingDeferredSubmitBaseline: {
+          button: HTMLElement;
+          messages: string[];
+          capturedAt: number;
+          waitStarted: boolean;
+        } | null = null;
         const buildUserSubmissionPayload = (text: string) => {
           let capturedAttachments = attachmentBuffer.getAttachmentsForSubmit();
           if (capturedAttachments.length === 0) {
@@ -454,10 +482,104 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
           }
         };
 
+        const waitForDeferredSubmittedText = (
+          baselineUserMessages: string[],
+          submitButton: HTMLElement,
+        ) => {
+          void waitFor(() => {
+            const currentUserMessages = config.getUserMessageTexts?.()
+              .map(normalizeWhitespace)
+              .filter(Boolean) ?? [];
+            if (currentUserMessages.length <= baselineUserMessages.length) {
+              return null;
+            }
+
+            const submittedText = currentUserMessages.at(-1);
+            return submittedText && !isDeferredSubmitLabelOnly(submittedText) ? submittedText : null;
+          }, config.deferredUserSubmitTextTimeoutMs ?? 4_000).then((submittedText) => {
+            if (!submittedText) {
+              return;
+            }
+
+            if (
+              pendingDeferredSubmitBaseline?.button === submitButton &&
+              pendingDeferredSubmitBaseline.waitStarted
+            ) {
+              pendingDeferredSubmitBaseline = null;
+            }
+
+            onSubmit(buildUserSubmissionPayload(submittedText));
+          });
+        };
+
+        const captureDeferredSubmitBaseline = (event: Event) => {
+          if (!config.getUserMessageTexts) {
+            return;
+          }
+
+          const submitButton = findUserSubmitButtons().find(
+            (button) => isUserSubmitButtonEnabled(button) && isElementWithin(event.target, button),
+          );
+          if (!submitButton) {
+            return;
+          }
+
+          if (getEditableText(findComposer()).trim().length > 0) {
+            pendingDeferredSubmitBaseline = null;
+            return;
+          }
+
+          if (
+            pendingDeferredSubmitBaseline?.button === submitButton &&
+            Date.now() - pendingDeferredSubmitBaseline.capturedAt < 500
+          ) {
+            return;
+          }
+
+          pendingDeferredSubmitBaseline = {
+            button: submitButton,
+            messages: config.getUserMessageTexts()
+              .map(normalizeWhitespace)
+              .filter(Boolean),
+            capturedAt: Date.now(),
+            waitStarted: true,
+          };
+          waitForDeferredSubmittedText(pendingDeferredSubmitBaseline.messages, submitButton);
+        };
+
         const handleClick = (event: MouseEvent) => {
-          const sendButton = findSendButton();
-          if (sendButton && isSendButtonEnabled(sendButton) && isElementWithin(event.target, sendButton)) {
-            onSubmit(buildUserSubmissionPayload(getEditableText(findComposer())));
+          const submitButton = findUserSubmitButtons().find(
+            (button) => isUserSubmitButtonEnabled(button) && isElementWithin(event.target, button),
+          );
+          if (submitButton) {
+            const payload = buildUserSubmissionPayload(getEditableText(findComposer()));
+            if (payload.text.trim().length > 0 || payload.attachments.length > 0) {
+              onSubmit(payload);
+              return;
+            }
+
+            const pendingBaseline =
+              pendingDeferredSubmitBaseline &&
+              pendingDeferredSubmitBaseline.button === submitButton &&
+              Date.now() - pendingDeferredSubmitBaseline.capturedAt < 5_000
+                ? pendingDeferredSubmitBaseline
+                : null;
+            if (pendingBaseline?.waitStarted) {
+              return;
+            }
+
+            pendingDeferredSubmitBaseline = null;
+            const baselineUserMessages = pendingBaseline ?? config.getUserMessageTexts?.()
+              .map(normalizeWhitespace)
+              .filter(Boolean);
+            if (!baselineUserMessages) {
+              return;
+            }
+
+            waitForDeferredSubmittedText(
+              Array.isArray(baselineUserMessages) ? baselineUserMessages : baselineUserMessages.messages,
+              submitButton,
+            );
           }
         };
 
@@ -466,6 +588,8 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
         document.addEventListener('change', handleFileInputChange, true);
         window.addEventListener('message', handleTransientFilesMessage);
         document.addEventListener('keydown', handleKeydown, true);
+        document.addEventListener('pointerdown', captureDeferredSubmitBaseline, true);
+        document.addEventListener('mousedown', captureDeferredSubmitBaseline, true);
         document.addEventListener('click', handleClick, true);
 
         return () => {
@@ -474,6 +598,8 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
           document.removeEventListener('change', handleFileInputChange, true);
           window.removeEventListener('message', handleTransientFilesMessage);
           document.removeEventListener('keydown', handleKeydown, true);
+          document.removeEventListener('pointerdown', captureDeferredSubmitBaseline, true);
+          document.removeEventListener('mousedown', captureDeferredSubmitBaseline, true);
           document.removeEventListener('click', handleClick, true);
         };
       },

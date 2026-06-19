@@ -309,6 +309,7 @@ export function createDeliveryController(
         sendResponse({
           ok: false,
           error: error instanceof Error ? error.message : String(error),
+          diagnostic: diagnostic ?? undefined,
         });
       }
     })();

@@ -85,6 +85,97 @@ function compactAttachmentText(value: string): string {
   return normalizeWhitespace(value).replace(/\s+/g, '').toLowerCase();
 }
 
+function isChatgptNonSendControlButton(button: HTMLElement): boolean {
+  const text = compactAttachmentText(getElementAccessibleText(button));
+  const testId = compactAttachmentText(button.getAttribute('data-testid') ?? '');
+  const id = compactAttachmentText(button.id);
+  const combined = `${text} ${testId} ${id}`;
+  const nonSendSignals = [
+    'dictation',
+    'microphone',
+    'record',
+    'startdictation',
+    'startvoice',
+    'stop',
+    'voice',
+    '录音',
+    '语音',
+    '麦克风',
+  ];
+
+  return nonSendSignals.some((signal) => combined.includes(signal));
+}
+
+function isChatgptSendButtonEnabled(button: HTMLElement): boolean {
+  return (
+    isVisible(button) &&
+    !button.hasAttribute('disabled') &&
+    button.getAttribute('aria-disabled') !== 'true' &&
+    !isChatgptNonSendControlButton(button)
+  );
+}
+
+function isChatgptDictationSubmitButton(button: HTMLElement): boolean {
+  const text = compactAttachmentText(getElementAccessibleText(button));
+  const testId = compactAttachmentText(button.getAttribute('data-testid') ?? '');
+  const combined = `${text} ${testId}`;
+
+  return combined.includes('submitdictation');
+}
+
+function isBasicEnabledButton(button: HTMLElement): boolean {
+  return (
+    isVisible(button) &&
+    !button.hasAttribute('disabled') &&
+    button.getAttribute('aria-disabled') !== 'true'
+  );
+}
+
+function isChatgptUserSubmitButtonEnabled(button: HTMLElement): boolean {
+  return isChatgptDictationSubmitButton(button)
+    ? isBasicEnabledButton(button)
+    : isChatgptSendButtonEnabled(button);
+}
+
+function findChatgptUserSubmitButtons(context: {
+  findComposer: () => HTMLElement | null;
+  findSendButton: () => HTMLElement | null;
+}): HTMLElement[] {
+  const composer = context.findComposer();
+  const sendButton = context.findSendButton();
+  const root = findChatgptComposerRoot(composer, sendButton);
+  const buttons = [
+    sendButton,
+    ...Array.from(
+      root instanceof Element || root instanceof Document
+        ? root.querySelectorAll<HTMLElement>('button')
+        : [],
+    ).filter(isChatgptDictationSubmitButton),
+  ].filter((button): button is HTMLElement => Boolean(button));
+
+  return buttons.filter((button, index) => buttons.indexOf(button) === index);
+}
+
+function getChatgptUserMessageTexts(): string[] {
+  const roleMessages = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-message-author-role="user"], [data-testid*="user-message" i]'),
+  )
+    .filter(isVisible)
+    .map(getElementAccessibleText)
+    .filter(Boolean);
+
+  if (roleMessages.length > 0) {
+    return roleMessages;
+  }
+
+  return Array.from(document.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6'))
+    .filter(isVisible)
+    .map(getElementAccessibleText)
+    .filter((text) => /^you said:/i.test(text))
+    .map((text) => text.replace(/^you said:\s*/i, ''))
+    .filter((text) => text.length > 0);
+}
+
 // True when an element's accessible text exposes a filename token (e.g. a file
 // tile labeled "old.pdf"). Image tiles expose no filename ("Uploaded image"), so
 // they return false. Used to tell a non-matching NAMED draft (skip — it is a
@@ -268,6 +359,10 @@ export const chatgptAdapter = createDomProviderAdapter({
     'button[aria-label="Send prompt"]',
     'form[aria-label="Chat with ChatGPT"] button[class*="composer-submit-button"]',
   ],
+  isSendButtonEnabled: isChatgptSendButtonEnabled,
+  findUserSubmitButtons: findChatgptUserSubmitButtons,
+  isUserSubmitButtonEnabled: isChatgptUserSubmitButtonEnabled,
+  getUserMessageTexts: getChatgptUserMessageTexts,
   isErrorPage() {
     return detectHardErrorPage({
       pageKeywords: ['unable to load conversation', 'conversation not found'],

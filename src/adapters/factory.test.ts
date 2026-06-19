@@ -84,6 +84,155 @@ describe('dom provider adapter submit detection', () => {
     unsubscribe?.();
   });
 
+  it('lets providers observe source-only submit buttons without changing delivery submit', async () => {
+    document.body.innerHTML = `
+      <div id="composer" contenteditable="true">voice text</div>
+      <button id="send">Send</button>
+      <button id="dictation-send">Submit dictation</button>
+    `;
+
+    const onSubmit = vi.fn();
+    const clicked: string[] = [];
+    document.getElementById('send')?.addEventListener('click', () => {
+      clicked.push('send');
+    });
+    document.getElementById('dictation-send')?.addEventListener('click', () => {
+      clicked.push('dictation');
+    });
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: ['#send'],
+      findUserSubmitButtons: () => Array.from(document.querySelectorAll<HTMLElement>('#send, #dictation-send')),
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    document.getElementById('dictation-send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'voice text',
+      attachments: [],
+      onConsumed: expect.any(Function),
+    }));
+
+    await adapter.composer?.submit({ timeoutMs: 10 });
+
+    expect(clicked).toEqual(['dictation', 'send']);
+    unsubscribe?.();
+  });
+
+  it('recovers text from a newly inserted user message when a source submit clears the composer first', async () => {
+    document.body.innerHTML = `
+      <main>
+        <div class="user-message">previous</div>
+      </main>
+      <div id="composer" contenteditable="true"></div>
+      <button id="dictation-send">Submit dictation</button>
+    `;
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: [],
+      findUserSubmitButtons: () => [document.getElementById('dictation-send') as HTMLElement],
+      getUserMessageTexts: () => Array.from(document.querySelectorAll<HTMLElement>('.user-message'))
+        .map((element) => element.textContent ?? ''),
+      deferredUserSubmitTextTimeoutMs: 500,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    document.getElementById('dictation-send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document.querySelector('main')?.insertAdjacentHTML('beforeend', '<div class="user-message">dictated later</div>');
+
+    await vi.waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        text: 'dictated later',
+        attachments: [],
+      }));
+    });
+    unsubscribe?.();
+  });
+
+  it('uses the pre-click baseline when a dictation submit inserts the message before click handlers run', async () => {
+    document.body.innerHTML = `
+      <main>
+        <div class="user-message">previous</div>
+      </main>
+      <div id="composer" contenteditable="true"></div>
+      <button id="dictation-send">Submit dictation</button>
+    `;
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: [],
+      findUserSubmitButtons: () => [document.getElementById('dictation-send') as HTMLElement],
+      getUserMessageTexts: () => Array.from(document.querySelectorAll<HTMLElement>('.user-message'))
+        .map((element) => element.textContent ?? ''),
+      deferredUserSubmitTextTimeoutMs: 500,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    document.getElementById('dictation-send')?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    document.querySelector('main')?.insertAdjacentHTML('beforeend', '<div class="user-message">already inserted</div>');
+    document.getElementById('dictation-send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        text: 'already inserted',
+        attachments: [],
+      }));
+    });
+    unsubscribe?.();
+  });
+
+  it('does not recover deferred submit text from a label-only user message', async () => {
+    document.body.innerHTML = `
+      <main>
+        <div class="user-message">previous</div>
+      </main>
+      <div id="composer" contenteditable="true"></div>
+      <button id="dictation-send">Submit dictation</button>
+    `;
+
+    const onSubmit = vi.fn();
+    const adapter = createDomProviderAdapter({
+      provider: 'chatgpt',
+      mountId: 'ask-em-chatgpt-ui',
+      className: 'ask-em-chatgpt-ui',
+      composerSelectors: ['#composer'],
+      sendButtonSelectors: [],
+      findUserSubmitButtons: () => [document.getElementById('dictation-send') as HTMLElement],
+      getUserMessageTexts: () => Array.from(document.querySelectorAll<HTMLElement>('.user-message'))
+        .map((element) => element.textContent ?? ''),
+      deferredUserSubmitTextTimeoutMs: 500,
+    });
+
+    const unsubscribe = adapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+    document.getElementById('dictation-send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document.querySelector('main')?.insertAdjacentHTML('beforeend', '<div class="user-message">You said</div>');
+    await Promise.resolve();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    document.querySelector<HTMLElement>('.user-message:last-child')?.append(' actual dictated text');
+
+    await vi.waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        text: 'You said actual dictated text',
+        attachments: [],
+      }));
+    });
+    unsubscribe?.();
+  });
+
   it('reports private mode as not sync-eligible', () => {
     document.body.innerHTML = `
       <div id="composer" contenteditable="true">hello</div>

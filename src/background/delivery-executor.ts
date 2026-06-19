@@ -17,6 +17,7 @@ type DeliverPromptResponse = {
   confirmed?: boolean;
   blocked?: boolean;
   error?: string;
+  diagnostic?: string;
 };
 
 type AttemptProviderDeliveryInput = {
@@ -44,6 +45,7 @@ async function logFailedDeliveryPayload(
   payload: DeliverPromptResponse | undefined,
 ) {
   const reason = getFailedDeliveryPayloadReason(payload);
+  const detail = payload?.diagnostic ? `${reason}; ${payload.diagnostic}` : reason;
 
   await logDebug({
     level: payload?.blocked || payload?.confirmed === false ? 'warn' : 'error',
@@ -55,7 +57,7 @@ async function logFailedDeliveryPayload(
       : payload?.blocked
         ? 'Prompt delivery blocked'
         : 'Prompt delivery failed',
-    detail: reason,
+    detail,
   });
 
   return {

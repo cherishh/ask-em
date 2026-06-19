@@ -110,6 +110,55 @@ describe('ChatGPT attachment delivery adapter', () => {
     expect(pastedFiles[0]?.name).toBe('sample.pdf');
   });
 
+  it('does not click ChatGPT voice or dictation controls matched by stale send selectors', async () => {
+    document.body.innerHTML = `
+      <form data-type="unified-composer" aria-label="Chat with ChatGPT">
+        <div id="prompt-textarea" role="textbox" aria-label="Chat with ChatGPT" contenteditable="true">ask-em probe</div>
+        <button id="composer-submit-button" type="button" aria-label="Start Voice"></button>
+        <button data-testid="send-button" type="button" aria-label="Start dictation"></button>
+      </form>
+    `;
+    const clickedControls: string[] = [];
+    for (const button of document.querySelectorAll<HTMLButtonElement>('button')) {
+      button.addEventListener('click', () => {
+        clickedControls.push(button.getAttribute('aria-label') ?? '');
+      });
+    }
+    let enterDispatched = false;
+    document.getElementById('prompt-textarea')?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        enterDispatched = true;
+      }
+    });
+
+    await chatgptAdapter.composer?.submit({ timeoutMs: 10 });
+
+    expect(clickedControls).toEqual([]);
+    expect(enterDispatched).toBe(true);
+  });
+
+  it('captures ChatGPT dictation submit clicks as user submissions', () => {
+    document.body.innerHTML = `
+      <form data-type="unified-composer" aria-label="Chat with ChatGPT">
+        <div id="prompt-textarea" role="textbox" aria-label="Chat with ChatGPT" contenteditable="true">dictated text</div>
+        <button type="button" aria-label="Cancel dictation"></button>
+        <button type="button" aria-label="Submit dictation"></button>
+      </form>
+    `;
+    const onSubmit = vi.fn();
+    const unsubscribe = chatgptAdapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+
+    document.querySelector<HTMLButtonElement>('button[aria-label="Submit dictation"]')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'dictated text',
+      attachments: [],
+    }));
+    unsubscribe?.();
+  });
+
   it('reports attachment presence from ChatGPT file tiles that show expected filenames', async () => {
     document.body.innerHTML = `
       <form data-type="unified-composer">
