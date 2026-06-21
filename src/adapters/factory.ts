@@ -50,6 +50,7 @@ type DomProviderAdapterConfig = {
   };
   isLoginRequired?: () => boolean;
   isPrivateMode?: () => boolean;
+  isPageEligible?: () => boolean;
   composerSelectors: string[];
   sendButtonSelectors?: string[];
   findSendButton?: (findComposer: () => HTMLElement | null) => HTMLElement | null;
@@ -190,15 +191,28 @@ function getAttachmentSnapshotContainer(
 
 export function createDomProviderAdapter(config: DomProviderAdapterConfig): ProviderAdapter {
   const site = getSiteInfoByProvider(config.provider);
+  const isPageEligible = () => config.isPageEligible?.() ?? true;
 
   const prepareDom = () => {
+    if (!isPageEligible()) {
+      return;
+    }
+
     config.prepareDom?.();
   };
   const findComposer = () => {
+    if (!isPageEligible()) {
+      return null;
+    }
+
     prepareDom();
     return queryVisible(config.composerSelectors);
   };
   const findSendButton = () => {
+    if (!isPageEligible()) {
+      return null;
+    }
+
     prepareDom();
     return config.findSendButton ? config.findSendButton(findComposer) : queryVisible(config.sendButtonSelectors ?? []);
   };
@@ -209,6 +223,10 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
   const isUserSubmitButtonEnabled = (button: HTMLElement) =>
     config.isUserSubmitButtonEnabled ? config.isUserSubmitButtonEnabled(button) : isSendButtonEnabled(button);
   const findUserSubmitButtons = (): HTMLElement[] => {
+    if (!isPageEligible()) {
+      return [];
+    }
+
     prepareDom();
     if (config.findUserSubmitButtons) {
       return config.findUserSubmitButtons({ findComposer, findSendButton });
@@ -218,6 +236,10 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     return sendButton ? [sendButton] : [];
   };
   const isFileInputForComposer = (input: HTMLInputElement) => {
+    if (!isPageEligible()) {
+      return false;
+    }
+
     if (input.type !== 'file') {
       return false;
     }
@@ -297,15 +319,18 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
   const getStatus = (): ProviderStatus => {
     prepareDom();
     const currentUrl = window.location.href;
-    const authClassification = config.classifyAuth
-      ? config.classifyAuth()
-      : config.isLoginRequired
-        ? { isLoginRequired: config.isLoginRequired() }
-        : { isLoginRequired: detectLoginRequired(config.loginKeywords ?? []) };
+    const isEligible = isPageEligible();
+    const authClassification = !isEligible
+      ? { isLoginRequired: false }
+      : config.classifyAuth
+        ? config.classifyAuth()
+        : config.isLoginRequired
+          ? { isLoginRequired: config.isLoginRequired() }
+          : { isLoginRequired: detectLoginRequired(config.loginKeywords ?? []) };
     const isLoginRequired = authClassification.isLoginRequired;
-    const isPrivateMode = config.isPrivateMode?.() ?? false;
-    const hasHardError = config.isErrorPage?.() ?? false;
-    const isReady = Boolean(findComposer());
+    const isPrivateMode = isEligible && (config.isPrivateMode?.() ?? false);
+    const hasHardError = isEligible ? config.isErrorPage?.() ?? false : false;
+    const isReady = isEligible && Boolean(findComposer());
     const pageState = isPrivateMode
       ? 'private-mode'
       : isLoginRequired

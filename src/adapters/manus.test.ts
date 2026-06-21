@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { manusAdapter } from './manus';
+import { isManusPreviewRoute, manusAdapter } from './manus';
 import { installTransientFileInputHook } from '../content/transient-file-input-main';
 
 function mockVisibleLayout() {
@@ -179,6 +179,60 @@ describe('Manus attachment delivery adapter', () => {
     rectSpy.mockRestore();
     vi.unstubAllGlobals();
     delete window.__ASK_EM_TRANSIENT_FILE_INPUT_HOOK__;
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('detects Manus report preview routes from query params', () => {
+    expect(isManusPreviewRoute('https://manus.im/app/session?previewEventId=event')).toBe(true);
+    expect(isManusPreviewRoute('https://manus.im/app/session?previewSandboxPath=%2Fhome%2Fubuntu%2Freport.md')).toBe(true);
+    expect(isManusPreviewRoute('https://manus.im/app/session')).toBe(false);
+  });
+
+  it('treats Manus report previews as non-interactive and does not click their close control', () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/app/session?previewEventId=event&previewSandboxPath=%2Fhome%2Fubuntu%2Freport.md',
+    );
+    document.body.innerHTML = `
+      <div id="preview-close" class="cursor-pointer rounded-full">
+        <svg class="lucide lucide-x"></svg>
+      </div>
+      <article class="tiptap ProseMirror">
+        <h1>Generated report</h1>
+      </article>
+    `;
+    const closeButton = document.getElementById('preview-close');
+    const submitSpy = vi.fn();
+    let closeClicks = 0;
+    closeButton?.addEventListener('click', () => {
+      closeClicks += 1;
+    });
+
+    const unsubscribe = manusAdapter.composer?.subscribeToUserSubmissions?.(submitSpy);
+    try {
+      expect(manusAdapter.session.getStatus()).toMatchObject({
+        pageKind: 'existing-session',
+        pageState: 'not-ready',
+        sessionId: 'session',
+      });
+    } finally {
+      unsubscribe?.();
+    }
+
+    expect(closeClicks).toBe(0);
+    expect(submitSpy).not.toHaveBeenCalled();
+  });
+
+  it('still recognizes the editable Manus composer on normal chat routes', () => {
+    window.history.replaceState({}, '', '/app/session');
+    renderManusComposer();
+
+    expect(manusAdapter.session.getStatus()).toMatchObject({
+      pageKind: 'existing-session',
+      pageState: 'ready',
+      sessionId: 'session',
+    });
   });
 
   it('sets text and injects files through the Manus local-files transient input flow', async () => {

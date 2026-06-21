@@ -11,7 +11,20 @@ import { createDomProviderAdapter } from './factory';
 import { readAttachmentFiles, setNextTransientFileInputFiles } from './attachment-delivery';
 import { PROVIDER_UPLOAD_CAPABILITIES } from '../runtime/protocol';
 
+export function isManusPreviewRoute(url = window.location.href): boolean {
+  try {
+    const searchParams = new URL(url, window.location.origin).searchParams;
+    return searchParams.has('previewEventId') || searchParams.has('previewSandboxPath');
+  } catch {
+    return false;
+  }
+}
+
 function dismissManusOverlay(): void {
+  if (isManusPreviewRoute()) {
+    return;
+  }
+
   const gotIt = findClickableByText('I got it') ?? findClickableByText('Got it');
   if (gotIt) {
     triggerPointerClick(gotIt);
@@ -402,6 +415,9 @@ export const manusAdapter = createDomProviderAdapter({
   uploadCapability: PROVIDER_UPLOAD_CAPABILITIES.manus,
   mountId: 'ask-em-manus-ui',
   className: 'ask-em-provider-ui ask-em-provider-ui-manus',
+  isPageEligible() {
+    return !isManusPreviewRoute();
+  },
   prepareDom: dismissManusOverlay,
   classifyAuth() {
     const pathname = window.location.pathname;
@@ -421,7 +437,7 @@ export const manusAdapter = createDomProviderAdapter({
       signals: `pathname=${pathname}; buttons=[${buttonTexts.slice(0, 8).join(' | ')}]`,
     };
   },
-  composerSelectors: ['.tiptap.ProseMirror'],
+  composerSelectors: ['.tiptap.ProseMirror[contenteditable="true"]'],
   findSendButton(findComposer) {
     const composer = findComposer();
     const container = findManusComposerRoot(composer);
