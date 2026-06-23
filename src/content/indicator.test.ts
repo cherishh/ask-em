@@ -140,7 +140,7 @@ describe('content indicator presentation', () => {
     });
   });
 
-  it('shows standalone read-only pages without a loading warning', () => {
+  it('shows standalone read-only pages as unable to receive prompts', () => {
     expect(
       getContentIndicatorPresentation(
         createInput({
@@ -148,11 +148,11 @@ describe('content indicator presentation', () => {
         }),
       ),
     ).toEqual({
-      state: 'idle',
+      state: 'blocked',
       label: 'read-only view',
-      syncLabel: 'current view is read-only',
-      syncTone: 'neutral',
-      alertLevel: 'normal',
+      syncLabel: 'read-only view cannot receive prompts',
+      syncTone: 'warning',
+      alertLevel: 'current-warning',
     });
   });
 
@@ -293,7 +293,7 @@ describe('content indicator presentation', () => {
     });
   });
 
-  it('shows workspace read-only pages without a loading warning', () => {
+  it('shows current workspace read-only pages as unable to receive prompts', () => {
     const summary = createWorkspaceSummary({
       memberStates: {
         claude: 'read-only',
@@ -302,7 +302,7 @@ describe('content indicator presentation', () => {
       },
     });
 
-    expect(countWorkspaceIssues(summary)).toBe(0);
+    expect(countWorkspaceIssues(summary)).toBe(1);
     expect(
       getContentIndicatorPresentation(
         createInput({
@@ -312,11 +312,37 @@ describe('content indicator presentation', () => {
         }),
       ),
     ).toEqual({
-      state: 'idle',
+      state: 'blocked',
       label: 'read-only view',
-      syncLabel: 'current view is read-only',
-      syncTone: 'neutral',
-      alertLevel: 'normal',
+      syncLabel: 'read-only view cannot receive prompts',
+      syncTone: 'warning',
+      alertLevel: 'current-warning',
+    });
+  });
+
+  it('surfaces other-provider read-only pages as set warnings', () => {
+    const summary = createWorkspaceSummary({
+      memberStates: {
+        claude: 'ready',
+        chatgpt: 'read-only',
+        gemini: 'ready',
+      },
+    });
+
+    expect(countWorkspaceIssues(summary)).toBe(1);
+    expect(
+      getContentIndicatorPresentation(
+        createInput({
+          hasWorkspace: true,
+          workspaceSummary: summary,
+        }),
+      ),
+    ).toEqual({
+      state: 'idle',
+      label: 'This chat is in sync',
+      syncLabel: '1 model needs attention',
+      syncTone: 'warning',
+      alertLevel: 'set-warning',
     });
   });
 

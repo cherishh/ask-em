@@ -117,7 +117,7 @@ describe('workspace provider display', () => {
     });
   });
 
-  it('surfaces read-only pages as neutral provider state', () => {
+  it('surfaces read-only pages as provider warning state', () => {
     expect(
       getWorkspaceProviderPresentation({
         memberState: 'read-only',
@@ -129,9 +129,9 @@ describe('workspace provider display', () => {
     ).toEqual({
       kind: 'read-only',
       label: 'Read Only',
-      detail: 'Current view is read-only',
-      tone: 'active',
-      dotState: 'active',
+      detail: 'Exit read-only view to receive prompts',
+      tone: 'warning',
+      dotState: 'warning',
     });
   });
 

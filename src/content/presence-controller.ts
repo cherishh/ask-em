@@ -74,7 +74,7 @@ export function createPresenceController(
         });
       } else {
         await dependencies?.logDebug?.({
-          level: status.pageState === 'ready' || status.pageState === 'read-only' ? 'info' : 'warn',
+          level: status.pageState === 'ready' ? 'info' : 'warn',
           message: 'Observed local page state change',
           detail: `${previousPageState} -> ${status.pageState} (${status.pageKind}; trigger=${trigger}) @ ${status.currentUrl}`,
           workspaceId: state.getUiContext().workspaceId ?? undefined,

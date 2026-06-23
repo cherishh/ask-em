@@ -44,7 +44,13 @@ function formatAttentionCount(count: number): string {
 }
 
 function isWarningMemberState(state: GroupMemberState | undefined) {
-  return state === 'login-required' || state === 'not-ready' || state === 'error' || state === 'private-mode';
+  return (
+    state === 'login-required' ||
+    state === 'not-ready' ||
+    state === 'error' ||
+    state === 'private-mode' ||
+    state === 'read-only'
+  );
 }
 
 function isWarningIssue(issue: WorkspaceIssue | null | undefined) {
@@ -157,8 +163,8 @@ function getStandaloneSyncStatus(input: ContentIndicatorInput) {
 
   if (input.pageState === 'read-only') {
     return {
-      label: 'current view is read-only',
-      tone: 'neutral' as const,
+      label: 'read-only view cannot receive prompts',
+      tone: 'warning' as const,
     };
   }
 
@@ -198,7 +204,7 @@ function hasActiveProgress(input: ContentIndicatorInput) {
 }
 
 function isCurrentTabWarningPageState(pageState: PageState) {
-  return pageState !== 'ready' && pageState !== 'read-only';
+  return pageState !== 'ready';
 }
 
 function getProgressSyncStatus(progress: SyncProgressSnapshot) {
@@ -253,8 +259,8 @@ function getWorkspaceSyncStatus(input: ContentIndicatorInput) {
 
   if (input.pageState === 'read-only') {
     return {
-      label: 'current view is read-only',
-      tone: 'neutral' as const,
+      label: 'read-only view cannot receive prompts',
+      tone: 'warning' as const,
     };
   }
 
@@ -287,7 +293,7 @@ function getWorkspaceSyncStatus(input: ContentIndicatorInput) {
 }
 
 function getIndicatorAlertLevel(input: ContentIndicatorInput): IndicatorAlertLevel {
-  if (input.pageState === 'private-mode' || input.pageState === 'read-only') {
+  if (input.pageState === 'private-mode') {
     return 'normal';
   }
 

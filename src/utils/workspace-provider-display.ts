@@ -92,7 +92,7 @@ export function getWorkspaceProviderDisplay(
     return {
       kind: 'read-only',
       label: 'Read Only',
-      detail: 'Current view is read-only',
+      detail: 'Exit read-only view to receive prompts',
     };
   }
 
@@ -167,10 +167,10 @@ export function getWorkspaceProviderTone(
     case 'private-mode':
     case 'needs-attention':
       return 'warning';
-    case 'read-only':
-      return 'active';
     case 'will-reopen':
       return 'inactive';
+    case 'read-only':
+      return 'warning';
   }
 }
 
@@ -199,7 +199,7 @@ export function getWorkspaceProviderDotState(
   }
 
   if (input.memberState === 'read-only') {
-    return 'active';
+    return 'warning';
   }
 
   if (input.memberState === 'pending') {
