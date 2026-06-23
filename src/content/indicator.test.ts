@@ -140,6 +140,22 @@ describe('content indicator presentation', () => {
     });
   });
 
+  it('shows standalone read-only pages without a loading warning', () => {
+    expect(
+      getContentIndicatorPresentation(
+        createInput({
+          pageState: 'read-only',
+        }),
+      ),
+    ).toEqual({
+      state: 'idle',
+      label: 'read-only view',
+      syncLabel: 'current view is read-only',
+      syncTone: 'neutral',
+      alertLevel: 'normal',
+    });
+  });
+
   it('shows standalone set limit warning', () => {
     expect(
       getContentIndicatorPresentation(
@@ -274,6 +290,33 @@ describe('content indicator presentation', () => {
       syncLabel: 'wait for page to become ready',
       syncTone: 'warning',
       alertLevel: 'current-warning',
+    });
+  });
+
+  it('shows workspace read-only pages without a loading warning', () => {
+    const summary = createWorkspaceSummary({
+      memberStates: {
+        claude: 'read-only',
+        chatgpt: 'ready',
+        gemini: 'ready',
+      },
+    });
+
+    expect(countWorkspaceIssues(summary)).toBe(0);
+    expect(
+      getContentIndicatorPresentation(
+        createInput({
+          hasWorkspace: true,
+          pageState: 'read-only',
+          workspaceSummary: summary,
+        }),
+      ),
+    ).toEqual({
+      state: 'idle',
+      label: 'read-only view',
+      syncLabel: 'current view is read-only',
+      syncTone: 'neutral',
+      alertLevel: 'normal',
     });
   });
 

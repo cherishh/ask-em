@@ -2,7 +2,7 @@ import type { ShortcutConfig } from './shortcuts';
 
 export type Provider = 'claude' | 'chatgpt' | 'gemini' | 'deepseek' | 'manus';
 
-export type PageState = 'ready' | 'login-required' | 'not-ready' | 'error' | 'private-mode';
+export type PageState = 'ready' | 'login-required' | 'not-ready' | 'error' | 'private-mode' | 'read-only';
 
 export type PageKind = 'new-chat' | 'existing-session';
 
@@ -115,5 +115,6 @@ export type GroupMemberState =
   | 'not-ready'
   | 'error'
   | 'private-mode'
+  | 'read-only'
   | 'inactive'
   | 'pending';

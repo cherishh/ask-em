@@ -418,6 +418,9 @@ export const manusAdapter = createDomProviderAdapter({
   isPageEligible() {
     return !isManusPreviewRoute();
   },
+  getIneligiblePageState() {
+    return isManusPreviewRoute() ? 'read-only' : 'not-ready';
+  },
   prepareDom: dismissManusOverlay,
   classifyAuth() {
     const pathname = window.location.pathname;

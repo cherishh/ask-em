@@ -48,7 +48,8 @@ export async function persistPresenceObservation({
   const previousIssue =
     nextLocalState.workspaces[workspaceId]?.memberIssues?.[message.provider] ?? null;
 
-  if (message.sessionId) {
+  const shouldBindWorkspaceMember = Boolean(message.sessionId) && message.pageState !== 'read-only';
+  if (shouldBindWorkspaceMember) {
     nextLocalState = bindWorkspaceMember(nextLocalState, {
       workspaceId,
       member: {
@@ -84,7 +85,7 @@ export async function persistPresenceObservation({
     });
   }
 
-  if (message.sessionId || issueUpdate.shouldPersist) {
+  if (shouldBindWorkspaceMember || issueUpdate.shouldPersist) {
     await setLocalState(nextLocalState);
   }
 

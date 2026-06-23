@@ -213,7 +213,7 @@ describe('Manus attachment delivery adapter', () => {
     try {
       expect(manusAdapter.session.getStatus()).toMatchObject({
         pageKind: 'existing-session',
-        pageState: 'not-ready',
+        pageState: 'read-only',
         sessionId: 'session',
       });
     } finally {

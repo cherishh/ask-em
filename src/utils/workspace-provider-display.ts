@@ -6,6 +6,7 @@ export type WorkspaceProviderDisplayKind =
   | 'paused'
   | 'needs-login'
   | 'loading'
+  | 'read-only'
   | 'private-mode'
   | 'needs-attention'
   | 'will-reopen';
@@ -87,6 +88,14 @@ export function getWorkspaceProviderDisplay(
     };
   }
 
+  if (input.memberState === 'read-only') {
+    return {
+      kind: 'read-only',
+      label: 'Read Only',
+      detail: 'Current view is read-only',
+    };
+  }
+
   if (input.memberIssue === 'loading' || input.memberState === 'not-ready') {
     return {
       kind: 'loading',
@@ -158,6 +167,8 @@ export function getWorkspaceProviderTone(
     case 'private-mode':
     case 'needs-attention':
       return 'warning';
+    case 'read-only':
+      return 'active';
     case 'will-reopen':
       return 'inactive';
   }
@@ -184,6 +195,10 @@ export function getWorkspaceProviderDotState(
   }
 
   if (input.memberState === 'ready') {
+    return 'active';
+  }
+
+  if (input.memberState === 'read-only') {
     return 'active';
   }
 

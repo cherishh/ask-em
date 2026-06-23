@@ -2,6 +2,7 @@ import type {
   AttachmentRef,
   CapturedAttachment,
   DeliverPromptMessage,
+  PageState,
   Provider,
   ProviderStatus,
   UploadCapability,
@@ -51,6 +52,7 @@ type DomProviderAdapterConfig = {
   isLoginRequired?: () => boolean;
   isPrivateMode?: () => boolean;
   isPageEligible?: () => boolean;
+  getIneligiblePageState?: () => PageState;
   composerSelectors: string[];
   sendButtonSelectors?: string[];
   findSendButton?: (findComposer: () => HTMLElement | null) => HTMLElement | null;
@@ -320,6 +322,7 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     prepareDom();
     const currentUrl = window.location.href;
     const isEligible = isPageEligible();
+    const ineligiblePageState = isEligible ? null : config.getIneligiblePageState?.() ?? 'not-ready';
     const authClassification = !isEligible
       ? { isLoginRequired: false }
       : config.classifyAuth
@@ -331,7 +334,7 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     const isPrivateMode = isEligible && (config.isPrivateMode?.() ?? false);
     const hasHardError = isEligible ? config.isErrorPage?.() ?? false : false;
     const isReady = isEligible && Boolean(findComposer());
-    const pageState = isPrivateMode
+    const pageState = ineligiblePageState ?? (isPrivateMode
       ? 'private-mode'
       : isLoginRequired
         ? 'login-required'
@@ -339,7 +342,7 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
           ? 'error'
           : isReady
             ? 'ready'
-            : 'not-ready';
+            : 'not-ready');
 
     return {
       provider: config.provider,

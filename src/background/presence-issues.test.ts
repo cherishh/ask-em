@@ -167,4 +167,20 @@ describe('applyPresenceWorkspaceIssue', () => {
     expect(result.localState.workspaces.w1.memberIssues?.deepseek).toBe('private-mode');
     expect(result.shouldPersist).toBe(true);
   });
+
+  it('does not mark read-only pages as presence issues', () => {
+    const state = makeLocalState({
+      workspaces: {
+        w1: makeWorkspace({
+          id: 'w1',
+          enabledProviders: ['chatgpt', 'manus'],
+        }),
+      },
+    });
+
+    const result = applyPresenceWorkspaceIssue(state, 'w1', 'manus', 'read-only');
+
+    expect(result.localState.workspaces.w1.memberIssues?.manus).toBeUndefined();
+    expect(result.shouldPersist).toBe(false);
+  });
 });

@@ -88,6 +88,10 @@ function getCurrentTabLabel(input: ContentIndicatorInput): string {
       return 'Local only';
     }
 
+    if (input.pageState === 'read-only') {
+      return 'read-only view';
+    }
+
     if (!input.globalSyncEnabled || !input.standaloneCreateSetEnabled) {
       return 'Local only';
     }
@@ -113,6 +117,10 @@ function getCurrentTabLabel(input: ContentIndicatorInput): string {
 
   if (input.pageState === 'private-mode') {
     return 'current model is private';
+  }
+
+  if (input.pageState === 'read-only') {
+    return 'read-only view';
   }
 
   return 'This chat is in sync';
@@ -143,6 +151,13 @@ function getStandaloneSyncStatus(input: ContentIndicatorInput) {
   if (input.pageState === 'private-mode') {
     return {
       label: 'private chat stays here',
+      tone: 'neutral' as const,
+    };
+  }
+
+  if (input.pageState === 'read-only') {
+    return {
+      label: 'current view is read-only',
       tone: 'neutral' as const,
     };
   }
@@ -180,6 +195,10 @@ function getStandaloneSyncStatus(input: ContentIndicatorInput) {
 
 function hasActiveProgress(input: ContentIndicatorInput) {
   return Boolean(input.syncProgress && input.syncProgress.total > 0);
+}
+
+function isCurrentTabWarningPageState(pageState: PageState) {
+  return pageState !== 'ready' && pageState !== 'read-only';
 }
 
 function getProgressSyncStatus(progress: SyncProgressSnapshot) {
@@ -232,6 +251,13 @@ function getWorkspaceSyncStatus(input: ContentIndicatorInput) {
     };
   }
 
+  if (input.pageState === 'read-only') {
+    return {
+      label: 'current view is read-only',
+      tone: 'neutral' as const,
+    };
+  }
+
   if (!input.globalSyncEnabled) {
     return {
       label: 'sync paused',
@@ -261,11 +287,11 @@ function getWorkspaceSyncStatus(input: ContentIndicatorInput) {
 }
 
 function getIndicatorAlertLevel(input: ContentIndicatorInput): IndicatorAlertLevel {
-  if (input.pageState === 'private-mode') {
+  if (input.pageState === 'private-mode' || input.pageState === 'read-only') {
     return 'normal';
   }
 
-  if (input.globalSyncEnabled && input.providerEnabled && input.pageState !== 'ready') {
+  if (input.globalSyncEnabled && input.providerEnabled && isCurrentTabWarningPageState(input.pageState)) {
     return 'current-warning';
   }
 
@@ -281,7 +307,7 @@ function getIndicatorAlertLevel(input: ContentIndicatorInput): IndicatorAlertLev
 }
 
 function getIndicatorState(input: ContentIndicatorInput): IndicatorUiState {
-  if (input.globalSyncEnabled && input.providerEnabled && input.pageState !== 'ready') {
+  if (input.globalSyncEnabled && input.providerEnabled && isCurrentTabWarningPageState(input.pageState)) {
     return 'blocked';
   }
 

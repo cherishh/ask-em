@@ -117,6 +117,24 @@ describe('workspace provider display', () => {
     });
   });
 
+  it('surfaces read-only pages as neutral provider state', () => {
+    expect(
+      getWorkspaceProviderPresentation({
+        memberState: 'read-only',
+        memberIssue: null,
+        enabled: true,
+        globalSyncEnabled: true,
+        hasMember: true,
+      }),
+    ).toEqual({
+      kind: 'read-only',
+      label: 'Read Only',
+      detail: 'Current view is read-only',
+      tone: 'active',
+      dotState: 'active',
+    });
+  });
+
   it('surfaces unsupported attachments as needs attention', () => {
     expect(
       getWorkspaceProviderDisplay({

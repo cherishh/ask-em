@@ -29,6 +29,10 @@ export function getWorkspaceIssueForPageState(pageState: PageState): WorkspaceIs
     return 'private-mode';
   }
 
+  if (pageState === 'read-only') {
+    return null;
+  }
+
   return null;
 }
 

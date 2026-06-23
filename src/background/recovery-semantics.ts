@@ -5,7 +5,8 @@ export function isTerminalRecoveryPageState(pageState: PageState): boolean {
     pageState === 'ready' ||
     pageState === 'login-required' ||
     pageState === 'error' ||
-    pageState === 'private-mode'
+    pageState === 'private-mode' ||
+    pageState === 'read-only'
   );
 }
 
@@ -27,6 +28,10 @@ export function getRecoveryStatusError(
 
   if (status.pageState === 'private-mode') {
     return `${provider} private chat`;
+  }
+
+  if (status.pageState === 'read-only') {
+    return `${provider} read-only page`;
   }
 
   if (status.pageState !== 'ready') {

@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { getRecoveryStatusError, isTerminalRecoveryPageState } from './recovery-semantics';
 
 describe('recovery-semantics', () => {
-  it('treats ready, login-required, error, and private-mode as terminal recovery states', () => {
+  it('treats ready, login-required, error, private-mode, and read-only as terminal recovery states', () => {
     expect(isTerminalRecoveryPageState('ready')).toBe(true);
     expect(isTerminalRecoveryPageState('login-required')).toBe(true);
     expect(isTerminalRecoveryPageState('error')).toBe(true);
     expect(isTerminalRecoveryPageState('private-mode')).toBe(true);
+    expect(isTerminalRecoveryPageState('read-only')).toBe(true);
     expect(isTerminalRecoveryPageState('not-ready')).toBe(false);
   });
 
@@ -42,6 +43,16 @@ describe('recovery-semantics', () => {
         pageKind: 'new-chat',
       }),
     ).toBe('claude private chat');
+    expect(
+      getRecoveryStatusError('manus', {
+        type: 'PING_RESPONSE',
+        provider: 'manus',
+        currentUrl: 'https://manus.im/app/session?previewEventId=e',
+        sessionId: 'session',
+        pageState: 'read-only',
+        pageKind: 'existing-session',
+      }),
+    ).toBe('manus read-only page');
     expect(
       getRecoveryStatusError('claude', {
         type: 'PING_RESPONSE',
