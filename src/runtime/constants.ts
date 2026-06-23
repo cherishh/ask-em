@@ -29,7 +29,7 @@ export const ATTACHMENT_CHUNK_BYTES = 256 * 1024;
 
 export const ALL_PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek', 'manus'];
 
-export const DEFAULT_ENABLED_PROVIDER_LIST: Provider[] = ['claude', 'chatgpt', 'gemini'];
+export const DEFAULT_ENABLED_PROVIDER_LIST: Provider[] = ['chatgpt', 'claude', 'manus'];
 
 export function createDefaultEnabledProviders(
   enabledProviders: Provider[] = DEFAULT_ENABLED_PROVIDER_LIST,
