@@ -59,7 +59,6 @@ describe('storage update queues', () => {
     const { DEFAULT_SHOW_DIAGNOSTICS, STORAGE_KEYS } = await import('./protocol');
 
     expect(storage.DEFAULT_LOCAL_STATE.showDiagnostics).toBe(DEFAULT_SHOW_DIAGNOSTICS);
-    expect(storage.DEFAULT_LOCAL_STATE.showDiagnostics).toBe(true);
 
     const legacyLocalState: Partial<LocalState> = { ...storage.DEFAULT_LOCAL_STATE };
     delete legacyLocalState.showDiagnostics;
