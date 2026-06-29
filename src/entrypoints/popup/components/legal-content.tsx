@@ -11,7 +11,7 @@ export function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => 
       {page === 'terms' ? (
         <div className="askem-legal-body">
           <h2>Terms of Service</h2>
-          <p className="askem-legal-updated">Last updated: April 2026</p>
+          <p className="askem-legal-updated">Last updated: June 2026</p>
 
           <h3>1. Acceptance</h3>
           <p>
@@ -36,10 +36,12 @@ export function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => 
           <h3>4. Optional Support Submissions</h3>
           <p>
             If you choose to send feedback or request additional providers, the information you
-            submit is sent to an ask&apos;em-operated support service. Feedback can include the
-            message you write, screenshots you choose to attach, and bug-report context such as
-            browser language and version, client timestamp, timezone, operating system, active tab
-            title, and optional debug logs when you explicitly choose to include them.
+            submit is sent to an ask&apos;em-operated support service. Feedback can include your
+            message, images you choose to attach, attachment metadata, extension version, and
+            bug-report context such as browser language and version, client timestamp, timezone,
+            operating system, active tab title, and optional debug logs when you explicitly choose
+            to include them. Provider requests can include selected provider names, a custom
+            provider name you type, and extension version.
           </p>
 
           <h3>5. User Responsibilities</h3>
@@ -67,44 +69,58 @@ export function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => 
       ) : (
         <div className="askem-legal-body">
           <h2>Privacy Policy</h2>
-          <p className="askem-legal-updated">Last updated: April 2026</p>
+          <p className="askem-legal-updated">Last updated: June 2026</p>
 
           <h3>1. Core Extension Data</h3>
           <p>
             ask&apos;em keeps its core sync state locally in your browser. This includes workspace
-            state, local settings, saved indicator positions, and local debug logs.
+            state, provider conversation URLs and session identifiers, local settings, saved
+            indicator positions, and local debug logs. Prompt attachments are staged locally in
+            browser storage only long enough to deliver the current sync and are then released or
+            expired.
           </p>
 
           <h3>2. Optional Remote Submissions</h3>
           <p>
             If you choose to send feedback or request more providers, that submission is sent to an
-            ask&apos;em-operated support endpoint. Feedback can include the message you write,
-            screenshots you attach, and, for bug reports, browser language, browser version, client
+            ask&apos;em-operated support endpoint. Provider requests include the providers you select
+            or type and the extension version. Feedback can include the message you write, images
+            you attach, attachment metadata such as filename, content type, and file size, the
+            extension version, and, for bug reports, browser language, browser version, client
             timestamp, timezone, operating system, and active tab title. Bug reports can also
             include a snapshot of local debug logs if you opt in.
           </p>
 
-          <h3>3. What Stays Out of Our Servers</h3>
+          <h3>3. Debug Logs</h3>
+          <p>
+            Debug logs are stored locally with size limits. Depending on what happened, they may
+            include provider names, provider page URLs or session identifiers, prompt previews,
+            attachment filenames and sizes, workspace state, delivery status, and failure details.
+            They do not include raw attachment bytes. Debug logs are sent to ask&apos;em only when
+            you submit a bug report with diagnostics enabled.
+          </p>
+
+          <h3>4. What Stays Out of Our Servers</h3>
           <p>
             Your prompts are forwarded between official provider tabs inside your browser. ask&apos;em
             does not send prompt content to its own servers as part of normal sync behavior.
           </p>
 
-          <h3>4. Third-Party Interaction</h3>
+          <h3>5. Third-Party Interaction</h3>
           <p>
             When you use the Extension, your prompts are sent to third-party AI providers through
             their official web interfaces — exactly as if you typed them yourself. Each
             provider&apos;s own privacy policy governs how they handle your data.
           </p>
 
-          <h3>5. Analytics &amp; Tracking</h3>
+          <h3>6. Analytics &amp; Tracking</h3>
           <p>
             ask&apos;em does not include passive analytics or tracking. The only data sent to
             ask&apos;em-operated services is information you explicitly choose to submit, such as
             feedback or provider requests.
           </p>
 
-          <h3>6. Permissions</h3>
+          <h3>7. Permissions</h3>
           <p>The Extension requests only the permissions needed to work:</p>
           <ul>
             <li>
@@ -119,7 +135,7 @@ export function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => 
             </li>
           </ul>
 
-          <h3>7. Contact</h3>
+          <h3>8. Contact</h3>
           <p>Questions about this policy? Reach us at one77r@gmail.com.</p>
         </div>
       )}
