@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "wxt",
     "build": "wxt build",
+    "package:chrome": "wxt zip -b chrome",
     "lint": "eslint .",
     "compile": "tsc --noEmit",
     "test": "vitest run",

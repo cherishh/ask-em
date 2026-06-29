@@ -66,6 +66,7 @@ pnpm dev                     # launches Chrome with the extension loaded (HMR)
 |--------|---------|
 | `pnpm dev` | Run the extension in dev mode |
 | `pnpm build` | Production build |
+| `pnpm package:chrome` | Production Chrome build and Web Store zip |
 | `pnpm test` | Run the Vitest suite |
 | `pnpm compile` | Type-check (`tsc --noEmit`) |
 | `pnpm lint` | ESLint |
