@@ -71,8 +71,10 @@ pnpm dev                     # launches Chrome with the extension loaded (HMR)
 | `pnpm compile` | Type-check (`tsc --noEmit`) |
 | `pnpm lint` | ESLint |
 
-The only Chrome permissions requested are `storage` and `tabs`; host permissions are
-limited to the optional support/feedback endpoints you configure in `.env.local`.
+The only Chrome API permission requested is `storage`. Host access is limited to the
+supported AI chat providers so the extension can run its content scripts there. The
+support/feedback endpoint configured in `.env.local` is requested only as an optional
+host permission when you submit feedback or provider requests.
 
 ## Configuration
 

@@ -127,7 +127,8 @@ export function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => 
               <strong>storage</strong> — to save preferences and local extension state
             </li>
             <li>
-              <strong>tabs</strong> — to manage and sync across provider tabs
+              supported AI chat provider access — to capture your submitted prompt and sync it
+              across provider tabs
             </li>
             <li>
               optional host permissions — only when you explicitly send feedback or a provider

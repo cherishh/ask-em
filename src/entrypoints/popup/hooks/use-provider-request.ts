@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { getMoreProvidersRequestEndpoint } from '../support-endpoints';
+import { ensureSupportEndpointPermission } from '../support-permissions';
 
 const MORE_PROVIDERS_REQUEST_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const MORE_PROVIDERS_REQUEST_STORAGE_KEY = 'askem-more-providers-last-submitted-at';
@@ -53,6 +54,11 @@ async function submitMoreProviderRequest(
 
   if (!endpoint) {
     return 'not-configured';
+  }
+
+  const hasEndpointPermission = await ensureSupportEndpointPermission(endpoint);
+  if (!hasEndpointPermission) {
+    throw new Error('Allow support endpoint access to submit provider requests.');
   }
 
   const response = await fetch(endpoint, {

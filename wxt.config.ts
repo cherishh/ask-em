@@ -4,6 +4,14 @@ import { join } from 'node:path';
 
 type EnvMap = Record<string, string | undefined>;
 
+const PROVIDER_HOST_PERMISSIONS = [
+  'https://claude.ai/*',
+  'https://chatgpt.com/*',
+  'https://gemini.google.com/*',
+  'https://chat.deepseek.com/*',
+  'https://manus.im/*',
+];
+
 function toOriginPermission(urlValue: string | undefined): string | null {
   const normalized = urlValue?.trim();
   if (!normalized) {
@@ -72,7 +80,7 @@ function loadWxtEnv(mode: string): EnvMap {
   };
 }
 
-function getSupportHostPermissions(env: EnvMap): string[] {
+export function getSupportHostPermissions(env: EnvMap): string[] {
   const permissions = [
     toOriginPermission(env.WXT_SUPPORT_API_BASE_URL),
     toOriginPermission(env.WXT_SUPPORT_API_ORIGIN),
@@ -83,24 +91,33 @@ function getSupportHostPermissions(env: EnvMap): string[] {
   return Array.from(new Set(permissions));
 }
 
+export function createManifestFromEnv(env: EnvMap) {
+  const supportHostPermissions = getSupportHostPermissions(env);
+
+  return {
+    name: "ask'em",
+    description: 'Sync chat messages across AI apps',
+    version: '0.1.2',
+    permissions: ['storage'],
+    host_permissions: PROVIDER_HOST_PERMISSIONS,
+    ...(supportHostPermissions.length > 0
+      ? { optional_host_permissions: supportHostPermissions }
+      : {}),
+    icons: {
+      16: 'icon/16.png',
+      32: 'icon/32.png',
+      48: 'icon/48.png',
+      128: 'icon/128.png',
+    },
+  };
+}
+
 export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-react'],
   manifest: ({ mode }) => {
     const env = loadWxtEnv(mode);
 
-    return {
-      name: "ask'em",
-      description: 'Sync chat messages across AI apps',
-      version: '0.1.0',
-      permissions: ['storage', 'tabs'],
-      host_permissions: getSupportHostPermissions(env),
-      icons: {
-        16: 'icon/16.png',
-        32: 'icon/32.png',
-        48: 'icon/48.png',
-        128: 'icon/128.png',
-      },
-    };
+    return createManifestFromEnv(env);
   },
 });

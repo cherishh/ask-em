@@ -10,6 +10,7 @@ import {
   type FeedbackStep,
 } from '../feedback';
 import { getFeedbackEndpoint } from '../support-endpoints';
+import { ensureSupportEndpointPermission } from '../support-permissions';
 
 const FEEDBACK_MAX_LENGTH = 4000;
 const ACCEPTED_ATTACHMENT_TYPES = new Set(
@@ -326,10 +327,16 @@ export function useFeedback() {
       return;
     }
 
-    setFeedbackSubmitting(true);
-    setFeedbackError(null);
-
     try {
+      const permissionRequest = ensureSupportEndpointPermission(endpoint);
+      setFeedbackSubmitting(true);
+      setFeedbackError(null);
+
+      const hasEndpointPermission = await permissionRequest;
+      if (!hasEndpointPermission) {
+        throw new Error('Allow support endpoint access to send feedback.');
+      }
+
       const shouldIncludeLogs = feedbackKind === 'bug-report' && includeLogs;
       const [rawLogs, status] = shouldIncludeLogs
         ? await Promise.all([requestFullLogs(), requestStatus()])

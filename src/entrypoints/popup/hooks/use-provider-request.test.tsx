@@ -6,10 +6,28 @@ import { renderHookHarness } from './test-utils';
 import { useProviderRequest } from './use-provider-request';
 
 describe('useProviderRequest', () => {
+  function stubLocalStorage() {
+    const values = new Map<string, string>();
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        clear: vi.fn(() => values.clear()),
+        getItem: vi.fn((key: string) => values.get(key) ?? null),
+        removeItem: vi.fn((key: string) => {
+          values.delete(key);
+        }),
+        setItem: vi.fn((key: string, value: string) => {
+          values.set(key, value);
+        }),
+      },
+    });
+  }
+
   beforeEach(() => {
-    window.localStorage.clear();
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    stubLocalStorage();
+    window.localStorage.clear();
     globalThis.fetch = vi.fn(async () => ({ ok: true } as Response)) as unknown as typeof fetch;
     globalThis.chrome = {
       runtime: {
