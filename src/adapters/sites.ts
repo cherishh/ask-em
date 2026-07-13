@@ -68,6 +68,18 @@ export const SUPPORTED_SITES: SiteInfo[] = [
       return extractLastPathSegment(url, '/app/');
     },
   },
+  {
+    name: 'grok',
+    origin: 'https://grok.com',
+    matches: ['*://grok.com/*'],
+    isBlankChatUrl(url) {
+      const pathname = new URL(url).pathname;
+      return pathname === '/' || pathname === '/c' || pathname === '/c/';
+    },
+    extractSessionId(url) {
+      return extractLastPathSegment(url, '/c/');
+    },
+  },
 ];
 
 function extractLastPathSegment(url: string, prefix: string): string | null {

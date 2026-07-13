@@ -9,7 +9,7 @@ out to the targets by replaying it into each one's composer.
 
 ## Supported providers
 
-Five today, more on the way.
+Six today, more on the way.
 
 | Provider | Host |
 |----------|------|
@@ -18,6 +18,7 @@ Five today, more on the way.
 | Gemini   | `gemini.google.com` |
 | DeepSeek | `chat.deepseek.com` |
 | Manus    | `manus.im` |
+| Grok     | `grok.com` |
 
 ## How it works
 

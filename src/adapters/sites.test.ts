@@ -24,3 +24,24 @@ describe('manus site info', () => {
     expect(getSiteInfo('https://manus.im/app')?.name).toBe('manus');
   });
 });
+
+describe('grok site info', () => {
+  it('distinguishes blank chat routes from conversation routes', () => {
+    const site = getSiteInfoByProvider('grok');
+
+    expect(site.isBlankChatUrl('https://grok.com/')).toBe(true);
+    expect(site.isBlankChatUrl('https://grok.com/c')).toBe(true);
+    expect(site.isBlankChatUrl('https://grok.com/c/')).toBe(true);
+    expect(site.isBlankChatUrl('https://grok.com/c/conversation-id')).toBe(false);
+  });
+
+  it('extracts conversation ids and recognizes the Grok origin', () => {
+    const site = getSiteInfoByProvider('grok');
+
+    expect(site.extractSessionId('https://grok.com/c/conversation-id?rid=request-id')).toBe(
+      'conversation-id',
+    );
+    expect(site.extractSessionId('https://grok.com/c')).toBeNull();
+    expect(getSiteInfo('https://grok.com/')?.name).toBe('grok');
+  });
+});

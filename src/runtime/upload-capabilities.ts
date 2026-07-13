@@ -17,6 +17,10 @@ export const PROVIDER_UPLOAD_CAPABILITIES: Record<Provider, UploadCapability> = 
     // Manus free plan renders a multiple file input, but rejects batches with an upgrade modal.
     maxFiles: 1,
   },
+  grok: {
+    // Grok web accepts larger batches; ask'em's own transport caps a submit at 20 files.
+    maxFiles: 20,
+  },
 };
 
 export function getAttachmentExtension(name: string): string | null {

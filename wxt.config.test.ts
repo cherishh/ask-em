@@ -15,6 +15,7 @@ describe('wxt manifest permissions', () => {
         'https://gemini.google.com/*',
         'https://chat.deepseek.com/*',
         'https://manus.im/*',
+        'https://grok.com/*',
       ]),
       optional_host_permissions: ['https://support.example.com/*'],
     });

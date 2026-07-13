@@ -112,6 +112,16 @@ function normalizeLocalState(state: LocalState): LocalState {
     };
   }
 
+  if (normalized.defaultEnabledProviders.grok === undefined) {
+    normalized = {
+      ...normalized,
+      defaultEnabledProviders: {
+        ...createDefaultEnabledProviders(),
+        ...normalized.defaultEnabledProviders,
+      },
+    };
+  }
+
   const debugLogs = trimDebugLogsForStorage(normalized.debugLogs ?? []);
   if (debugLogs !== normalized.debugLogs) {
     normalized = {

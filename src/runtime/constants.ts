@@ -27,9 +27,9 @@ export const ATTACHMENT_MAX_COUNT = 20;
 
 export const ATTACHMENT_CHUNK_BYTES = 256 * 1024;
 
-export const ALL_PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'deepseek', 'manus'];
+export const ALL_PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus'];
 
-export const DEFAULT_ENABLED_PROVIDER_LIST: Provider[] = ['chatgpt', 'claude', 'manus'];
+export const DEFAULT_ENABLED_PROVIDER_LIST: Provider[] = ['claude', 'chatgpt'];
 
 export function createDefaultEnabledProviders(
   enabledProviders: Provider[] = DEFAULT_ENABLED_PROVIDER_LIST,
@@ -40,6 +40,7 @@ export function createDefaultEnabledProviders(
     gemini: enabledProviders.includes('gemini'),
     deepseek: enabledProviders.includes('deepseek'),
     manus: enabledProviders.includes('manus'),
+    grok: enabledProviders.includes('grok'),
   };
 }
 

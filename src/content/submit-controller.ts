@@ -19,6 +19,7 @@ const PROVIDER_LABELS: Record<Provider, string> = {
   gemini: 'Gemini',
   deepseek: 'DeepSeek',
   manus: 'Manus',
+  grok: 'Grok',
 };
 
 function normalizeSubmitInput(input: SubmitInput): UserSubmissionPayload {

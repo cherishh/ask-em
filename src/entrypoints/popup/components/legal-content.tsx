@@ -29,7 +29,7 @@ export function LegalContent({ page, onBack }: { page: LegalPage; onBack: () => 
           <h3>3. Third-Party Services</h3>
           <p>
             The Extension interacts with third-party AI chat services (Claude, ChatGPT, Gemini,
-            DeepSeek, Manus). Your use of those services is governed by their respective terms.
+            DeepSeek, Manus, Grok). Your use of those services is governed by their respective terms.
             ask&apos;em is not affiliated with any of these providers.
           </p>
 

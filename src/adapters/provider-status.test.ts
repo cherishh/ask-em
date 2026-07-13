@@ -6,6 +6,7 @@ import { isChatgptLoginRequiredPage, isChatgptPrivateModePage } from './chatgpt'
 import { isDeepseekLoginRequiredPage } from './deepseek';
 import { isGeminiLoginRequiredPage, isGeminiPrivateModePage } from './gemini';
 import { isManusLoginRequiredPage } from './manus';
+import { isGrokLoginRequiredPage, isGrokPrivateModePage } from './grok';
 
 describe('provider login-required detection', () => {
   it('treats Gemini /app with visible sign-in CTA as login-required', () => {
@@ -76,6 +77,33 @@ describe('provider login-required detection', () => {
       }),
     ).toBe(false);
   });
+
+  it('treats Grok auth routes and logged-out CTAs as login-required', () => {
+    expect(
+      isGrokLoginRequiredPage({
+        pathname: '/sign-in',
+        buttonTexts: [],
+        hasComposer: false,
+      }),
+    ).toBe(true);
+    expect(
+      isGrokLoginRequiredPage({
+        pathname: '/',
+        buttonTexts: ['Sign in', 'Create account'],
+        hasComposer: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('does not treat the logged-in Grok composer as login-required', () => {
+    expect(
+      isGrokLoginRequiredPage({
+        pathname: '/',
+        buttonTexts: ['New Chat', 'History'],
+        hasComposer: true,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('provider private-mode detection', () => {
@@ -98,5 +126,13 @@ describe('provider private-mode detection', () => {
 
     document.body.innerHTML = '<chat-window></chat-window>';
     expect(isGeminiPrivateModePage()).toBe(false);
+  });
+
+  it('detects Grok private chat from its structural switch control', () => {
+    document.body.innerHTML = '<a aria-label="Switch to Default Chat" href="/c">Private</a>';
+    expect(isGrokPrivateModePage()).toBe(true);
+
+    document.body.innerHTML = '<a aria-label="Switch to Private Chat" href="/c#private">Private</a>';
+    expect(isGrokPrivateModePage()).toBe(false);
   });
 });

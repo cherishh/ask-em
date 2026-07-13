@@ -51,6 +51,7 @@ describe('usePopupStatus', () => {
         gemini: true,
         deepseek: true,
         manus: true,
+        grok: false,
       },
       shortcuts: undefined,
       debugLoggingEnabled: false,
@@ -93,6 +94,7 @@ describe('usePopupStatus', () => {
           gemini: true,
           deepseek: true,
           manus: true,
+          grok: false,
         },
         shortcuts: undefined,
         debugLoggingEnabled: false,
@@ -112,6 +114,7 @@ describe('usePopupStatus', () => {
           gemini: true,
           deepseek: true,
           manus: true,
+          grok: false,
         },
         shortcuts: undefined,
         debugLoggingEnabled: false,
@@ -196,6 +199,7 @@ describe('usePopupStatus', () => {
           gemini: true,
           deepseek: true,
           manus: true,
+          grok: false,
         },
         shortcuts: undefined,
         debugLoggingEnabled: true,
@@ -215,6 +219,7 @@ describe('usePopupStatus', () => {
           gemini: true,
           deepseek: true,
           manus: true,
+          grok: false,
         },
         shortcuts: undefined,
         debugLoggingEnabled: true,
@@ -255,6 +260,7 @@ describe('usePopupStatus', () => {
         gemini: false,
         deepseek: false,
         manus: false,
+        grok: false,
       },
       defaultFanOutProviders: null,
       shortcuts: undefined,
@@ -282,14 +288,14 @@ describe('usePopupStatus', () => {
     const hook = renderHookHarness(() => usePopupStatus());
     await flushMicrotasks();
 
-    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'deepseek', 'manus']);
+    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus']);
     expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude', 'chatgpt']);
 
     await act(async () => {
       await hook.current.toggleDefaultFanOutProvider('chatgpt');
     });
 
-    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'deepseek', 'manus']);
+    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus']);
     expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude']);
     expect(sendMessage).toHaveBeenCalledWith(
       { type: 'SET_DEFAULT_FAN_OUT_PROVIDERS', providers: ['claude'] },
@@ -309,6 +315,7 @@ describe('usePopupStatus', () => {
         gemini: false,
         deepseek: false,
         manus: false,
+        grok: false,
       },
       defaultFanOutProviders: ['claude'],
       shortcuts: undefined,
@@ -353,6 +360,7 @@ describe('usePopupStatus', () => {
         gemini: false,
         deepseek: false,
         manus: false,
+        grok: false,
       },
       defaultFanOutProviders: ['claude'],
       shortcuts: undefined,
@@ -384,7 +392,7 @@ describe('usePopupStatus', () => {
       await flushMicrotasks();
     });
 
-    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'deepseek', 'manus']);
+    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus']);
     expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude', 'deepseek']);
     expect(sendMessage).toHaveBeenCalledWith({
       type: 'SET_DEFAULT_FAN_OUT_PROVIDERS',
@@ -406,6 +414,7 @@ describe('usePopupStatus', () => {
         gemini: true,
         deepseek: false,
         manus: false,
+        grok: false,
       },
       defaultFanOutProviders: null,
       shortcuts: undefined,

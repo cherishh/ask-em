@@ -2,7 +2,6 @@ import { formatCooldownRemaining } from '../hooks/use-provider-request';
 
 const MORE_PROVIDER_REQUEST_OPTIONS = [
   'Perplexity',
-  'Grok',
   'Meta AI',
   'Mistral',
   'Qwen',

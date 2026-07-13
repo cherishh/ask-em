@@ -68,6 +68,33 @@ describe('storage update queues', () => {
     expect(normalizedState.showDiagnostics).toBe(DEFAULT_SHOW_DIAGNOSTICS);
   });
 
+  it('adds Grok as disabled when normalizing storage from an older extension version', async () => {
+    const storage = await import('./storage');
+    const { STORAGE_KEYS } = await import('./protocol');
+    const legacyLocalState = {
+      ...storage.DEFAULT_LOCAL_STATE,
+      defaultEnabledProviders: {
+        claude: true,
+        chatgpt: false,
+        gemini: true,
+        deepseek: false,
+        manus: true,
+      },
+    };
+    await chrome.storage.local.set({ [STORAGE_KEYS.local]: legacyLocalState });
+
+    const normalizedState = await storage.getLocalState();
+
+    expect(normalizedState.defaultEnabledProviders).toEqual({
+      claude: true,
+      chatgpt: false,
+      gemini: true,
+      deepseek: false,
+      manus: true,
+      grok: false,
+    });
+  });
+
   it('serializes local state updates so debug logs are not lost under concurrent writes', async () => {
     const storage = await import('./storage');
     const deferred = createDeferred<LocalState>();

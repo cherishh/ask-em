@@ -51,6 +51,17 @@ function createEmptySessionState(): SessionState {
 }
 
 describe('workspace state', () => {
+  it('enables only Claude and ChatGPT by default', () => {
+    expect(createDefaultEnabledProviders()).toEqual({
+      claude: true,
+      chatgpt: true,
+      gemini: false,
+      deepseek: false,
+      manus: false,
+      grok: false,
+    });
+  });
+
   it('creates a pending workspace from a new-chat source', () => {
     const nextState = createPendingWorkspace(createEmptyState(), {
       sourceProvider: 'gemini',

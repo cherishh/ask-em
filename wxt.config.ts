@@ -10,6 +10,7 @@ const PROVIDER_HOST_PERMISSIONS = [
   'https://gemini.google.com/*',
   'https://chat.deepseek.com/*',
   'https://manus.im/*',
+  'https://grok.com/*',
 ];
 
 function toOriginPermission(urlValue: string | undefined): string | null {

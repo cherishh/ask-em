@@ -35,6 +35,7 @@ const { requestFullLogs, requestStatus } = vi.hoisted(() => ({
       gemini: true,
       deepseek: true,
       manus: true,
+      grok: false,
     },
     defaultFanOutProviders: null,
     shortcuts: {
