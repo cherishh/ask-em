@@ -31,20 +31,18 @@ export function isGrokChatRoute(url = window.location.href): boolean {
 export function isGrokLoginRequiredPage(input: {
   pathname: string;
   buttonTexts: string[];
-  hasComposer: boolean;
 }): boolean {
   if (isGrokAuthRoute(input.pathname)) {
     return true;
   }
 
-  if (input.hasComposer) {
-    return false;
-  }
-
+  // Grok exposes a functional-looking anonymous composer before showing its
+  // sign-up gate, so explicit auth CTAs must take precedence over composer presence.
   const authLabels = new Set([
     'sign in',
     'log in',
     'sign up',
+    'sign up for free',
     'create account',
     'continue with google',
     'continue with x',
@@ -188,7 +186,6 @@ export const grokAdapter = createDomProviderAdapter({
     const isLoginRequired = isGrokLoginRequiredPage({
       pathname,
       buttonTexts,
-      hasComposer,
     });
 
     return {

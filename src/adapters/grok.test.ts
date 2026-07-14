@@ -87,6 +87,32 @@ describe('Grok adapter', () => {
     });
   });
 
+  it('reports the anonymous composer with auth CTAs as login-required', () => {
+    renderGrokComposer();
+    document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<button type="button">Sign in</button><button type="button">Sign up</button>',
+    );
+
+    expect(grokAdapter.session.getStatus()).toMatchObject({
+      provider: 'grok',
+      pageState: 'login-required',
+    });
+  });
+
+  it('reports the post-submit sign-up gate as login-required', () => {
+    document.body.innerHTML = `
+      <h2>Continue your conversation</h2>
+      <p>Sign up to continue seamlessly with Grok's full power</p>
+      <button type="button">Sign up for free</button>
+    `;
+
+    expect(grokAdapter.session.getStatus()).toMatchObject({
+      provider: 'grok',
+      pageState: 'login-required',
+    });
+  });
+
   it('captures Grok submit clicks as user submissions', () => {
     renderGrokComposer();
     const composer = document.querySelector<HTMLElement>('[data-testid="chat-input"] [role="textbox"]');

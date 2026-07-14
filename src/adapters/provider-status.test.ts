@@ -83,14 +83,18 @@ describe('provider login-required detection', () => {
       isGrokLoginRequiredPage({
         pathname: '/sign-in',
         buttonTexts: [],
-        hasComposer: false,
       }),
     ).toBe(true);
     expect(
       isGrokLoginRequiredPage({
         pathname: '/',
         buttonTexts: ['Sign in', 'Create account'],
-        hasComposer: false,
+      }),
+    ).toBe(true);
+    expect(
+      isGrokLoginRequiredPage({
+        pathname: '/',
+        buttonTexts: ['Sign up for free'],
       }),
     ).toBe(true);
   });
@@ -100,7 +104,6 @@ describe('provider login-required detection', () => {
       isGrokLoginRequiredPage({
         pathname: '/',
         buttonTexts: ['New Chat', 'History'],
-        hasComposer: true,
       }),
     ).toBe(false);
   });
