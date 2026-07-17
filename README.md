@@ -9,7 +9,7 @@ out to the targets by replaying it into each one's composer.
 
 ## Supported providers
 
-Seven today, more on the way.
+Seven providers are supported today, with more on the way.
 
 | Provider | Host |
 |----------|------|
