@@ -55,7 +55,7 @@ local UI) is documented in [`docs/architecture/state-ownership.md`](docs/archite
 
 ## Develop
 
-Requires Node + [pnpm](https://pnpm.io). Built with [WXT](https://wxt.dev), React 19, and
+Requires Node.js + [pnpm](https://pnpm.io). Built with [WXT](https://wxt.dev), React 19, and
 TypeScript.
 
 ```bash
