@@ -1,7 +1,9 @@
 import {
   createDefaultEnabledProviders,
+  DEFAULT_POPUP_PROVIDER_ORDER,
   DEFAULT_SHOW_DIAGNOSTICS,
   DEFAULT_SHORTCUTS,
+  normalizePopupProviderOrder,
   type DebugLogEntry,
   STORAGE_KEYS,
   type ClaimedTab,
@@ -22,6 +24,7 @@ export const DEFAULT_LOCAL_STATE: LocalState = {
   closeTabsOnDeleteSet: false,
   defaultEnabledProviders: createDefaultEnabledProviders(),
   defaultFanOutProviders: null,
+  popupProviderOrder: [...DEFAULT_POPUP_PROVIDER_ORDER],
   shortcuts: DEFAULT_SHORTCUTS,
   workspaces: {},
   workspaceIndex: {},
@@ -80,6 +83,10 @@ function isWorkspaceIndexEqual(left: LocalState['workspaceIndex'], right: LocalS
   return leftEntries.every(([key, value]) => right[key] === value);
 }
 
+function isProviderOrderEqual(left: Provider[] | undefined, right: Provider[]): boolean {
+  return left?.length === right.length && left.every((provider, index) => provider === right[index]);
+}
+
 function normalizeLocalState(state: LocalState): LocalState {
   let normalized = state;
   const legacyState = state as LegacyLocalState;
@@ -112,13 +119,24 @@ function normalizeLocalState(state: LocalState): LocalState {
     };
   }
 
-  if (normalized.defaultEnabledProviders.grok === undefined) {
+  if (
+    normalized.defaultEnabledProviders.grok === undefined ||
+    normalized.defaultEnabledProviders.kimi === undefined
+  ) {
     normalized = {
       ...normalized,
       defaultEnabledProviders: {
         ...createDefaultEnabledProviders(),
         ...normalized.defaultEnabledProviders,
       },
+    };
+  }
+
+  const popupProviderOrder = normalizePopupProviderOrder(normalized.popupProviderOrder);
+  if (!isProviderOrderEqual(normalized.popupProviderOrder, popupProviderOrder)) {
+    normalized = {
+      ...normalized,
+      popupProviderOrder,
     };
   }
 

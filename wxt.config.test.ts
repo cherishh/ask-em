@@ -13,6 +13,7 @@ describe('wxt manifest permissions', () => {
         'https://chatgpt.com/*',
         'https://claude.ai/*',
         'https://gemini.google.com/*',
+        'https://www.kimi.com/*',
         'https://chat.deepseek.com/*',
         'https://manus.im/*',
         'https://grok.com/*',

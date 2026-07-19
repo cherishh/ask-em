@@ -1,4 +1,4 @@
-import type { GroupMemberState, Provider, WorkspaceSummary } from '../../../runtime/protocol';
+import type { Provider, WorkspaceSummary } from '../../../runtime/protocol';
 import { getVisibleWorkspaceProviders } from '../../../runtime/workspace';
 import { SUPPORTED_SITES } from '../../../adapters/sites';
 import { getWorkspaceProviderPresentation } from '../../../utils/workspace-provider-display';
@@ -19,19 +19,22 @@ function getProviderOrigin(provider: Provider): string {
 
 export function WorkspaceCard({
   workspaceSummary,
+  providerOrder,
   globalSyncEnabled,
   busyKey,
   onClearWorkspace,
   onClearProvider,
 }: {
   workspaceSummary: WorkspaceSummary;
+  providerOrder: Provider[];
   globalSyncEnabled: boolean;
   busyKey: string | null;
   onClearWorkspace: (workspaceId: string) => Promise<void>;
   onClearProvider: (workspaceId: string, provider: Provider) => Promise<void>;
 }) {
   const { workspace, memberStates } = workspaceSummary;
-  const visibleProviders = getVisibleWorkspaceProviders(workspace);
+  const visibleProviderSet = new Set(getVisibleWorkspaceProviders(workspace));
+  const visibleProviders = providerOrder.filter((provider) => visibleProviderSet.has(provider));
   const allProvidersInactive =
     visibleProviders.length > 0 &&
     visibleProviders.every((provider) => (memberStates[provider] ?? 'inactive') === 'inactive');

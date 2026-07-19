@@ -9,13 +9,14 @@ out to the targets by replaying it into each one's composer.
 
 ## Supported providers
 
-Six today, more on the way.
+Seven today, more on the way.
 
 | Provider | Host |
 |----------|------|
 | Claude   | `claude.ai` |
 | ChatGPT  | `chatgpt.com` |
 | Gemini   | `gemini.google.com` |
+| Kimi     | `www.kimi.com` (text only) |
 | DeepSeek | `chat.deepseek.com` |
 | Manus    | `manus.im` |
 | Grok     | `grok.com` |

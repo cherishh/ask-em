@@ -4,6 +4,7 @@ import { geminiAdapter } from './gemini';
 import { chatgptAdapter } from './chatgpt';
 import { manusAdapter } from './manus';
 import { grokAdapter } from './grok';
+import { kimiAdapter } from './kimi';
 import type { ProviderAdapter } from './types';
 import { getSiteInfo, isSupportedOrigin, SUPPORTED_SITES } from './sites';
 
@@ -11,6 +12,7 @@ export const adapterRegistry: Record<(typeof SUPPORTED_SITES)[number]['name'], P
   claude: claudeAdapter,
   chatgpt: chatgptAdapter,
   gemini: geminiAdapter,
+  kimi: kimiAdapter,
   deepseek: deepseekAdapter,
   manus: manusAdapter,
   grok: grokAdapter,

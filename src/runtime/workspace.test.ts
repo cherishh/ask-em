@@ -56,6 +56,7 @@ describe('workspace state', () => {
       claude: true,
       chatgpt: true,
       gemini: false,
+      kimi: false,
       deepseek: false,
       manus: false,
       grok: false,

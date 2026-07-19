@@ -2,7 +2,9 @@ import { startTransition, useCallback, useEffect, useMemo, useState } from 'reac
 import {
   ALL_PROVIDERS as PROVIDERS,
   DEFAULT_ENABLED_PROVIDER_LIST,
+  DEFAULT_POPUP_PROVIDER_ORDER,
   DEFAULT_SHORTCUTS,
+  normalizePopupProviderOrder,
   resolveShortcutConfig,
 } from '../../../runtime/protocol';
 import type {
@@ -24,6 +26,9 @@ export function usePopupStatus() {
     DEFAULT_ENABLED_PROVIDER_LIST,
   );
   const [defaultFanOutProviders, setDefaultFanOutProviders] = useState<Provider[] | null>(null);
+  const [popupProviderOrder, setPopupProviderOrder] = useState<Provider[]>(
+    DEFAULT_POPUP_PROVIDER_ORDER,
+  );
   const [shortcuts, setShortcuts] = useState<ShortcutConfig>(DEFAULT_SHORTCUTS);
   const resolvedShortcuts = useMemo(() => resolveShortcutConfig(shortcuts), [shortcuts]);
   const defaultFanOutSelectedProviders = useMemo(
@@ -45,6 +50,7 @@ export function usePopupStatus() {
             PROVIDERS.filter((provider) => nextStatus.defaultEnabledProviders[provider]),
           );
           setDefaultFanOutProviders(nextStatus.defaultFanOutProviders ?? null);
+          setPopupProviderOrder(normalizePopupProviderOrder(nextStatus.popupProviderOrder));
           setShortcuts(resolveShortcutConfig(nextStatus.shortcuts));
         }
       });
@@ -154,6 +160,19 @@ export function usePopupStatus() {
     }, { silentRefresh: true });
   }, [sendRuntimeMessage, status?.globalSyncEnabled]);
 
+  const updatePopupProviderOrder = useCallback(async (providers: Provider[]) => {
+    const normalized = normalizePopupProviderOrder(providers);
+    setPopupProviderOrder(normalized);
+    await sendRuntimeMessage({
+      type: 'SET_POPUP_PROVIDER_ORDER',
+      providers: normalized,
+    }, { silentRefresh: true });
+  }, [sendRuntimeMessage]);
+
+  const resetPopupProviderOrder = useCallback(async () => {
+    await updatePopupProviderOrder(DEFAULT_POPUP_PROVIDER_ORDER);
+  }, [updatePopupProviderOrder]);
+
   const togglePauseAfterFirstFanOut = useCallback(async () => {
     const nextEnabled = !(status?.pauseAfterFirstFanOutEnabled ?? false);
     await sendRuntimeMessage({
@@ -201,7 +220,7 @@ export function usePopupStatus() {
     status,
     loading,
     busyKey,
-    providerOptions: PROVIDERS,
+    providerOptions: popupProviderOrder,
     defaultFanOutSelectedProviders,
     shortcuts,
     resolvedShortcuts,
@@ -210,6 +229,8 @@ export function usePopupStatus() {
     clearProvider,
     toggleDefaultFanOutProvider,
     toggleGlobalSync,
+    updatePopupProviderOrder,
+    resetPopupProviderOrder,
     togglePauseAfterFirstFanOut,
     toggleCloseTabsOnDeleteSet,
     toggleShowDiagnostics,

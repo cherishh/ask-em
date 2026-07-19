@@ -56,4 +56,19 @@ describe('settings handlers', () => {
       defaultFanOutProviders: ['claude', 'deepseek'],
     }));
   });
+
+  it('stores a normalized popup-only provider order', async () => {
+    storageMocks.getLocalState.mockResolvedValue(makeLocalState());
+
+    const { handleSetPopupProviderOrder } = await import('./settings');
+    const result = await handleSetPopupProviderOrder({
+      type: 'SET_POPUP_PROVIDER_ORDER',
+      providers: ['kimi', 'claude', 'kimi'],
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(storageMocks.setLocalState).toHaveBeenCalledWith(expect.objectContaining({
+      popupProviderOrder: ['kimi', 'claude', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus'],
+    }));
+  });
 });

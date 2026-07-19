@@ -29,6 +29,7 @@ import {
   handleSetDefaultFanOutProviders,
   handleSetGlobalSyncEnabled,
   handleSetPauseAfterFirstFanOutEnabled,
+  handleSetPopupProviderOrder,
   handleSetShowDiagnostics,
   handleResetIndicatorPositions,
   handleSetShortcuts,
@@ -63,6 +64,7 @@ export {
   handleSetDefaultFanOutProviders,
   handleSetGlobalSyncEnabled,
   handleSetPauseAfterFirstFanOutEnabled,
+  handleSetPopupProviderOrder,
   handleSetShowDiagnostics,
   handleResetIndicatorPositions,
   handleSetShortcuts,
@@ -173,6 +175,9 @@ export default defineBackground(() => {
           return;
         case 'SET_DEFAULT_FAN_OUT_PROVIDERS':
           sendResponse(await handleSetDefaultFanOutProviders(message));
+          return;
+        case 'SET_POPUP_PROVIDER_ORDER':
+          sendResponse(await handleSetPopupProviderOrder(message));
           return;
         case 'SET_WORKSPACE_PROVIDER_ENABLED':
           sendResponse(await handleSetWorkspaceProviderEnabled(message));

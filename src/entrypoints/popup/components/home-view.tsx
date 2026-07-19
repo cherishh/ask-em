@@ -43,6 +43,7 @@ export function HomeView(props: {
             <WorkspaceCard
               key={workspaceSummary.workspace.id}
               workspaceSummary={workspaceSummary}
+              providerOrder={props.providerOptions}
               globalSyncEnabled={props.globalSyncEnabled}
               busyKey={props.busyKey}
               onClearWorkspace={props.onClearWorkspace}

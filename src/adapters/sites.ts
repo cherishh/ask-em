@@ -45,6 +45,19 @@ export const SUPPORTED_SITES: SiteInfo[] = [
     },
   },
   {
+    name: 'kimi',
+    origin: 'https://www.kimi.com',
+    matches: ['*://www.kimi.com/*'],
+    isBlankChatUrl(url) {
+      const pathname = new URL(url).pathname;
+      return pathname === '/' || pathname === '/chat' || pathname === '/chat/';
+    },
+    extractSessionId(url) {
+      const sessionId = extractLastPathSegment(url, '/chat/');
+      return sessionId === 'history' ? null : sessionId;
+    },
+  },
+  {
     name: 'deepseek',
     origin: 'https://chat.deepseek.com',
     matches: ['*://chat.deepseek.com/*'],

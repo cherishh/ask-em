@@ -1,5 +1,6 @@
 import {
   createDefaultEnabledProviders,
+  DEFAULT_POPUP_PROVIDER_ORDER,
   DEFAULT_SHORTCUTS,
   type ClaimedTab,
   type ConversationRef,
@@ -44,6 +45,7 @@ export function makeLocalState(overrides: Partial<LocalState> = {}): LocalState 
     showDiagnostics: false,
     closeTabsOnDeleteSet: false,
     defaultEnabledProviders: createDefaultEnabledProviders(),
+    popupProviderOrder: [...DEFAULT_POPUP_PROVIDER_ORDER],
     shortcuts: DEFAULT_SHORTCUTS,
     workspaces: {},
     workspaceIndex: {},

@@ -39,6 +39,8 @@ export default function App() {
     clearProvider,
     toggleDefaultFanOutProvider,
     toggleGlobalSync,
+    updatePopupProviderOrder,
+    resetPopupProviderOrder,
     togglePauseAfterFirstFanOut,
     toggleCloseTabsOnDeleteSet,
     toggleShowDiagnostics,
@@ -186,6 +188,8 @@ export default function App() {
             showDiagnostics={status?.showDiagnostics ?? DEFAULT_SHOW_DIAGNOSTICS}
             onOpenRequestModal={openRequestModal}
             onToggleProvider={(provider) => void toggleDefaultFanOutProvider(provider)}
+            onUpdateProviderOrder={(providers) => void updatePopupProviderOrder(providers)}
+            onResetProviderOrder={() => void resetPopupProviderOrder()}
             onTogglePauseAfterFirstFanOut={() => void togglePauseAfterFirstFanOut()}
             onToggleCloseTabsOnDeleteSet={() => void toggleCloseTabsOnDeleteSet()}
             onResetIndicatorPositions={() => void resetIndicatorPositions()}

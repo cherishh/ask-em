@@ -1,4 +1,9 @@
-import { ALL_PROVIDERS, MAX_WORKSPACES, type StatusResponseMessage } from '../runtime/protocol';
+import {
+  ALL_PROVIDERS,
+  MAX_WORKSPACES,
+  normalizePopupProviderOrder,
+  type StatusResponseMessage,
+} from '../runtime/protocol';
 import type { GetWorkspaceContextMessage } from '../runtime/protocol';
 import { getLocalState } from '../runtime/storage';
 import { getWorkspacesOrdered } from '../runtime/workspace';
@@ -62,6 +67,7 @@ export async function handleGetStatus(): Promise<StatusResponseMessage> {
     workspaceLimit: MAX_WORKSPACES,
     defaultEnabledProviders: localState.defaultEnabledProviders,
     defaultFanOutProviders: localState.defaultFanOutProviders ?? null,
+    popupProviderOrder: normalizePopupProviderOrder(localState.popupProviderOrder),
     shortcuts: localState.shortcuts,
     workspaces,
     recentLogs: localState.debugLogs.slice(-20).reverse(),

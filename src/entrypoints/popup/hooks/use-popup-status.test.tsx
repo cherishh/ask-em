@@ -2,6 +2,7 @@
 
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Provider } from '../../../runtime/protocol';
 import { renderHookHarness, flushMicrotasks } from './test-utils';
 
 const popupRuntimeMocks = vi.hoisted(() => ({
@@ -49,6 +50,7 @@ describe('usePopupStatus', () => {
         claude: true,
         chatgpt: true,
         gemini: true,
+        kimi: false,
         deepseek: true,
         manus: true,
         grok: false,
@@ -92,6 +94,7 @@ describe('usePopupStatus', () => {
           claude: true,
           chatgpt: true,
           gemini: true,
+          kimi: false,
           deepseek: true,
           manus: true,
           grok: false,
@@ -112,6 +115,7 @@ describe('usePopupStatus', () => {
           claude: true,
           chatgpt: true,
           gemini: true,
+          kimi: false,
           deepseek: true,
           manus: true,
           grok: false,
@@ -197,6 +201,7 @@ describe('usePopupStatus', () => {
           claude: true,
           chatgpt: true,
           gemini: true,
+          kimi: false,
           deepseek: true,
           manus: true,
           grok: false,
@@ -217,6 +222,7 @@ describe('usePopupStatus', () => {
           claude: true,
           chatgpt: true,
           gemini: true,
+          kimi: false,
           deepseek: true,
           manus: true,
           grok: false,
@@ -258,6 +264,7 @@ describe('usePopupStatus', () => {
         claude: true,
         chatgpt: true,
         gemini: false,
+        kimi: false,
         deepseek: false,
         manus: false,
         grok: false,
@@ -288,14 +295,14 @@ describe('usePopupStatus', () => {
     const hook = renderHookHarness(() => usePopupStatus());
     await flushMicrotasks();
 
-    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus']);
+    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'kimi', 'grok', 'deepseek', 'manus']);
     expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude', 'chatgpt']);
 
     await act(async () => {
       await hook.current.toggleDefaultFanOutProvider('chatgpt');
     });
 
-    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus']);
+    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'kimi', 'grok', 'deepseek', 'manus']);
     expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude']);
     expect(sendMessage).toHaveBeenCalledWith(
       { type: 'SET_DEFAULT_FAN_OUT_PROVIDERS', providers: ['claude'] },
@@ -313,6 +320,7 @@ describe('usePopupStatus', () => {
         claude: true,
         chatgpt: true,
         gemini: false,
+        kimi: false,
         deepseek: false,
         manus: false,
         grok: false,
@@ -358,6 +366,7 @@ describe('usePopupStatus', () => {
         claude: true,
         chatgpt: true,
         gemini: false,
+        kimi: false,
         deepseek: false,
         manus: false,
         grok: false,
@@ -392,11 +401,58 @@ describe('usePopupStatus', () => {
       await flushMicrotasks();
     });
 
-    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus']);
+    expect(hook.current.providerOptions).toEqual(['claude', 'chatgpt', 'gemini', 'kimi', 'grok', 'deepseek', 'manus']);
     expect(hook.current.defaultFanOutSelectedProviders).toEqual(['claude', 'deepseek']);
     expect(sendMessage).toHaveBeenCalledWith({
       type: 'SET_DEFAULT_FAN_OUT_PROVIDERS',
       providers: ['claude', 'deepseek'],
+    });
+    hook.unmount();
+  });
+
+  it('loads and updates the popup-only provider order', async () => {
+    const initialStatus = {
+      type: 'STATUS_RESPONSE',
+      workspaces: [],
+      globalSyncEnabled: true,
+      autoSyncNewChatsEnabled: true,
+      defaultEnabledProviders: {
+        claude: true,
+        chatgpt: true,
+        gemini: false,
+        kimi: false,
+        deepseek: false,
+        manus: false,
+        grok: false,
+      },
+      defaultFanOutProviders: null,
+      popupProviderOrder: ['kimi', 'claude', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus'],
+      shortcuts: undefined,
+      debugLoggingEnabled: true,
+      showDiagnostics: false,
+      closeTabsOnDeleteSet: false,
+      workspaceLimit: 3,
+      recentLogs: [],
+    };
+    const updatedOrder: Provider[] = ['claude', 'kimi', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus'];
+    popupRuntimeMocks.requestStatus
+      .mockResolvedValueOnce(initialStatus)
+      .mockResolvedValueOnce({ ...initialStatus, popupProviderOrder: updatedOrder });
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('chrome', { runtime: { sendMessage } });
+
+    const hook = renderHookHarness(() => usePopupStatus());
+    await flushMicrotasks();
+    expect(hook.current.providerOptions).toEqual(initialStatus.popupProviderOrder);
+
+    await act(async () => {
+      await hook.current.updatePopupProviderOrder(updatedOrder);
+    });
+
+    expect(hook.current.providerOptions).toEqual(updatedOrder);
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'SET_POPUP_PROVIDER_ORDER',
+      providers: updatedOrder,
     });
     hook.unmount();
   });
@@ -412,6 +468,7 @@ describe('usePopupStatus', () => {
         claude: true,
         chatgpt: true,
         gemini: true,
+        kimi: false,
         deepseek: false,
         manus: false,
         grok: false,

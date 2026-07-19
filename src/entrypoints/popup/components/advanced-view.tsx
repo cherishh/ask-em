@@ -9,6 +9,7 @@ import type {
 } from '../../../runtime/protocol';
 import { DEFAULT_SHORTCUTS } from '../../../runtime/protocol';
 import { ShortcutRecorder } from './shortcut-recorder';
+import { ProviderOrderList } from './provider-order-list';
 
 const SHORTCUT_ROWS = [
   {
@@ -53,6 +54,8 @@ export function AdvancedView(props: {
   showDiagnostics: boolean;
   onOpenRequestModal: () => void;
   onToggleProvider: (provider: Provider) => void;
+  onUpdateProviderOrder: (providers: Provider[]) => void;
+  onResetProviderOrder: () => void;
   onTogglePauseAfterFirstFanOut: () => void;
   onToggleCloseTabsOnDeleteSet: () => void;
   onResetIndicatorPositions: () => void;
@@ -95,44 +98,33 @@ export function AdvancedView(props: {
               </button>
             </div>
           </div>
-          <div className={`askem-ep-list ${providerOptionsExpanded ? 'is-expanded' : ''}`}>
-            {visibleProviderOptions.map((provider) => {
-              const active = props.selectedProviders.includes(provider);
-              const locked = active && props.selectedProviders.length <= 1;
-              return (
-                <button
-                  key={provider}
-                  className={`askem-ep-row ${active ? 'is-active' : ''}`}
-                  onClick={() => props.onToggleProvider(provider)}
-                  disabled={props.loading || locked}
-                  aria-pressed={active}
-                  aria-label={
-                    locked
-                      ? `Keep ${provider} selected for new sets`
-                      : `${active ? 'Remove' : 'Add'} ${provider} from new set defaults`
-                  }
-                  type="button"
-                >
-                  <span className="askem-ep-dot" aria-hidden="true" />
-                  <span className="askem-ep-copy">
-                    <span className="askem-ep-name">{provider}</span>
-                    <span className="askem-ep-state">
-                      {active ? 'Included' : 'Not included'}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {hasProviderOverflow ? (
+          <ProviderOrderList
+            providers={props.providerOptions}
+            visibleProviders={visibleProviderOptions}
+            selectedProviders={props.selectedProviders}
+            loading={props.loading}
+            onToggleProvider={props.onToggleProvider}
+            onChange={props.onUpdateProviderOrder}
+          />
+          <div className="askem-ep-footer-actions">
+            {hasProviderOverflow ? (
+              <button
+                type="button"
+                className="askem-ep-expand"
+                onClick={() => setProviderOptionsExpanded((expanded) => !expanded)}
+              >
+                {providerOptionsExpanded ? 'Show fewer' : `Show ${props.providerOptions.length - ENABLED_PROVIDER_COLLAPSED_LIMIT} more`}
+              </button>
+            ) : null}
             <button
               type="button"
               className="askem-ep-expand"
-              onClick={() => setProviderOptionsExpanded((expanded) => !expanded)}
+              onClick={props.onResetProviderOrder}
+              disabled={props.loading}
             >
-              {providerOptionsExpanded ? 'Show fewer' : `Show ${props.providerOptions.length - ENABLED_PROVIDER_COLLAPSED_LIMIT} more`}
+              Reset order
             </button>
-          ) : null}
+          </div>
         </div>
 
         <div className="askem-us-divider" />

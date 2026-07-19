@@ -27,7 +27,29 @@ export const ATTACHMENT_MAX_COUNT = 20;
 
 export const ATTACHMENT_CHUNK_BYTES = 256 * 1024;
 
-export const ALL_PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus'];
+export const ALL_PROVIDERS: Provider[] = ['claude', 'chatgpt', 'gemini', 'kimi', 'grok', 'deepseek', 'manus'];
+
+export const DEFAULT_POPUP_PROVIDER_ORDER: Provider[] = [...ALL_PROVIDERS];
+
+export function normalizePopupProviderOrder(
+  providerOrder: readonly Provider[] | null | undefined,
+): Provider[] {
+  const normalized: Provider[] = [];
+
+  for (const provider of providerOrder ?? []) {
+    if (ALL_PROVIDERS.includes(provider) && !normalized.includes(provider)) {
+      normalized.push(provider);
+    }
+  }
+
+  for (const provider of ALL_PROVIDERS) {
+    if (!normalized.includes(provider)) {
+      normalized.push(provider);
+    }
+  }
+
+  return normalized;
+}
 
 export const DEFAULT_ENABLED_PROVIDER_LIST: Provider[] = ['claude', 'chatgpt'];
 
@@ -38,6 +60,7 @@ export function createDefaultEnabledProviders(
     claude: enabledProviders.includes('claude'),
     chatgpt: enabledProviders.includes('chatgpt'),
     gemini: enabledProviders.includes('gemini'),
+    kimi: enabledProviders.includes('kimi'),
     deepseek: enabledProviders.includes('deepseek'),
     manus: enabledProviders.includes('manus'),
     grok: enabledProviders.includes('grok'),

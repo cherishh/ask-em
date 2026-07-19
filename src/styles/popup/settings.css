@@ -76,10 +76,20 @@
   border-top: 1px solid rgba(35, 25, 8, 0.06);
 }
 
-.askem-ep-list.is-expanded {
-  max-height: 260px;
-  overflow-y: auto;
-  padding-right: 3px;
+.askem-ep-row-shell {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  border-bottom: 1px solid rgba(35, 25, 8, 0.06);
+  transition: background 120ms ease, opacity 120ms ease;
+}
+
+.askem-ep-row-shell:last-child {
+  border-bottom: 0;
+}
+
+.askem-ep-row-shell.is-dragging {
+  opacity: 0.44;
 }
 
 .askem-ep-row {
@@ -90,17 +100,12 @@
   width: 100%;
   min-height: 42px;
   border: 0;
-  border-bottom: 1px solid rgba(35, 25, 8, 0.06);
   background: transparent;
-  padding: 9px 0;
+  padding: 9px 4px;
   color: var(--askem-ink);
   cursor: pointer;
   text-align: left;
   transition: background 140ms ease, opacity 140ms ease;
-}
-
-.askem-ep-row:last-child {
-  border-bottom: 0;
 }
 
 .askem-ep-row:hover {
@@ -154,6 +159,25 @@
 .askem-ep-row:not(.is-active) .askem-ep-name,
 .askem-ep-row:not(.is-active) .askem-ep-state {
   color: rgba(107, 100, 89, 0.42);
+}
+
+.askem-ep-drag-handle {
+  color: rgba(107, 100, 89, 0.4);
+  cursor: grab;
+  font: 700 12px/1 var(--askem-font-sans);
+  letter-spacing: -0.18em;
+  touch-action: none;
+  user-select: none;
+}
+
+.askem-ep-drag-handle:active {
+  cursor: grabbing;
+}
+
+.askem-ep-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .askem-ep-expand {

@@ -68,7 +68,7 @@ describe('storage update queues', () => {
     expect(normalizedState.showDiagnostics).toBe(DEFAULT_SHOW_DIAGNOSTICS);
   });
 
-  it('adds Grok as disabled when normalizing storage from an older extension version', async () => {
+  it('adds newer providers as disabled when normalizing storage from an older extension version', async () => {
     const storage = await import('./storage');
     const { STORAGE_KEYS } = await import('./protocol');
     const legacyLocalState = {
@@ -89,10 +89,30 @@ describe('storage update queues', () => {
       claude: true,
       chatgpt: false,
       gemini: true,
+      kimi: false,
       deepseek: false,
       manus: true,
       grok: false,
     });
+  });
+
+  it('adds and normalizes popup provider order for older extension state', async () => {
+    const storage = await import('./storage');
+    const { STORAGE_KEYS } = await import('./protocol');
+    const legacyLocalState: Partial<LocalState> = { ...storage.DEFAULT_LOCAL_STATE };
+    delete legacyLocalState.popupProviderOrder;
+    await chrome.storage.local.set({ [STORAGE_KEYS.local]: legacyLocalState });
+
+    const normalizedState = await storage.getLocalState();
+    expect(normalizedState.popupProviderOrder).toEqual([
+      'claude',
+      'chatgpt',
+      'gemini',
+      'kimi',
+      'grok',
+      'deepseek',
+      'manus',
+    ]);
   });
 
   it('serializes local state updates so debug logs are not lost under concurrent writes', async () => {

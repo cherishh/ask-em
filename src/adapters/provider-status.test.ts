@@ -7,6 +7,7 @@ import { isDeepseekLoginRequiredPage } from './deepseek';
 import { isGeminiLoginRequiredPage, isGeminiPrivateModePage } from './gemini';
 import { isManusLoginRequiredPage } from './manus';
 import { isGrokLoginRequiredPage, isGrokPrivateModePage } from './grok';
+import { isKimiLoginRequiredPage } from './kimi';
 
 describe('provider login-required detection', () => {
   it('treats Gemini /app with visible sign-in CTA as login-required', () => {
@@ -104,6 +105,21 @@ describe('provider login-required detection', () => {
       isGrokLoginRequiredPage({
         pathname: '/',
         buttonTexts: ['New Chat', 'History'],
+      }),
+    ).toBe(false);
+  });
+
+  it('treats Kimi auth routes as login-required but accepts the logged-in composer chrome', () => {
+    expect(
+      isKimiLoginRequiredPage({
+        pathname: '/login',
+        buttonTexts: [],
+      }),
+    ).toBe(true);
+    expect(
+      isKimiLoginRequiredPage({
+        pathname: '/',
+        buttonTexts: ['New Chat', 'All Chats'],
       }),
     ).toBe(false);
   });

@@ -33,6 +33,7 @@ const { requestFullLogs, requestStatus } = vi.hoisted(() => ({
       claude: true,
       chatgpt: true,
       gemini: true,
+      kimi: false,
       deepseek: true,
       manus: true,
       grok: false,

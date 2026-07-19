@@ -45,3 +45,23 @@ describe('grok site info', () => {
     expect(getSiteInfo('https://grok.com/')?.name).toBe('grok');
   });
 });
+
+describe('kimi site info', () => {
+  it('distinguishes blank chat routes from conversation routes', () => {
+    const site = getSiteInfoByProvider('kimi');
+
+    expect(site.isBlankChatUrl('https://www.kimi.com/')).toBe(true);
+    expect(site.isBlankChatUrl('https://www.kimi.com/chat')).toBe(true);
+    expect(site.isBlankChatUrl('https://www.kimi.com/chat/conversation-id')).toBe(false);
+  });
+
+  it('extracts conversation ids without treating history as a session', () => {
+    const site = getSiteInfoByProvider('kimi');
+
+    expect(site.extractSessionId('https://www.kimi.com/chat/conversation-id?chat_enter_method=history')).toBe(
+      'conversation-id',
+    );
+    expect(site.extractSessionId('https://www.kimi.com/chat/history')).toBeNull();
+    expect(getSiteInfo('https://www.kimi.com/')?.name).toBe('kimi');
+  });
+});

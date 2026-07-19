@@ -24,6 +24,17 @@ describe('provider attachment capability gate', () => {
     });
   });
 
+  it('treats Kimi as text-only', () => {
+    expect(
+      checkProviderAttachmentCapability('kimi', [
+        { id: 'a1', name: 'anything.png', mime: 'image/png', size: 100 },
+      ]),
+    ).toEqual({
+      ok: false,
+      reason: 'kimi attachment count not supported',
+    });
+  });
+
   it('rejects provider-specific count overage', () => {
     const attachments = Array.from({ length: 11 }, (_, index) => ({
       id: `a${index}`,

@@ -1,6 +1,6 @@
 import type { ShortcutConfig } from './shortcuts';
 
-export type Provider = 'claude' | 'chatgpt' | 'gemini' | 'deepseek' | 'manus' | 'grok';
+export type Provider = 'claude' | 'chatgpt' | 'gemini' | 'kimi' | 'deepseek' | 'manus' | 'grok';
 
 export type PageState = 'ready' | 'login-required' | 'not-ready' | 'error' | 'private-mode' | 'read-only';
 
@@ -93,6 +93,7 @@ export type LocalState = {
   closeTabsOnDeleteSet: boolean;
   defaultEnabledProviders: DefaultEnabledProviders;
   defaultFanOutProviders?: Provider[] | null;
+  popupProviderOrder?: Provider[];
   shortcuts: ShortcutConfig;
   workspaces: Record<string, Workspace>;
   workspaceIndex: WorkspaceIndex;

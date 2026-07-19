@@ -1,6 +1,7 @@
 import {
   ALL_PROVIDERS,
   createDefaultEnabledProviders,
+  normalizePopupProviderOrder,
   STORAGE_KEYS,
   type DefaultEnabledProviders,
   type Provider,
@@ -174,6 +175,25 @@ export async function handleSetDefaultFanOutProviders(
       ? 'Updated default fan-out providers'
       : 'Reset default fan-out providers to defaults',
     detail: providers?.join(', ') ?? 'default',
+  });
+  return { ok: true };
+}
+
+export async function handleSetPopupProviderOrder(
+  message: Extract<RuntimeMessage, { type: 'SET_POPUP_PROVIDER_ORDER' }>,
+) {
+  const localState = await getLocalState();
+  const popupProviderOrder = normalizePopupProviderOrder(message.providers);
+
+  await setLocalState({
+    ...localState,
+    popupProviderOrder,
+  });
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    message: 'Updated popup provider order',
+    detail: popupProviderOrder.join(', '),
   });
   return { ok: true };
 }

@@ -148,6 +148,7 @@ export type StatusResponseMessage = {
   workspaceLimit: number;
   defaultEnabledProviders: DefaultEnabledProviders;
   defaultFanOutProviders?: Provider[] | null;
+  popupProviderOrder?: Provider[];
   shortcuts: ShortcutConfig;
   workspaces: WorkspaceSummary[];
   recentLogs: DebugLogEntry[];
@@ -197,6 +198,11 @@ export type SetDefaultEnabledProvidersMessage = {
 export type SetDefaultFanOutProvidersMessage = {
   type: 'SET_DEFAULT_FAN_OUT_PROVIDERS';
   providers: Provider[] | null;
+};
+
+export type SetPopupProviderOrderMessage = {
+  type: 'SET_POPUP_PROVIDER_ORDER';
+  providers: Provider[];
 };
 
 export type SetWorkspaceProviderEnabledMessage = {
@@ -294,6 +300,7 @@ export type RuntimeMessage =
   | ClearDebugLogsMessage
   | SetDefaultEnabledProvidersMessage
   | SetDefaultFanOutProvidersMessage
+  | SetPopupProviderOrderMessage
   | SetWorkspaceProviderEnabledMessage
   | SetAutoSyncNewChatsEnabledMessage
   | SetPauseAfterFirstFanOutEnabledMessage

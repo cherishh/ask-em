@@ -10,6 +10,10 @@ export const PROVIDER_UPLOAD_CAPABILITIES: Record<Provider, UploadCapability> = 
   gemini: {
     maxFiles: 10,
   },
+  kimi: {
+    // Kimi integration currently supports text prompts only.
+    maxFiles: 0,
+  },
   deepseek: {
     maxFiles: 10,
   },
