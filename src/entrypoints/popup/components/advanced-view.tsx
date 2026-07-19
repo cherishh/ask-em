@@ -27,6 +27,8 @@ const SHORTCUT_ROWS = [
 ] as const satisfies Array<{ id: ShortcutId; label: string }>;
 
 const ENABLED_PROVIDER_COLLAPSED_LIMIT = 5;
+const TERMS_URL = 'https://askem.chat/terms.html';
+const PRIVACY_URL = 'https://askem.chat/privacy.html';
 
 function LogRow({ log }: { log: DebugLogEntry }) {
   return (
@@ -65,8 +67,6 @@ export function AdvancedView(props: {
   onToggleDebugLogging: () => void;
   onDownloadLogs: () => void;
   onClearLogs: () => void;
-  onOpenTerms: () => void;
-  onOpenPrivacy: () => void;
 }) {
   const [providerOptionsExpanded, setProviderOptionsExpanded] = useState(false);
   const hasProviderOverflow = props.providerOptions.length > ENABLED_PROVIDER_COLLAPSED_LIMIT;
@@ -288,13 +288,13 @@ export function AdvancedView(props: {
 
       <footer className="askem-footer">
         <div className="askem-legal-links">
-          <button type="button" className="askem-legal-link" onClick={props.onOpenTerms}>
+          <a className="askem-legal-link" href={TERMS_URL} target="_blank" rel="noreferrer">
             Terms of Service
-          </button>
+          </a>
           <span className="askem-legal-sep">·</span>
-          <button type="button" className="askem-legal-link" onClick={props.onOpenPrivacy}>
+          <a className="askem-legal-link" href={PRIVACY_URL} target="_blank" rel="noreferrer">
             Privacy Policy
-          </button>
+          </a>
         </div>
         <div className="askem-author">
           <span>by </span>

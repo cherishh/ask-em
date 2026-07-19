@@ -42,12 +42,8 @@
 }
 
 .askem-legal-link {
-  border: 0;
-  background: transparent;
-  padding: 0;
+  border-bottom: 0;
   color: var(--askem-muted);
-  cursor: pointer;
-  font: inherit;
   text-decoration: underline;
   text-decoration-color: rgba(107, 100, 89, 0.24);
   text-underline-offset: 0.2em;

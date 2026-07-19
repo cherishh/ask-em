@@ -3,7 +3,6 @@ import {
   DEFAULT_SHOW_DIAGNOSTICS,
   MAX_WORKSPACES,
 } from '../../runtime/protocol';
-import { LegalContent, type LegalPage } from './components/legal-content';
 import { HomeView } from './components/home-view';
 import { AdvancedView } from './components/advanced-view';
 import { RequestProvidersModal } from './components/request-providers-modal';
@@ -15,12 +14,11 @@ import { useDiagnostics } from './hooks/use-diagnostics';
 import { usePopupStatus } from './hooks/use-popup-status';
 import { useProviderRequest } from './hooks/use-provider-request';
 
-type PopupView = 'home' | 'settings' | 'legal';
+type PopupView = 'home' | 'settings';
 
 export default function App() {
   const popupVersion = chrome.runtime.getManifest().version;
   const [activeView, setActiveView] = useState<PopupView>('home');
-  const [activeLegalPage, setActiveLegalPage] = useState<LegalPage>('terms');
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [devModalOpen, setDevModalOpen] = useState(false);
   const [devActionBusy, setDevActionBusy] = useState(false);
@@ -147,7 +145,7 @@ export default function App() {
             Home
           </button>
           <button
-            className={`askem-view-tab ${activeView === 'settings' || activeView === 'legal' ? 'is-active' : ''}`}
+            className={`askem-view-tab ${activeView === 'settings' ? 'is-active' : ''}`}
             onClick={() => setActiveView('settings')}
             type="button"
           >
@@ -155,12 +153,7 @@ export default function App() {
           </button>
         </nav>
 
-        {activeView === 'legal' ? (
-          <LegalContent
-            page={activeLegalPage}
-            onBack={() => setActiveView('settings')}
-          />
-        ) : activeView === 'home' ? (
+        {activeView === 'home' ? (
           <HomeView
             atLimit={atLimit}
             workspaceCount={workspaceCount}
@@ -199,14 +192,6 @@ export default function App() {
             onToggleDebugLogging={() => void toggleDebugLogging()}
             onDownloadLogs={() => void downloadLogs()}
             onClearLogs={() => void clearLogs()}
-            onOpenTerms={() => {
-              setActiveLegalPage('terms');
-              setActiveView('legal');
-            }}
-            onOpenPrivacy={() => {
-              setActiveLegalPage('privacy');
-              setActiveView('legal');
-            }}
           />
         )}
       </section>

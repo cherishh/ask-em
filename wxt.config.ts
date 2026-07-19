@@ -99,7 +99,7 @@ export function createManifestFromEnv(env: EnvMap) {
   return {
     name: "ask'em",
     description: 'Sync chat messages across AI apps',
-    version: '0.1.4',
+    version: '0.1.5',
     permissions: ['storage'],
     host_permissions: PROVIDER_HOST_PERMISSIONS,
     ...(supportHostPermissions.length > 0
