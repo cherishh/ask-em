@@ -5,8 +5,15 @@ import {
   type ProviderDeliveryResult,
   PROVIDER_UPLOAD_CAPABILITIES,
 } from '../runtime/protocol';
-import { formatAttachmentSummary, shortSubmitId } from '../runtime/attachment-log';
-import { buildUserSubmitMessage, createSubmitId, sendRuntimeMessage } from './routing';
+import {
+  formatAttachmentSummary,
+  shortSubmitId,
+} from '../runtime/attachment-log';
+import {
+  buildUserSubmitMessage,
+  createSubmitId,
+  sendRuntimeMessage,
+} from './routing';
 import { stageSubmitAttachments } from './attachment-staging';
 import type { ContentStateController, SubmitResponse } from './state';
 
@@ -42,18 +49,23 @@ function buildAttachmentLimitToast(
   deliveryResults: ProviderDeliveryResult[] | undefined,
   attachmentCount: number,
 ): string | null {
-  const limitedResults = (deliveryResults ?? []).filter((result) =>
-    !result.ok && result.reason?.toLowerCase().includes('attachment count not supported'),
+  const limitedResults = (deliveryResults ?? []).filter(
+    (result) =>
+      !result.ok &&
+      result.reason?.toLowerCase().includes('attachment count not supported'),
   );
 
   if (limitedResults.length === 0) {
     return null;
   }
 
-  const providerLabels = limitedResults.map((result) => PROVIDER_LABELS[result.provider]);
-  const skippedPrefix = providerLabels.length === 1
-    ? `${providerLabels[0]} skipped`
-    : `${providerLabels.join(', ')} skipped`;
+  const providerLabels = limitedResults.map(
+    (result) => PROVIDER_LABELS[result.provider],
+  );
+  const skippedPrefix =
+    providerLabels.length === 1
+      ? `${providerLabels[0]} skipped`
+      : `${providerLabels.join(', ')} skipped`;
   const successSuffix = (deliveryResults ?? []).some((result) => result.ok)
     ? ' Other providers synced.'
     : '';
@@ -107,7 +119,10 @@ export function createSubmitController(
   const reportUserSubmit = async (input: SubmitInput) => {
     const payload = normalizeSubmitInput(input);
     const content = payload.text.trim();
-    if ((!content && payload.attachments.length === 0) || state.isSubmissionSuppressed()) {
+    if (
+      (!content && payload.attachments.length === 0) ||
+      state.isSubmissionSuppressed()
+    ) {
       return;
     }
 
@@ -126,10 +141,13 @@ export function createSubmitController(
       return;
     }
 
-    const attachmentIds = payload.attachments.map((attachment) => attachment.id).sort();
-    const fingerprint = attachmentIds.length > 0
-      ? `${status.currentUrl}::${content}::${attachmentIds.join(',')}`
-      : `${status.currentUrl}::${content}`;
+    const attachmentIds = payload.attachments
+      .map((attachment) => attachment.id)
+      .sort();
+    const fingerprint =
+      attachmentIds.length > 0
+        ? `${status.currentUrl}::${content}::${attachmentIds.join(',')}`
+        : `${status.currentUrl}::${content}`;
 
     if (state.shouldSkipDuplicateSubmit(fingerprint)) {
       return;
@@ -153,7 +171,8 @@ export function createSubmitController(
       !uiContext.workspaceId &&
       status.pageKind === 'new-chat' &&
       status.sessionId === null &&
-      (!uiContext.standaloneCreateSetEnabled || uiContext.standaloneFanOutTargetCount === 0)
+      (!uiContext.standaloneCreateSetEnabled ||
+        uiContext.standaloneFanOutTargetCount === 0)
     ) {
       state.applyIndicatorPresentation(status);
       await dependencies.logDebug({
@@ -168,7 +187,7 @@ export function createSubmitController(
     await dependencies.logDebug({
       level: 'info',
       message: 'Detected user submit',
-      detail: `${content.slice(0, 120)}; attachments=${payload.attachments.length}${payload.attachmentResolution ? `; captured=${payload.attachmentResolution.capturedCount}; current=${payload.attachmentResolution.currentCount ?? 'unknown'}` : ''}`,
+      detail: `${content.slice(0, 120)}; attachments=${payload.attachments.length}${payload.attachmentResolution ? `; captured=${payload.attachmentResolution.capturedCount}; current=${payload.attachmentResolution.currentCount ?? 'unknown'}; capturedItems=[${(payload.attachmentResolution.capturedItems ?? []).join(' | ')}]; currentItems=[${(payload.attachmentResolution.currentItems ?? []).join(' | ')}]` : ''}`,
     });
 
     state.setSyncing();
@@ -180,7 +199,8 @@ export function createSubmitController(
     if (
       canFanOutAttachments &&
       payload.attachmentResolution &&
-      payload.attachmentResolution.capturedCount > 0 &&
+      (payload.attachmentResolution.capturedCount > 0 ||
+        (payload.attachmentResolution.currentCount ?? 0) > 0) &&
       payload.attachmentResolution.submittedCount === 0 &&
       payload.attachmentResolution.reason &&
       payload.attachmentResolution.reason !== 'no-current-attachments'
@@ -225,11 +245,12 @@ export function createSubmitController(
       }
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      const warningLabel = error instanceof Error && reason === 'too many files'
-        ? 'too many files'
-        : error instanceof Error && reason.includes('large')
-          ? 'attachment too large'
-          : 'attachment sync skipped';
+      const warningLabel =
+        error instanceof Error && reason === 'too many files'
+          ? 'too many files'
+          : error instanceof Error && reason.includes('large')
+            ? 'attachment too large'
+            : 'attachment sync skipped';
       if (canFanOutAttachments) {
         state.showCurrentWarning(warningLabel);
         // The pill warning is overwritten by applyIndicatorPresentation() below, so
@@ -252,10 +273,15 @@ export function createSubmitController(
     }
 
     const response = await sendRuntimeMessage<SubmitResponse>(
-      buildUserSubmitMessage(status, content, uiContext.standaloneCreateSetEnabled, {
-        attachments,
-        submitId,
-      }),
+      buildUserSubmitMessage(
+        status,
+        content,
+        uiContext.standaloneCreateSetEnabled,
+        {
+          attachments,
+          submitId,
+        },
+      ),
       {
         onError(error) {
           console.warn('ask-em: failed to report user submit', error);
@@ -263,7 +289,10 @@ export function createSubmitController(
       },
     );
     state.applySubmitResponse(response);
-    const attachmentLimitToast = buildAttachmentLimitToast(response?.deliveryResults, attachments.length);
+    const attachmentLimitToast = buildAttachmentLimitToast(
+      response?.deliveryResults,
+      attachments.length,
+    );
     if (attachmentLimitToast) {
       state.showToast(attachmentLimitToast, 'warning');
     }

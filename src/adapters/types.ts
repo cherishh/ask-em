@@ -56,6 +56,7 @@ export type ComposerDeliveryPreparation = ComposerPayload & {
 export type ComposerAttachmentPresence = {
   count: number;
   keys?: string[];
+  diagnostic?: string;
 };
 
 export type ComposerAttachmentSnapshot = {
@@ -76,6 +77,8 @@ export type AttachmentSubmitResolution = {
   currentCount: number | null;
   submittedCount: number;
   reason?: AttachmentSubmitResolutionReason;
+  capturedItems?: string[];
+  currentItems?: string[];
 };
 
 export interface ProviderComposerAdapter {

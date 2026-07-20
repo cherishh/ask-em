@@ -7,6 +7,7 @@ import {
   type AttachmentReadChunkResponse,
   type AttachmentRef,
   type AskEmFileInputDeliveryMessage,
+  type AskEmSerializedFile,
   type AskEmTransientFileInputDeliveryMessage,
   isAskEmFileInputDeliveryResultMessage,
   isAskEmTransientFileInputDeliveryResultMessage,
@@ -158,20 +159,44 @@ export async function readAttachmentFiles(refs: AttachmentRef[]): Promise<File[]
   return files;
 }
 
-export function setFileInputFiles(input: HTMLInputElement, files: File[]): Promise<void> {
+async function serializeFileInputFiles(files: File[]): Promise<AskEmSerializedFile[]> {
+  return Promise.all(files.map(async (file) => ({
+    name: file.name,
+    type: file.type,
+    lastModified: file.lastModified,
+    bytes: await file.arrayBuffer(),
+  })));
+}
+
+export async function setFileInputFiles(
+  input: HTMLInputElement,
+  files: File[],
+  options: { serialize?: boolean } = {},
+): Promise<void> {
   const requestId = createDeliveryRequestId();
+  const message: AskEmFileInputDeliveryMessage = options.serialize
+    ? {
+      source: ASK_EM_BRIDGE_SOURCE,
+      type: ASK_EM_FILE_INPUT_DELIVERY,
+      requestId,
+      inputToken: requestId,
+      encoding: 'serialized',
+      files: await serializeFileInputFiles(files),
+    }
+    : {
+      source: ASK_EM_BRIDGE_SOURCE,
+      type: ASK_EM_FILE_INPUT_DELIVERY,
+      requestId,
+      inputToken: requestId,
+      encoding: 'native',
+      files,
+    };
   input.setAttribute(ASK_EM_FILE_INPUT_TOKEN_ATTRIBUTE, requestId);
 
   const result = waitForFileInputDeliveryResult(requestId);
-  window.postMessage({
-    source: ASK_EM_BRIDGE_SOURCE,
-    type: ASK_EM_FILE_INPUT_DELIVERY,
-    requestId,
-    inputToken: requestId,
-    files,
-  } satisfies AskEmFileInputDeliveryMessage, getPostMessageTargetOrigin());
+  window.postMessage(message, getPostMessageTargetOrigin());
 
-  return result.finally(() => {
+  await result.finally(() => {
     input.removeAttribute(ASK_EM_FILE_INPUT_TOKEN_ATTRIBUTE);
   });
 }

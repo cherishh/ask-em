@@ -14,7 +14,10 @@ import type {
   ComposerAttachmentSnapshot,
   ComposerPayload,
 } from './types';
-import { isAskEmTransientFilesMessage } from '../runtime/protocol';
+import {
+  ASK_EM_FILE_INPUT_SOURCE_CAPTURE_EVENT,
+  isAskEmTransientFilesMessage,
+} from '../runtime/protocol';
 import {
   ComposerAttachmentCaptureBuffer,
   getFilesFromDataTransfer,
@@ -54,8 +57,14 @@ type DomProviderAdapterConfig = {
   isPageEligible?: () => boolean;
   getIneligiblePageState?: () => PageState;
   composerSelectors: string[];
+  isDropTargetForComposer?: (
+    target: EventTarget | null,
+    composer: HTMLElement | null,
+  ) => boolean;
   sendButtonSelectors?: string[];
-  findSendButton?: (findComposer: () => HTMLElement | null) => HTMLElement | null;
+  findSendButton?: (
+    findComposer: () => HTMLElement | null,
+  ) => HTMLElement | null;
   findUserSubmitButtons?: (context: {
     findComposer: () => HTMLElement | null;
     findSendButton: () => HTMLElement | null;
@@ -100,12 +109,10 @@ type DomProviderAdapterConfig = {
     },
     capturedAttachments: CapturedAttachment[],
   ) => ComposerAttachmentSnapshot | null;
-  detectAttachmentUploadError?: (
-    context: {
-      findComposer: () => HTMLElement | null;
-      findSendButton: () => HTMLElement | null;
-    },
-  ) => string | null | Promise<string | null>;
+  detectAttachmentUploadError?: (context: {
+    findComposer: () => HTMLElement | null;
+    findSendButton: () => HTMLElement | null;
+  }) => string | null | Promise<string | null>;
   isFileInputForComposer?: (
     input: HTMLInputElement,
     context: {
@@ -141,7 +148,10 @@ function compactAttachmentText(value: string): string {
   return normalizeWhitespace(value).replace(/\s+/g, '').toLowerCase();
 }
 
-function containsCapturedAttachmentName(text: string, capturedAttachments: AttachmentRef[]): boolean {
+function containsCapturedAttachmentName(
+  text: string,
+  capturedAttachments: AttachmentRef[],
+): boolean {
   const compactText = compactAttachmentText(text);
   return capturedAttachments.some((attachment) => {
     const compactName = compactAttachmentText(attachment.name);
@@ -150,7 +160,9 @@ function containsCapturedAttachmentName(text: string, capturedAttachments: Attac
 }
 
 function isDeferredSubmitLabelOnly(text: string): boolean {
-  return /^(you said|user said|你说|你发送了)[:：]?$/i.test(normalizeWhitespace(text));
+  return /^(you said|user said|你说|你发送了)[:：]?$/i.test(
+    normalizeWhitespace(text),
+  );
 }
 
 function findGenericAttachmentSnapshotLabels(
@@ -166,10 +178,20 @@ function findGenericAttachmentSnapshotLabels(
   )
     .filter((element, index, elements) => elements.indexOf(element) === index)
     .filter(isVisible)
-    .filter((element) => containsCapturedAttachmentName(getElementAccessibleText(element), capturedAttachments));
+    .filter((element) =>
+      containsCapturedAttachmentName(
+        getElementAccessibleText(element),
+        capturedAttachments,
+      ),
+    );
 
   return candidates
-    .filter((candidate) => !candidates.some((other) => other !== candidate && candidate.contains(other)))
+    .filter(
+      (candidate) =>
+        !candidates.some(
+          (other) => other !== candidate && candidate.contains(other),
+        ),
+    )
     .map(getElementAccessibleText)
     .filter(Boolean);
 }
@@ -191,7 +213,9 @@ function getAttachmentSnapshotContainer(
   );
 }
 
-export function createDomProviderAdapter(config: DomProviderAdapterConfig): ProviderAdapter {
+export function createDomProviderAdapter(
+  config: DomProviderAdapterConfig,
+): ProviderAdapter {
   const site = getSiteInfoByProvider(config.provider);
   const isPageEligible = () => config.isPageEligible?.() ?? true;
 
@@ -216,14 +240,21 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     }
 
     prepareDom();
-    return config.findSendButton ? config.findSendButton(findComposer) : queryVisible(config.sendButtonSelectors ?? []);
+    return config.findSendButton
+      ? config.findSendButton(findComposer)
+      : queryVisible(config.sendButtonSelectors ?? []);
   };
   let suppressAttachmentCaptureUntil = 0;
-  const isAttachmentCaptureSuppressed = () => Date.now() < suppressAttachmentCaptureUntil;
+  const isAttachmentCaptureSuppressed = () =>
+    Date.now() < suppressAttachmentCaptureUntil;
   const isSendButtonEnabled = (button: HTMLElement) =>
-    config.isSendButtonEnabled ? config.isSendButtonEnabled(button) : !button.hasAttribute('disabled');
+    config.isSendButtonEnabled
+      ? config.isSendButtonEnabled(button)
+      : !button.hasAttribute('disabled');
   const isUserSubmitButtonEnabled = (button: HTMLElement) =>
-    config.isUserSubmitButtonEnabled ? config.isUserSubmitButtonEnabled(button) : isSendButtonEnabled(button);
+    config.isUserSubmitButtonEnabled
+      ? config.isUserSubmitButtonEnabled(button)
+      : isSendButtonEnabled(button);
   const findUserSubmitButtons = (): HTMLElement[] => {
     if (!isPageEligible()) {
       return [];
@@ -252,17 +283,22 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
       return config.isFileInputForComposer(input, { composer, sendButton });
     }
 
-    const form = composer?.closest('form') ?? sendButton?.closest('form') ?? null;
+    const form =
+      composer?.closest('form') ?? sendButton?.closest('form') ?? null;
     if (form && isElementWithin(input, form)) {
       return true;
     }
 
-    const composerContainer = composer?.parentElement?.parentElement ?? composer?.parentElement ?? null;
+    const composerContainer =
+      composer?.parentElement?.parentElement ?? composer?.parentElement ?? null;
     if (composerContainer && isElementWithin(input, composerContainer)) {
       return true;
     }
 
-    const buttonContainer = sendButton?.parentElement?.parentElement ?? sendButton?.parentElement ?? null;
+    const buttonContainer =
+      sendButton?.parentElement?.parentElement ??
+      sendButton?.parentElement ??
+      null;
     return Boolean(buttonContainer && isElementWithin(input, buttonContainer));
   };
   const getDefaultComposerAttachmentSnapshot = (
@@ -289,9 +325,15 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
       };
     }
 
-    const scopedFileInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
-      .filter(isFileInputForComposer);
-    if (scopedFileInputs.length > 0 && capturedAttachments.every((attachment) => attachment.source === 'file-input')) {
+    const scopedFileInputs = Array.from(
+      document.querySelectorAll<HTMLInputElement>('input[type="file"]'),
+    ).filter(isFileInputForComposer);
+    if (
+      scopedFileInputs.length > 0 &&
+      capturedAttachments.every(
+        (attachment) => attachment.source === 'file-input',
+      )
+    ) {
       return {
         count: 0,
         items: [],
@@ -304,11 +346,14 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     capturedAttachments: CapturedAttachment[],
   ): ComposerAttachmentSnapshot | null => {
     if (config.getComposerAttachmentSnapshot) {
-      return config.getComposerAttachmentSnapshot({
-        findComposer,
-        findSendButton,
-        isFileInputForComposer,
-      }, capturedAttachments);
+      return config.getComposerAttachmentSnapshot(
+        {
+          findComposer,
+          findSendButton,
+          isFileInputForComposer,
+        },
+        capturedAttachments,
+      );
     }
 
     if (config.useGenericAttachmentSnapshot) {
@@ -322,41 +367,57 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
     prepareDom();
     const currentUrl = window.location.href;
     const isEligible = isPageEligible();
-    const ineligiblePageState = isEligible ? null : config.getIneligiblePageState?.() ?? 'not-ready';
+    const ineligiblePageState = isEligible
+      ? null
+      : (config.getIneligiblePageState?.() ?? 'not-ready');
     const authClassification = !isEligible
       ? { isLoginRequired: false }
       : config.classifyAuth
         ? config.classifyAuth()
         : config.isLoginRequired
           ? { isLoginRequired: config.isLoginRequired() }
-          : { isLoginRequired: detectLoginRequired(config.loginKeywords ?? []) };
+          : {
+            isLoginRequired: detectLoginRequired(config.loginKeywords ?? []),
+          };
     const isLoginRequired = authClassification.isLoginRequired;
     const isPrivateMode = isEligible && (config.isPrivateMode?.() ?? false);
-    const hasHardError = isEligible ? config.isErrorPage?.() ?? false : false;
+    const hasHardError = isEligible ? (config.isErrorPage?.() ?? false) : false;
     const isReady = isEligible && Boolean(findComposer());
-    const pageState = ineligiblePageState ?? (isPrivateMode
-      ? 'private-mode'
-      : isLoginRequired
-        ? 'login-required'
-        : hasHardError
-          ? 'error'
-          : isReady
-            ? 'ready'
-            : 'not-ready');
+    const pageState =
+      ineligiblePageState ??
+      (isPrivateMode
+        ? 'private-mode'
+        : isLoginRequired
+          ? 'login-required'
+          : hasHardError
+            ? 'error'
+            : isReady
+              ? 'ready'
+              : 'not-ready');
 
     return {
       provider: config.provider,
       currentUrl,
       sessionId: site.extractSessionId(currentUrl),
-      pageKind: site.isBlankChatUrl(currentUrl) ? 'new-chat' : 'existing-session',
+      pageKind: site.isBlankChatUrl(currentUrl)
+        ? 'new-chat'
+        : 'existing-session',
       pageState,
       authRule: isLoginRequired ? authClassification.rule : undefined,
-      authSignalSummary: isLoginRequired ? authClassification.signals : undefined,
+      authSignalSummary: isLoginRequired
+        ? authClassification.signals
+        : undefined,
     };
   };
 
-  const canDeliverPrompt = (message: DeliverPromptMessage, snapshot: AdapterSnapshot): boolean => {
-    if (message.provider !== config.provider || snapshot.pageState !== 'ready') {
+  const canDeliverPrompt = (
+    message: DeliverPromptMessage,
+    snapshot: AdapterSnapshot,
+  ): boolean => {
+    if (
+      message.provider !== config.provider ||
+      snapshot.pageState !== 'ready'
+    ) {
       return false;
     }
 
@@ -402,7 +463,9 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
         const buildUserSubmissionPayload = (text: string) => {
           let capturedAttachments = attachmentBuffer.getAttachmentsForSubmit();
           if (capturedAttachments.length === 0) {
-            const lateFiles = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
+            const lateFiles = Array.from(
+              document.querySelectorAll<HTMLInputElement>('input[type="file"]'),
+            )
               .filter(isFileInputForComposer)
               .flatMap((input) => getFilesFromFileList(input.files));
             if (lateFiles.length > 0) {
@@ -411,12 +474,15 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
             }
           }
 
-          const attachmentResolution: AttachmentSubmitResolution = attachmentBuffer.resolveAttachmentsForSubmit(
-            capturedAttachments.length > 0 ? getComposerAttachmentSnapshot(capturedAttachments) : {
-              count: 0,
-              items: [],
-            },
-          );
+          const attachmentSnapshot =
+              getComposerAttachmentSnapshot(capturedAttachments);
+          const attachmentResolution: AttachmentSubmitResolution = {
+            ...attachmentBuffer.resolveAttachmentsForSubmit(attachmentSnapshot),
+            capturedItems: capturedAttachments.map((attachment) =>
+              `${attachment.id.slice(0, 8)}:${attachment.source}:${attachment.name}:${attachment.mime}:${attachment.size}b`,
+            ),
+            currentItems: attachmentSnapshot?.items ?? [],
+          };
 
           return {
             text,
@@ -452,11 +518,17 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
           }
 
           const composer = findComposer();
-          if (!isElementWithin(event.target, composer)) {
+          const isComposerDrop = config.isDropTargetForComposer
+            ? config.isDropTargetForComposer(event.target, composer)
+            : isElementWithin(event.target, composer);
+          if (!isComposerDrop) {
             return;
           }
 
-          attachmentBuffer.addFiles(getFilesFromDataTransfer(event.dataTransfer), 'drop');
+          attachmentBuffer.addFiles(
+            getFilesFromDataTransfer(event.dataTransfer),
+            'drop',
+          );
         };
 
         const handleFileInputChange = (event: Event) => {
@@ -464,8 +536,13 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
             return;
           }
 
-          const input = event.target instanceof HTMLInputElement ? event.target : null;
-          if (!input || input.type !== 'file' || !isFileInputForComposer(input)) {
+          const input =
+            event.target instanceof HTMLInputElement ? event.target : null;
+          if (
+            !input ||
+            input.type !== 'file' ||
+            !isFileInputForComposer(input)
+          ) {
             return;
           }
 
@@ -475,6 +552,27 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
           }
 
           attachmentBuffer.addFiles(files, 'file-input');
+        };
+
+        const handleMainFileInputSourceCapture = (event: Event) => {
+          if (isAttachmentCaptureSuppressed()) {
+            return;
+          }
+
+          const input =
+            event.target instanceof HTMLInputElement ? event.target : null;
+          if (
+            !input ||
+            input.type !== 'file' ||
+            !isFileInputForComposer(input)
+          ) {
+            return;
+          }
+
+          attachmentBuffer.addFiles(
+            getFilesFromFileList(input.files),
+            'main-file-input',
+          );
         };
 
         const handleTransientFilesMessage = (event: MessageEvent) => {
@@ -515,29 +613,35 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
           submitButton: HTMLElement,
         ) => {
           void waitFor(() => {
-            const currentUserMessages = config.getUserMessageTexts?.()
-              .map(normalizeWhitespace)
-              .filter(Boolean) ?? [];
+            const currentUserMessages =
+              config
+                .getUserMessageTexts?.()
+                .map(normalizeWhitespace)
+                .filter(Boolean) ?? [];
             if (currentUserMessages.length <= baselineUserMessages.length) {
               return null;
             }
 
             const submittedText = currentUserMessages.at(-1);
-            return submittedText && !isDeferredSubmitLabelOnly(submittedText) ? submittedText : null;
-          }, config.deferredUserSubmitTextTimeoutMs ?? 4_000).then((submittedText) => {
-            if (!submittedText) {
-              return;
-            }
+            return submittedText && !isDeferredSubmitLabelOnly(submittedText)
+              ? submittedText
+              : null;
+          }, config.deferredUserSubmitTextTimeoutMs ?? 4_000).then(
+            (submittedText) => {
+              if (!submittedText) {
+                return;
+              }
 
-            if (
-              pendingDeferredSubmitBaseline?.button === submitButton &&
-              pendingDeferredSubmitBaseline.waitStarted
-            ) {
-              pendingDeferredSubmitBaseline = null;
-            }
+              if (
+                pendingDeferredSubmitBaseline?.button === submitButton &&
+                pendingDeferredSubmitBaseline.waitStarted
+              ) {
+                pendingDeferredSubmitBaseline = null;
+              }
 
-            onSubmit(buildUserSubmissionPayload(submittedText));
-          });
+              onSubmit(buildUserSubmissionPayload(submittedText));
+            },
+          );
         };
 
         const captureDeferredSubmitBaseline = (event: Event) => {
@@ -546,7 +650,9 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
           }
 
           const submitButton = findUserSubmitButtons().find(
-            (button) => isUserSubmitButtonEnabled(button) && isElementWithin(event.target, button),
+            (button) =>
+              isUserSubmitButtonEnabled(button) &&
+              isElementWithin(event.target, button),
           );
           if (!submitButton) {
             return;
@@ -566,22 +672,33 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
 
           pendingDeferredSubmitBaseline = {
             button: submitButton,
-            messages: config.getUserMessageTexts()
+            messages: config
+              .getUserMessageTexts()
               .map(normalizeWhitespace)
               .filter(Boolean),
             capturedAt: Date.now(),
             waitStarted: true,
           };
-          waitForDeferredSubmittedText(pendingDeferredSubmitBaseline.messages, submitButton);
+          waitForDeferredSubmittedText(
+            pendingDeferredSubmitBaseline.messages,
+            submitButton,
+          );
         };
 
         const handleClick = (event: MouseEvent) => {
           const submitButton = findUserSubmitButtons().find(
-            (button) => isUserSubmitButtonEnabled(button) && isElementWithin(event.target, button),
+            (button) =>
+              isUserSubmitButtonEnabled(button) &&
+              isElementWithin(event.target, button),
           );
           if (submitButton) {
-            const payload = buildUserSubmissionPayload(getEditableText(findComposer()));
-            if (payload.text.trim().length > 0 || payload.attachments.length > 0) {
+            const payload = buildUserSubmissionPayload(
+              getEditableText(findComposer()),
+            );
+            if (
+              payload.text.trim().length > 0 ||
+              payload.attachments.length > 0
+            ) {
               onSubmit(payload);
               return;
             }
@@ -597,15 +714,20 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
             }
 
             pendingDeferredSubmitBaseline = null;
-            const baselineUserMessages = pendingBaseline ?? config.getUserMessageTexts?.()
-              .map(normalizeWhitespace)
-              .filter(Boolean);
+            const baselineUserMessages =
+              pendingBaseline ??
+              config
+                .getUserMessageTexts?.()
+                .map(normalizeWhitespace)
+                .filter(Boolean);
             if (!baselineUserMessages) {
               return;
             }
 
             waitForDeferredSubmittedText(
-              Array.isArray(baselineUserMessages) ? baselineUserMessages : baselineUserMessages.messages,
+              Array.isArray(baselineUserMessages)
+                ? baselineUserMessages
+                : baselineUserMessages.messages,
               submitButton,
             );
           }
@@ -614,20 +736,46 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
         document.addEventListener('paste', handlePaste, true);
         document.addEventListener('drop', handleDrop, true);
         document.addEventListener('change', handleFileInputChange, true);
+        document.addEventListener(
+          ASK_EM_FILE_INPUT_SOURCE_CAPTURE_EVENT,
+          handleMainFileInputSourceCapture,
+          true,
+        );
         window.addEventListener('message', handleTransientFilesMessage);
         document.addEventListener('keydown', handleKeydown, true);
-        document.addEventListener('pointerdown', captureDeferredSubmitBaseline, true);
-        document.addEventListener('mousedown', captureDeferredSubmitBaseline, true);
+        document.addEventListener(
+          'pointerdown',
+          captureDeferredSubmitBaseline,
+          true,
+        );
+        document.addEventListener(
+          'mousedown',
+          captureDeferredSubmitBaseline,
+          true,
+        );
         document.addEventListener('click', handleClick, true);
 
         return () => {
           document.removeEventListener('paste', handlePaste, true);
           document.removeEventListener('drop', handleDrop, true);
           document.removeEventListener('change', handleFileInputChange, true);
+          document.removeEventListener(
+            ASK_EM_FILE_INPUT_SOURCE_CAPTURE_EVENT,
+            handleMainFileInputSourceCapture,
+            true,
+          );
           window.removeEventListener('message', handleTransientFilesMessage);
           document.removeEventListener('keydown', handleKeydown, true);
-          document.removeEventListener('pointerdown', captureDeferredSubmitBaseline, true);
-          document.removeEventListener('mousedown', captureDeferredSubmitBaseline, true);
+          document.removeEventListener(
+            'pointerdown',
+            captureDeferredSubmitBaseline,
+            true,
+          );
+          document.removeEventListener(
+            'mousedown',
+            captureDeferredSubmitBaseline,
+            true,
+          );
           document.removeEventListener('click', handleClick, true);
         };
       },
@@ -657,30 +805,43 @@ export function createDomProviderAdapter(config: DomProviderAdapterConfig): Prov
         await setComposerText(payload.text);
       },
       getComposerAttachmentPresence(expectedAttachments) {
-        return config.getComposerAttachmentPresence?.({
-          findComposer,
-          findSendButton,
-        }, expectedAttachments) ?? { count: 0 };
+        return (
+          config.getComposerAttachmentPresence?.(
+            {
+              findComposer,
+              findSendButton,
+            },
+            expectedAttachments,
+          ) ?? { count: 0 }
+        );
       },
       getComposerAttachmentSnapshot(capturedAttachments) {
         return getComposerAttachmentSnapshot(capturedAttachments ?? []);
       },
       detectAttachmentUploadError() {
-        return config.detectAttachmentUploadError?.({
-          findComposer,
-          findSendButton,
-        }) ?? null;
+        return (
+          config.detectAttachmentUploadError?.({
+            findComposer,
+            findSendButton,
+          }) ?? null
+        );
       },
       suppressAttachmentCaptureFor(durationMs) {
-        suppressAttachmentCaptureUntil = Math.max(suppressAttachmentCaptureUntil, Date.now() + durationMs);
+        suppressAttachmentCaptureUntil = Math.max(
+          suppressAttachmentCaptureUntil,
+          Date.now() + durationMs,
+        );
       },
       async submit(options) {
         prepareDom();
         await sleep(config.submitWaitMs ?? 150);
-        const sendButton = await waitFor(() => {
-          const button = findSendButton();
-          return button && isSendButtonEnabled(button) ? button : null;
-        }, options?.timeoutMs ?? config.submitTimeoutMs ?? 2_000);
+        const sendButton = await waitFor(
+          () => {
+            const button = findSendButton();
+            return button && isSendButtonEnabled(button) ? button : null;
+          },
+          options?.timeoutMs ?? config.submitTimeoutMs ?? 2_000,
+        );
 
         if (sendButton && isSendButtonEnabled(sendButton)) {
           triggerPointerClick(sendButton);

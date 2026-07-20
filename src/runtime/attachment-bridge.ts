@@ -1,6 +1,8 @@
 export const ASK_EM_BRIDGE_SOURCE = 'ask-em';
 
 export const ASK_EM_TRANSIENT_FILES = 'ASK_EM_TRANSIENT_FILES';
+export const ASK_EM_FILE_INPUT_SOURCE_CAPTURE_EVENT =
+  'ask-em:file-input-source-capture';
 export const ASK_EM_TRANSIENT_FILE_INPUT_DELIVERY = 'ASK_EM_TRANSIENT_FILE_INPUT_DELIVERY';
 export const ASK_EM_TRANSIENT_FILE_INPUT_DELIVERY_RESULT = 'ASK_EM_TRANSIENT_FILE_INPUT_DELIVERY_RESULT';
 export const ASK_EM_FILE_INPUT_DELIVERY = 'ASK_EM_FILE_INPUT_DELIVERY';
@@ -20,6 +22,13 @@ export type AskEmTransientFileInputDeliveryMessage = {
   files: File[];
 };
 
+export type AskEmSerializedFile = {
+  name: string;
+  type: string;
+  lastModified: number;
+  bytes: ArrayBuffer;
+};
+
 export type AskEmTransientFileInputDeliveryResultMessage = {
   source: typeof ASK_EM_BRIDGE_SOURCE;
   type: typeof ASK_EM_TRANSIENT_FILE_INPUT_DELIVERY_RESULT;
@@ -28,13 +37,22 @@ export type AskEmTransientFileInputDeliveryResultMessage = {
   error?: string;
 };
 
-export type AskEmFileInputDeliveryMessage = {
+type AskEmFileInputDeliveryMessageBase = {
   source: typeof ASK_EM_BRIDGE_SOURCE;
   type: typeof ASK_EM_FILE_INPUT_DELIVERY;
   requestId: string;
   inputToken: string;
-  files: File[];
 };
+
+export type AskEmFileInputDeliveryMessage =
+  | (AskEmFileInputDeliveryMessageBase & {
+    encoding?: 'native';
+    files: File[];
+  })
+  | (AskEmFileInputDeliveryMessageBase & {
+    encoding: 'serialized';
+    files: AskEmSerializedFile[];
+  });
 
 export type AskEmFileInputDeliveryResultMessage = {
   source: typeof ASK_EM_BRIDGE_SOURCE;
@@ -59,6 +77,29 @@ function isFileLike(value: unknown): value is File {
     typeof candidate.type === 'string' &&
     typeof candidate.size === 'number' &&
     typeof candidate.arrayBuffer === 'function'
+  );
+}
+
+function isArrayBufferLike(value: unknown): value is ArrayBuffer {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<ArrayBuffer>;
+  return typeof candidate.byteLength === 'number' && typeof candidate.slice === 'function';
+}
+
+function isSerializedFile(value: unknown): value is AskEmSerializedFile {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<AskEmSerializedFile>;
+  return (
+    typeof candidate.name === 'string' &&
+    typeof candidate.type === 'string' &&
+    typeof candidate.lastModified === 'number' &&
+    isArrayBufferLike(candidate.bytes)
   );
 }
 
@@ -115,13 +156,23 @@ export function isAskEmFileInputDeliveryMessage(value: unknown): value is AskEmF
   }
 
   const candidate = value as Partial<AskEmFileInputDeliveryMessage>;
-  return (
+  const hasValidEnvelope =
     candidate.source === ASK_EM_BRIDGE_SOURCE &&
     candidate.type === ASK_EM_FILE_INPUT_DELIVERY &&
     typeof candidate.requestId === 'string' &&
     typeof candidate.inputToken === 'string' &&
-    Array.isArray(candidate.files) &&
-    candidate.files.every(isFileLike)
+    Array.isArray(candidate.files);
+  if (!hasValidEnvelope) {
+    return false;
+  }
+
+  if (candidate.encoding === 'serialized') {
+    return candidate.files?.every(isSerializedFile) ?? false;
+  }
+
+  return (
+    (candidate.encoding === undefined || candidate.encoding === 'native') &&
+    (candidate.files?.every(isFileLike) ?? false)
   );
 }
 

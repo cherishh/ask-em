@@ -8,6 +8,13 @@ export default tseslint.config(
     ignores: ['.output/**', '.wxt/**', 'dist/**', 'node_modules/**'],
   },
   {
+    files: ['**/*.{js,mjs,cjs,ts,tsx}'],
+    rules: {
+      'no-tabs': 'error',
+      quotes: ['error', 'single', { avoidEscape: true, allowTemplateLiterals: true }],
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     languageOptions: {

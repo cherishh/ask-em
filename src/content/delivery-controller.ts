@@ -60,7 +60,7 @@ async function waitForAttachmentPresence(
   }
 
   throw new Error(
-    `upload failed: attachment presence timeout expected=${expectedCount}; baseline=${baseline.count}; current=${lastPresence.count}`,
+    `upload failed: attachment presence timeout expected=${expectedCount}; baseline=${baseline.count}; current=${lastPresence.count}${lastPresence.diagnostic ? `; ${lastPresence.diagnostic}` : ''}`,
   );
 }
 
@@ -199,6 +199,15 @@ export function createDeliveryController(
           await adapter.composer.setComposerText(message.content);
         }
 
+        if (attachmentBaseline) {
+          await dependencies.logDebug({
+            level: 'info',
+            message: 'Attachment delivery baseline',
+            detail: `count=${attachmentBaseline.count}; keys=${(attachmentBaseline.keys ?? []).slice(0, 5).join(' | ') || 'none'}${attachmentBaseline.diagnostic ? `; ${attachmentBaseline.diagnostic}` : ''}`,
+            workspaceId: message.workspaceId,
+          });
+        }
+
         await dependencies.logDebug({
           level: 'info',
           message: 'Prompt payload injected',
@@ -221,7 +230,7 @@ export function createDeliveryController(
           await dependencies.logDebug({
             level: 'info',
             message: 'Attachment delivery confirmed',
-            detail: `expected=${message.attachments.length}; baseline=${baseline.count}; current=${currentPresence.count}; keys=${(currentPresence.keys ?? []).slice(0, 5).join(' | ')}`,
+            detail: `expected=${message.attachments.length}; baseline=${baseline.count}; current=${currentPresence.count}; keys=${(currentPresence.keys ?? []).slice(0, 5).join(' | ')}${currentPresence.diagnostic ? `; ${currentPresence.diagnostic}` : ''}`,
             workspaceId: message.workspaceId,
           });
         }

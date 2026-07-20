@@ -2,7 +2,9 @@ import {
   ASK_EM_BRIDGE_SOURCE,
   ASK_EM_FILE_INPUT_DELIVERY_RESULT,
   ASK_EM_FILE_INPUT_TOKEN_ATTRIBUTE,
+  type AskEmFileInputDeliveryMessage,
   type AskEmFileInputDeliveryResultMessage,
+  type AskEmSerializedFile,
   isAskEmFileInputDeliveryMessage,
 } from '../runtime/protocol';
 
@@ -37,6 +39,19 @@ function createFileList(files: File[]): FileList | File[] {
   }
 
   return dataTransfer.files;
+}
+
+function reconstructMainWorldFiles(files: AskEmSerializedFile[]): File[] {
+  return files.map((file) => new File([file.bytes], file.name, {
+    type: file.type,
+    lastModified: file.lastModified,
+  }));
+}
+
+function getDeliveryFiles(message: AskEmFileInputDeliveryMessage): File[] {
+  return message.encoding === 'serialized'
+    ? reconstructMainWorldFiles(message.files)
+    : message.files;
 }
 
 function setNativeFileInputFiles(input: HTMLInputElement, files: File[]) {
@@ -89,7 +104,7 @@ export function installFileInputDeliveryBridge(): () => void {
     }
 
     try {
-      setNativeFileInputFiles(input, event.data.files);
+      setNativeFileInputFiles(input, getDeliveryFiles(event.data));
       postResult(event.data.requestId, { ok: true });
     } catch (error) {
       postResult(event.data.requestId, {

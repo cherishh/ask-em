@@ -35,7 +35,28 @@ describe('file input delivery bridge', () => {
     document.body.innerHTML = '';
   });
 
-  it('sets files and dispatches change from the page world bridge', async () => {
+  it('passes native files through the page world bridge', async () => {
+    cleanup = installFileInputDeliveryBridge();
+    document.body.innerHTML = `<input type="file" ${ASK_EM_FILE_INPUT_TOKEN_ATTRIBUTE}="request-native" />`;
+    const input = document.querySelector('input') as HTMLInputElement;
+    const file = new File(['native'], 'native.txt', { type: 'text/plain' });
+    const result = waitForResult('request-native');
+
+    window.postMessage({
+      source: ASK_EM_BRIDGE_SOURCE,
+      type: ASK_EM_FILE_INPUT_DELIVERY,
+      requestId: 'request-native',
+      inputToken: 'request-native',
+      encoding: 'native',
+      files: [file],
+    } satisfies AskEmFileInputDeliveryMessage, '*');
+
+    await expect(result).resolves.toBe(true);
+    expect(input.files?.[0]?.name).toBe('native.txt');
+    await expect(input.files?.[0]?.text()).resolves.toBe('native');
+  });
+
+  it('reconstructs serialized files and dispatches change', async () => {
     cleanup = installFileInputDeliveryBridge();
     document.body.innerHTML = `<input type="file" ${ASK_EM_FILE_INPUT_TOKEN_ATTRIBUTE}="request-1" />`;
     const input = document.querySelector('input') as HTMLInputElement;
@@ -50,12 +71,21 @@ describe('file input delivery bridge', () => {
       type: ASK_EM_FILE_INPUT_DELIVERY,
       requestId: 'request-1',
       inputToken: 'request-1',
-      files: [new File(['abc'], 'sample.pdf', { type: 'application/pdf' })],
+      encoding: 'serialized',
+      files: [{
+        name: 'sample.pdf',
+        type: 'application/pdf',
+        lastModified: 123,
+        bytes: new TextEncoder().encode('abc').buffer,
+      }],
     } satisfies AskEmFileInputDeliveryMessage, '*');
 
     await expect(result).resolves.toBe(true);
     expect(sawChange).toBe(true);
     expect(input.files?.[0]?.name).toBe('sample.pdf');
+    expect(input.files?.[0]?.type).toBe('application/pdf');
+    expect(input.files?.[0]?.lastModified).toBe(123);
+    await expect(input.files?.[0]?.text()).resolves.toBe('abc');
   });
 
   it('reports missing tokenized inputs', async () => {
@@ -81,6 +111,7 @@ describe('file input delivery bridge', () => {
       type: ASK_EM_FILE_INPUT_DELIVERY,
       requestId: 'request-2',
       inputToken: 'missing',
+      encoding: 'native',
       files: [new File(['abc'], 'sample.pdf', { type: 'application/pdf' })],
     } satisfies AskEmFileInputDeliveryMessage, '*');
 

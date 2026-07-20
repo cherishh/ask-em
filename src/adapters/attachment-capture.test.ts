@@ -44,7 +44,7 @@ describe('attachment capture file extraction', () => {
 
   it('reads plain text from clipboard data safely', () => {
     const dataTransfer = {
-      getData: (type: string) => type === 'text/plain' ? 'hello' : '',
+      getData: (type: string) => (type === 'text/plain' ? 'hello' : ''),
     } as DataTransfer;
 
     expect(getPlainTextFromDataTransfer(dataTransfer)).toBe('hello');
@@ -52,6 +52,23 @@ describe('attachment capture file extraction', () => {
 });
 
 describe('attachment submit snapshot resolution', () => {
+  it('reports composer-visible attachments even when nothing was captured', () => {
+    const buffer = new ComposerAttachmentCaptureBuffer();
+
+    expect(
+      buffer.resolveAttachmentsForSubmit({
+        count: 1,
+        items: ['restored-draft.pdf'],
+      }),
+    ).toEqual({
+      attachments: [],
+      capturedCount: 0,
+      currentCount: 1,
+      submittedCount: 0,
+      reason: 'no-captured-attachments',
+    });
+  });
+
   it('deduplicates the same file reported by overlapping capture events', () => {
     const buffer = new ComposerAttachmentCaptureBuffer();
     const first = new File(['a'], 'report.pdf', {
@@ -65,10 +82,12 @@ describe('attachment submit snapshot resolution', () => {
 
     expect(buffer.addFiles([first], 'transient-file-input')).toHaveLength(1);
     expect(buffer.addFiles([duplicate], 'file-input')).toHaveLength(0);
-    expect(buffer.resolveAttachmentsForSubmit({
-      count: 1,
-      items: ['report.pdf'],
-    })).toMatchObject({
+    expect(
+      buffer.resolveAttachmentsForSubmit({
+        count: 1,
+        items: ['report.pdf'],
+      }),
+    ).toMatchObject({
       capturedCount: 1,
       currentCount: 1,
       submittedCount: 1,
@@ -87,10 +106,12 @@ describe('attachment submit snapshot resolution', () => {
     });
 
     expect(buffer.addFiles([first, second], 'file-input')).toHaveLength(2);
-    expect(buffer.resolveAttachmentsForSubmit({
-      count: 2,
-      items: ['report.pdf', 'report.pdf'],
-    })).toMatchObject({
+    expect(
+      buffer.resolveAttachmentsForSubmit({
+        count: 2,
+        items: ['report.pdf', 'report.pdf'],
+      }),
+    ).toMatchObject({
       capturedCount: 2,
       currentCount: 2,
       submittedCount: 2,
@@ -99,15 +120,20 @@ describe('attachment submit snapshot resolution', () => {
 
   it('fails closed when duplicate captured filenames become ambiguous at submit time', () => {
     const buffer = new ComposerAttachmentCaptureBuffer();
-    buffer.addFiles([
-      new File(['a'], 'report.pdf', { type: 'application/pdf' }),
-      new File(['b'], 'report.pdf', { type: 'application/pdf' }),
-    ], 'file-input');
+    buffer.addFiles(
+      [
+        new File(['a'], 'report.pdf', { type: 'application/pdf' }),
+        new File(['b'], 'report.pdf', { type: 'application/pdf' }),
+      ],
+      'file-input',
+    );
 
-    expect(buffer.resolveAttachmentsForSubmit({
-      count: 1,
-      items: ['report.pdf'],
-    })).toMatchObject({
+    expect(
+      buffer.resolveAttachmentsForSubmit({
+        count: 1,
+        items: ['report.pdf'],
+      }),
+    ).toMatchObject({
       attachments: [],
       capturedCount: 2,
       currentCount: 1,
@@ -118,17 +144,22 @@ describe('attachment submit snapshot resolution', () => {
 
   it('prefers the longest filename match so a shorter name is not mis-paired by substring', () => {
     const buffer = new ComposerAttachmentCaptureBuffer();
-    buffer.addFiles([
-      new File(['a'], 'port.png', { type: 'image/png' }),
-      new File(['b'], 'report.png', { type: 'image/png' }),
-    ], 'file-input');
+    buffer.addFiles(
+      [
+        new File(['a'], 'port.png', { type: 'image/png' }),
+        new File(['b'], 'report.png', { type: 'image/png' }),
+      ],
+      'file-input',
+    );
 
     // The DOM shows both files; "port.png" is a substring of "report.png", so a
     // first-match-wins strategy would pair the "report.png" item with port.png.
-    expect(buffer.resolveAttachmentsForSubmit({
-      count: 2,
-      items: ['report.png', 'port.png'],
-    })).toMatchObject({
+    expect(
+      buffer.resolveAttachmentsForSubmit({
+        count: 2,
+        items: ['report.png', 'port.png'],
+      }),
+    ).toMatchObject({
       attachments: [
         expect.objectContaining({ name: 'report.png' }),
         expect.objectContaining({ name: 'port.png' }),
@@ -139,15 +170,20 @@ describe('attachment submit snapshot resolution', () => {
 
   it('allows duplicate filenames when the submit-time snapshot still shows all copies', () => {
     const buffer = new ComposerAttachmentCaptureBuffer();
-    buffer.addFiles([
-      new File(['a'], 'report.pdf', { type: 'application/pdf' }),
-      new File(['b'], 'report.pdf', { type: 'application/pdf' }),
-    ], 'file-input');
+    buffer.addFiles(
+      [
+        new File(['a'], 'report.pdf', { type: 'application/pdf' }),
+        new File(['b'], 'report.pdf', { type: 'application/pdf' }),
+      ],
+      'file-input',
+    );
 
-    expect(buffer.resolveAttachmentsForSubmit({
-      count: 2,
-      items: ['report.pdf', 'report.pdf'],
-    })).toMatchObject({
+    expect(
+      buffer.resolveAttachmentsForSubmit({
+        count: 2,
+        items: ['report.pdf', 'report.pdf'],
+      }),
+    ).toMatchObject({
       capturedCount: 2,
       currentCount: 2,
       submittedCount: 2,
@@ -158,7 +194,10 @@ describe('attachment submit snapshot resolution', () => {
     const buffer = new ComposerAttachmentCaptureBuffer();
     const text = 'x'.repeat(PASTED_TEXT_ATTACHMENT_MIN_CHARS);
 
-    const captured = buffer.addPastedText(text, PASTED_TEXT_ATTACHMENT_MIN_CHARS);
+    const captured = buffer.addPastedText(
+      text,
+      PASTED_TEXT_ATTACHMENT_MIN_CHARS,
+    );
 
     expect(captured).toHaveLength(1);
     expect(captured[0]).toMatchObject({
@@ -173,21 +212,28 @@ describe('attachment submit snapshot resolution', () => {
   it('ignores short pasted text so normal paste stays plain text only', () => {
     const buffer = new ComposerAttachmentCaptureBuffer();
 
-    expect(buffer.addPastedText(
-      'x'.repeat(PASTED_TEXT_ATTACHMENT_MIN_CHARS - 1),
-      PASTED_TEXT_ATTACHMENT_MIN_CHARS,
-    )).toEqual([]);
+    expect(
+      buffer.addPastedText(
+        'x'.repeat(PASTED_TEXT_ATTACHMENT_MIN_CHARS - 1),
+        PASTED_TEXT_ATTACHMENT_MIN_CHARS,
+      ),
+    ).toEqual([]);
     expect(buffer.getAttachmentsForSubmit()).toEqual([]);
   });
 
   it('matches provider-generated pasted-text attachment labels by count', () => {
     const buffer = new ComposerAttachmentCaptureBuffer();
-    buffer.addPastedText('x'.repeat(PASTED_TEXT_ATTACHMENT_MIN_CHARS), PASTED_TEXT_ATTACHMENT_MIN_CHARS);
+    buffer.addPastedText(
+      'x'.repeat(PASTED_TEXT_ATTACHMENT_MIN_CHARS),
+      PASTED_TEXT_ATTACHMENT_MIN_CHARS,
+    );
 
-    expect(buffer.resolveAttachmentsForSubmit({
-      count: 1,
-      items: ['Pasted text'],
-    })).toMatchObject({
+    expect(
+      buffer.resolveAttachmentsForSubmit({
+        count: 1,
+        items: ['Pasted text'],
+      }),
+    ).toMatchObject({
       capturedCount: 1,
       currentCount: 1,
       submittedCount: 1,

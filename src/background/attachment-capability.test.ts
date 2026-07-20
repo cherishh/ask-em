@@ -15,24 +15,30 @@ describe('provider attachment capability gate', () => {
 
   it('rejects providers without attachment support', () => {
     expect(
-      checkProviderAttachmentCapability('deepseek', [
-        { id: 'a1', name: 'anything.bin', mime: 'application/octet-stream', size: 100 },
-      ], null),
+      checkProviderAttachmentCapability(
+        'deepseek',
+        [
+          {
+            id: 'a1',
+            name: 'anything.bin',
+            mime: 'application/octet-stream',
+            size: 100,
+          },
+        ],
+        null,
+      ),
     ).toEqual({
       ok: false,
       reason: 'deepseek attachment not supported',
     });
   });
 
-  it('treats Kimi as text-only', () => {
+  it('lets Kimi accept attachments within the shared transport cap', () => {
     expect(
       checkProviderAttachmentCapability('kimi', [
         { id: 'a1', name: 'anything.png', mime: 'image/png', size: 100 },
       ]),
-    ).toEqual({
-      ok: false,
-      reason: 'kimi attachment count not supported',
-    });
+    ).toEqual({ ok: true });
   });
 
   it('rejects provider-specific count overage', () => {

@@ -1,10 +1,10 @@
 import type { DebugLogEntry } from './types';
 
-export const DEBUG_LOG_MAX_ENTRIES = 500;
-export const DEBUG_LOG_MAX_BYTES = 512 * 1024;
-export const DEBUG_LOG_MESSAGE_MAX_BYTES = 2 * 1024;
-export const DEBUG_LOG_DETAIL_MAX_BYTES = 8 * 1024;
-export const FEEDBACK_DEBUG_LOG_MAX_BYTES = 256 * 1024;
+export const DEBUG_LOG_MAX_ENTRIES = 200;
+export const DEBUG_LOG_MAX_BYTES = 128 * 1024;
+export const DEBUG_LOG_MESSAGE_MAX_BYTES = 1024;
+export const DEBUG_LOG_DETAIL_MAX_BYTES = 4 * 1024;
+export const FEEDBACK_DEBUG_LOG_MAX_BYTES = 64 * 1024;
 
 type DebugLogRetentionLimits = {
   maxEntries: number;
@@ -95,10 +95,14 @@ export function truncateUtf8Middle(value: string, maxBytes: number): string {
     const remainingBytes = maxBytes - markerBytes;
     const head = takePrefixByBytes(value, Math.ceil(remainingBytes / 2));
     const tail = takeSuffixByBytes(value, Math.floor(remainingBytes / 2));
-    const nextOmittedBytes = originalBytes - getUtf8ByteLength(head) - getUtf8ByteLength(tail);
+    const nextOmittedBytes =
+      originalBytes - getUtf8ByteLength(head) - getUtf8ByteLength(tail);
     truncated = `${head}${marker}${tail}`;
 
-    if (nextOmittedBytes === omittedBytes && getUtf8ByteLength(truncated) <= maxBytes) {
+    if (
+      nextOmittedBytes === omittedBytes &&
+      getUtf8ByteLength(truncated) <= maxBytes
+    ) {
       return truncated;
     }
 
@@ -115,9 +119,10 @@ function normalizeDebugLogEntry(
   limits: DebugLogRetentionLimits,
 ): DebugLogEntry {
   const message = truncateUtf8Middle(entry.message, limits.maxMessageBytes);
-  const detail = entry.detail === undefined
-    ? undefined
-    : truncateUtf8Middle(entry.detail, limits.maxDetailBytes);
+  const detail =
+    entry.detail === undefined
+      ? undefined
+      : truncateUtf8Middle(entry.detail, limits.maxDetailBytes);
 
   if (message === entry.message && detail === entry.detail) {
     return entry;
@@ -145,7 +150,8 @@ function enforceDebugLogLimits(
   logs: DebugLogEntry[],
   limits: DebugLogRetentionLimits,
 ): DebugLogEntry[] {
-  let nextLogs = logs.length > limits.maxEntries ? logs.slice(-limits.maxEntries) : logs;
+  let nextLogs =
+    logs.length > limits.maxEntries ? logs.slice(-limits.maxEntries) : logs;
 
   let totalBytes = getDebugLogsByteLength(nextLogs);
   let start = 0;
@@ -191,14 +197,21 @@ export function appendDebugLogForStorage(
   entry: DebugLogEntry,
 ): DebugLogEntry[] {
   const normalized = normalizeDebugLogEntry(entry, DEFAULT_DEBUG_LOG_LIMITS);
-  return enforceDebugLogLimits([...existing, normalized], DEFAULT_DEBUG_LOG_LIMITS);
+  return enforceDebugLogLimits(
+    [...existing, normalized],
+    DEFAULT_DEBUG_LOG_LIMITS,
+  );
 }
 
-export function trimDebugLogsForStorage(logs: DebugLogEntry[]): DebugLogEntry[] {
+export function trimDebugLogsForStorage(
+  logs: DebugLogEntry[],
+): DebugLogEntry[] {
   return trimDebugLogs(logs, DEFAULT_DEBUG_LOG_LIMITS);
 }
 
-export function trimDebugLogsForFeedback(logs: DebugLogEntry[]): DebugLogEntry[] {
+export function trimDebugLogsForFeedback(
+  logs: DebugLogEntry[],
+): DebugLogEntry[] {
   return trimDebugLogs(logs, {
     ...DEFAULT_DEBUG_LOG_LIMITS,
     maxBytes: FEEDBACK_DEBUG_LOG_MAX_BYTES,
