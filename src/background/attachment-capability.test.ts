@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getProviderDeliveryAttachments } from '../runtime/protocol';
 import { checkProviderAttachmentCapability } from './attachment-capability';
 
 describe('provider attachment capability gate', () => {
@@ -33,12 +34,26 @@ describe('provider attachment capability gate', () => {
     });
   });
 
-  it('lets Kimi accept attachments within the shared transport cap', () => {
+  it('treats Kimi as prompt-only while attachment fan-out is disabled', () => {
     expect(
       checkProviderAttachmentCapability('kimi', [
         { id: 'a1', name: 'anything.png', mime: 'image/png', size: 100 },
       ]),
-    ).toEqual({ ok: true });
+    ).toEqual({
+      ok: false,
+      reason: 'kimi attachment count not supported',
+    });
+  });
+
+  it('strips attachments for prompt-only targets without changing other providers', () => {
+    const attachments = [
+      { id: 'a1', name: 'anything.png', mime: 'image/png', size: 100 },
+    ];
+
+    expect(getProviderDeliveryAttachments('kimi', attachments)).toEqual([]);
+    expect(getProviderDeliveryAttachments('chatgpt', attachments)).toBe(
+      attachments,
+    );
   });
 
   it('rejects provider-specific count overage', () => {

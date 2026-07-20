@@ -2,7 +2,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installFileInputDeliveryBridge } from '../content/file-input-delivery-main';
+import { KIMI_ATTACHMENT_FANOUT_ENABLED } from '../runtime/protocol';
 import { isKimiChatRoute, kimiAdapter } from './kimi';
+
+const describeKimiAttachmentDelivery = KIMI_ATTACHMENT_FANOUT_ENABLED
+  ? describe
+  : describe.skip;
 
 function mockVisibleLayout() {
   return vi
@@ -181,26 +186,74 @@ describe('Kimi adapter', () => {
     );
   });
 
-  it('rejects attachment delivery', async () => {
+  it('keeps prompt delivery text-only when attachments are present', async () => {
     renderKimiComposer();
 
-    await expect(async () => {
-      await kimiAdapter.composer?.setComposerPayload?.({
+    await kimiAdapter.composer?.setComposerPayload?.({
+      text: 'hello',
+      attachments: [
+        {
+          id: 'a1',
+          name: 'sample.pdf',
+          mime: 'application/pdf',
+          size: 3,
+        },
+      ],
+    });
+
+    expect(document.querySelector('.chat-input-editor')?.textContent).toBe(
+      'hello',
+    );
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+  });
+
+  it('captures source attachment metadata for the prompt-only warning', () => {
+    renderKimiComposer();
+    const composer = document.querySelector<HTMLElement>('.chat-input-editor');
+    if (composer) {
+      composer.textContent = 'hello';
+    }
+    const pasteEvent = new Event('paste', { bubbles: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: {
+        files: [
+          new File(['abc'], 'sample.pdf', { type: 'application/pdf' }),
+        ],
+        items: [],
+      },
+    });
+    const onSubmit = vi.fn();
+    const unsubscribe =
+      kimiAdapter.composer?.subscribeToUserSubmissions?.(onSubmit);
+
+    composer?.dispatchEvent(pasteEvent);
+    insertKimiFileCard('success', 'sample', 'PDF');
+    const sendButton = document.querySelector<HTMLElement>(
+      '.send-button-container',
+    );
+    sendButton?.classList.remove('disabled');
+    sendButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
         text: 'hello',
         attachments: [
-          {
-            id: 'a1',
+          expect.objectContaining({
             name: 'sample.pdf',
-            mime: 'application/pdf',
-            size: 3,
-          },
+            source: 'paste',
+          }),
         ],
-      });
-    }).rejects.toThrow('upload failed');
+        attachmentResolution: expect.objectContaining({
+          currentCount: 1,
+          submittedCount: 1,
+        }),
+      }),
+    );
+    unsubscribe?.();
   });
 });
 
-describe('Kimi attachment delivery adapter', () => {
+describeKimiAttachmentDelivery('Kimi attachment delivery adapter', () => {
   let rectSpy: ReturnType<typeof vi.spyOn>;
   let uninstallFileInputDeliveryBridge: () => void;
 

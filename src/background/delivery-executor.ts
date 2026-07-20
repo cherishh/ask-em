@@ -1,9 +1,10 @@
-import type {
-  Provider,
-  ProviderDeliveryResult,
-  SessionState,
-  UserSubmitMessage,
-  Workspace,
+import {
+  getProviderDeliveryAttachments,
+  type Provider,
+  type ProviderDeliveryResult,
+  type SessionState,
+  type UserSubmitMessage,
+  type Workspace,
 } from '../runtime/protocol';
 import { upsertClaimedTab } from '../runtime/storage';
 import { formatAttachmentSummary } from '../runtime/attachment-log';
@@ -43,6 +44,7 @@ async function logFailedDeliveryPayload(
   workspaceId: string,
   provider: Provider,
   payload: DeliverPromptResponse | undefined,
+  skippedAttachmentCount = 0,
 ) {
   const reason = getFailedDeliveryPayloadReason(payload);
   const detail = payload?.diagnostic ? `${reason}; ${payload.diagnostic}` : reason;
@@ -67,6 +69,8 @@ async function logFailedDeliveryPayload(
     confirmed: payload?.confirmed,
     blocked: payload?.blocked,
     reason,
+    skippedAttachmentCount:
+      skippedAttachmentCount > 0 ? skippedAttachmentCount : undefined,
   } satisfies ProviderDeliveryResult;
 }
 
@@ -79,7 +83,16 @@ export async function attemptProviderDelivery({
 }: AttemptProviderDeliveryInput): Promise<ProviderDeliveryResult> {
   const existingIssue = workspace.memberIssues?.[provider] ?? null;
   let deliveryTargetOverride: Awaited<ReturnType<typeof resolveReadyProviderTabForWorkspace>> = null;
-  const attachmentCapability = checkProviderAttachmentCapability(provider, message.attachments);
+  const deliveryAttachments = getProviderDeliveryAttachments(
+    provider,
+    message.attachments,
+  );
+  const skippedAttachmentCount =
+    message.attachments.length - deliveryAttachments.length;
+  const attachmentCapability = checkProviderAttachmentCapability(
+    provider,
+    deliveryAttachments,
+  );
 
   if (!attachmentCapability.ok) {
     await logDebug({
@@ -88,13 +101,34 @@ export async function attemptProviderDelivery({
       provider,
       workspaceId,
       message: 'Skipped delivery for unsupported attachment',
-      detail: `${attachmentCapability.reason}; ${formatAttachmentSummary(message.attachments)}`,
+      detail: `${attachmentCapability.reason}; ${formatAttachmentSummary(deliveryAttachments)}`,
     });
 
     return {
       provider,
       ok: false,
       reason: attachmentCapability.reason,
+    } satisfies ProviderDeliveryResult;
+  }
+
+  if (
+    skippedAttachmentCount > 0 &&
+    deliveryAttachments.length === 0 &&
+    message.content.trim().length === 0
+  ) {
+    await logDebug({
+      level: 'info',
+      scope: 'background',
+      provider,
+      workspaceId,
+      message: 'Skipped empty prompt for prompt-only provider',
+      detail: `Skipped ${skippedAttachmentCount} attachments`,
+    });
+
+    return {
+      provider,
+      ok: true,
+      skippedAttachmentCount,
     } satisfies ProviderDeliveryResult;
   }
 
@@ -120,6 +154,8 @@ export async function attemptProviderDelivery({
         provider,
         ok: false,
         reason,
+        skippedAttachmentCount:
+          skippedAttachmentCount > 0 ? skippedAttachmentCount : undefined,
       } satisfies ProviderDeliveryResult;
     }
 
@@ -160,7 +196,7 @@ export async function attemptProviderDelivery({
       provider,
       workspaceId,
       message: 'Delivering prompt',
-      detail: `${message.provider} -> ${provider} @ ${target.expectedSessionId ?? 'new-chat'}; ${formatAttachmentSummary(message.attachments)}`,
+      detail: `${message.provider} -> ${provider} @ ${target.expectedSessionId ?? 'new-chat'}; ${formatAttachmentSummary(deliveryAttachments)}`,
     });
 
     const response = (await chrome.tabs.sendMessage(target.tabId, {
@@ -168,7 +204,7 @@ export async function attemptProviderDelivery({
       workspaceId,
       provider,
       content: message.content,
-      attachments: message.attachments,
+      attachments: deliveryAttachments,
       expectedSessionId: target.expectedSessionId,
       expectedUrl: target.expectedUrl,
       timestamp: Date.now(),
@@ -181,12 +217,17 @@ export async function attemptProviderDelivery({
         provider,
         workspaceId,
         message: 'Prompt delivery accepted',
-        detail: `${message.provider} -> ${provider}; attachments=${message.attachments.length}`,
+        detail: `${message.provider} -> ${provider}; attachments=${deliveryAttachments.length}`,
       });
     }
 
     if (!response?.ok || response?.confirmed === false) {
-      return logFailedDeliveryPayload(workspaceId, provider, response);
+      return logFailedDeliveryPayload(
+        workspaceId,
+        provider,
+        response,
+        skippedAttachmentCount,
+      );
     }
 
     await logDebug({
@@ -195,7 +236,7 @@ export async function attemptProviderDelivery({
       provider,
       workspaceId,
       message: 'Prompt delivery confirmed',
-      detail: `${message.provider} -> ${provider}; attachments=${message.attachments.length}`,
+      detail: `${message.provider} -> ${provider}; attachments=${deliveryAttachments.length}`,
     });
 
     return {
@@ -203,6 +244,8 @@ export async function attemptProviderDelivery({
       ok: true,
       accepted: response?.accepted,
       confirmed: response?.confirmed,
+      skippedAttachmentCount:
+        skippedAttachmentCount > 0 ? skippedAttachmentCount : undefined,
     } satisfies ProviderDeliveryResult;
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
@@ -220,6 +263,8 @@ export async function attemptProviderDelivery({
       provider,
       ok: false,
       reason,
+      skippedAttachmentCount:
+        skippedAttachmentCount > 0 ? skippedAttachmentCount : undefined,
     } satisfies ProviderDeliveryResult;
   }
 }

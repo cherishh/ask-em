@@ -1,4 +1,14 @@
-import type { Provider, UploadCapability } from './types';
+import type { AttachmentRef, Provider, UploadCapability } from './types';
+
+// Temporary product switch: keep Kimi in prompt-only fan-out mode while its
+// image/file delivery is disabled.
+//
+// Before enabling this again, fix these known issues in the dormant Kimi path:
+// 1. A ready image or same-named file already present in the target composer can
+//    make the attachment-presence delta stay at zero until delivery times out.
+// 2. A restored attachment-only source draft has no captured bytes or prompt
+//    text, so submit-controller returns before showing the skipped-sync warning.
+export const KIMI_ATTACHMENT_FANOUT_ENABLED = false;
 
 export const PROVIDER_UPLOAD_CAPABILITIES: Record<Provider, UploadCapability> =
   {
@@ -12,8 +22,7 @@ export const PROVIDER_UPLOAD_CAPABILITIES: Record<Provider, UploadCapability> =
       maxFiles: 10,
     },
     kimi: {
-      // The Kimi toolkit file input is multiple; ask'em's own transport caps a submit at 20 files.
-      maxFiles: 20,
+      maxFiles: KIMI_ATTACHMENT_FANOUT_ENABLED ? 20 : 0,
     },
     deepseek: {
       maxFiles: 10,
@@ -27,6 +36,15 @@ export const PROVIDER_UPLOAD_CAPABILITIES: Record<Provider, UploadCapability> =
       maxFiles: 20,
     },
   };
+
+export function getProviderDeliveryAttachments<T extends AttachmentRef>(
+  provider: Provider,
+  attachments: T[],
+): T[] {
+  return PROVIDER_UPLOAD_CAPABILITIES[provider]?.maxFiles === 0
+    ? []
+    : attachments;
+}
 
 export function getAttachmentExtension(name: string): string | null {
   const lastSegment = name.trim().split(/[\\/]/).at(-1) ?? '';

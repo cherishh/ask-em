@@ -109,6 +109,7 @@ export type ProviderDeliveryResult = {
   confirmed?: boolean;
   blocked?: boolean;
   reason?: string;
+  skippedAttachmentCount?: number;
 };
 
 export type SyncProgressMessage = {

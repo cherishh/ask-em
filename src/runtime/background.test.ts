@@ -1337,6 +1337,123 @@ describe('background submit routing', () => {
     expect(attachmentStoreMocks.releaseSubmitAttachments).toHaveBeenCalledWith('submit-success');
   });
 
+  it('delivers only the prompt to Kimi and reports skipped attachments', async () => {
+    const attachment = {
+      id: 'a1',
+      name: 'a.png',
+      mime: 'image/png',
+      size: 1,
+    };
+    const workspace = makeWorkspace({
+      id: 'w1',
+      members: {
+        claude: makeConversationRef(
+          'claude',
+          'c-1',
+          'https://claude.ai/chat/c-1',
+        ),
+        kimi: makeConversationRef(
+          'kimi',
+          'k-1',
+          'https://www.kimi.com/chat/k-1',
+        ),
+      },
+      enabledProviders: ['claude', 'kimi'],
+    });
+    const sessionState = makeSessionState({
+      'w1:kimi': makeClaimedTab({
+        provider: 'kimi',
+        workspaceId: 'w1',
+        tabId: 10,
+        currentUrl: 'https://www.kimi.com/chat/k-1',
+        sessionId: 'k-1',
+      }),
+    });
+    const sendMessage = vi.fn(
+      async (_tabId: number, message: { type: string }) => {
+        if (message.type === 'PING') {
+          return {
+            type: 'PING_RESPONSE',
+            provider: 'kimi',
+            currentUrl: 'https://www.kimi.com/chat/k-1',
+            sessionId: 'k-1',
+            pageState: 'ready',
+            pageKind: 'existing-session',
+          };
+        }
+
+        return { ok: true, accepted: true, confirmed: true };
+      },
+    );
+    vi.stubGlobal('chrome', {
+      tabs: {
+        get: vi.fn().mockResolvedValue({ id: 10 }),
+        sendMessage,
+        update: vi.fn().mockResolvedValue({ id: 10, windowId: 3 }),
+        query: vi.fn().mockResolvedValue([]),
+        onRemoved: { addListener: vi.fn() },
+      },
+      windows: {
+        update: vi.fn().mockResolvedValue({ id: 3 }),
+      },
+    });
+
+    const { attemptProviderDelivery } = await import(
+      '../background/delivery-executor'
+    );
+    const result = await attemptProviderDelivery({
+      workspace,
+      workspaceId: 'w1',
+      provider: 'kimi',
+      message: makeSubmitMessage({
+        provider: 'claude',
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+        content: 'hello',
+        attachments: [attachment],
+      }),
+      sessionState,
+    });
+
+    expect(sendMessage).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({
+        type: 'DELIVER_PROMPT',
+        content: 'hello',
+        attachments: [],
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        provider: 'kimi',
+        ok: true,
+        skippedAttachmentCount: 1,
+      }),
+    );
+
+    sendMessage.mockClear();
+    const attachmentOnlyResult = await attemptProviderDelivery({
+      workspace,
+      workspaceId: 'w1',
+      provider: 'kimi',
+      message: makeSubmitMessage({
+        provider: 'claude',
+        currentUrl: 'https://claude.ai/chat/c-1',
+        sessionId: 'c-1',
+        content: '',
+        attachments: [attachment],
+      }),
+      sessionState,
+    });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(attachmentOnlyResult).toEqual({
+      provider: 'kimi',
+      ok: true,
+      skippedAttachmentCount: 1,
+    });
+  });
+
   it('applies attachment capability gates per target without blocking supported targets', async () => {
     const attachments = Array.from({ length: 11 }, (_, index) => ({
       id: `a${index}`,

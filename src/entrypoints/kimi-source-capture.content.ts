@@ -8,6 +8,8 @@ export default defineContentScript({
   runAt: 'document_start',
   world: 'MAIN',
   main() {
+    // Keep source capture active in prompt-only mode so the content script can
+    // warn that Kimi attachments will be skipped.
     installFileInputSourceCaptureHook();
   },
 });

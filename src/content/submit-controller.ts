@@ -3,6 +3,7 @@ import {
   type AttachmentRef,
   type Provider,
   type ProviderDeliveryResult,
+  getProviderDeliveryAttachments,
   PROVIDER_UPLOAD_CAPABILITIES,
 } from '../runtime/protocol';
 import {
@@ -83,6 +84,21 @@ function buildAttachmentLimitToast(
   return `${skippedPrefix}: this prompt has ${formatFileCount(attachmentCount)}; those models support fewer files.${successSuffix}`;
 }
 
+function buildPromptOnlyAttachmentToast(
+  deliveryResults: ProviderDeliveryResult[] | undefined,
+): string | null {
+  const promptOnlyProviders = (deliveryResults ?? [])
+    .filter((result) => (result.skippedAttachmentCount ?? 0) > 0)
+    .map((result) => PROVIDER_LABELS[result.provider]);
+
+  if (promptOnlyProviders.length === 0) {
+    return null;
+  }
+
+  const providerLabel = promptOnlyProviders.join(', ');
+  return `${providerLabel} attachments aren't supported yet. Only text prompts are synced.`;
+}
+
 function canAttemptAttachmentFanOut(
   status: ReturnType<ProviderAdapter['session']['getStatus']>,
   uiContext: SubmitUiContext,
@@ -119,10 +135,33 @@ export function createSubmitController(
   const reportUserSubmit = async (input: SubmitInput) => {
     const payload = normalizeSubmitInput(input);
     const content = payload.text.trim();
-    if (
-      (!content && payload.attachments.length === 0) ||
-      state.isSubmissionSuppressed()
-    ) {
+    if (state.isSubmissionSuppressed()) {
+      return;
+    }
+
+    const sourceAttachments = getProviderDeliveryAttachments(
+      adapter.name,
+      payload.attachments,
+    );
+    const sourceIsPromptOnly =
+      PROVIDER_UPLOAD_CAPABILITIES[adapter.name]?.maxFiles === 0;
+    const hasObservedSourceAttachments = Boolean(
+      payload.attachments.length > 0 ||
+        (payload.attachmentResolution?.capturedCount ?? 0) > 0 ||
+        (payload.attachmentResolution?.currentCount ?? 0) > 0,
+    );
+    const skippedSourceAttachments =
+      sourceIsPromptOnly && hasObservedSourceAttachments;
+
+    if (skippedSourceAttachments) {
+      state.showToast(
+        `${PROVIDER_LABELS[adapter.name]} attachments aren't supported yet. Only text prompts are synced.`,
+        'warning',
+      );
+    }
+
+    if (!content && sourceAttachments.length === 0) {
+      payload.onConsumed?.();
       return;
     }
 
@@ -198,6 +237,7 @@ export function createSubmitController(
 
     if (
       canFanOutAttachments &&
+      !skippedSourceAttachments &&
       payload.attachmentResolution &&
       (payload.attachmentResolution.capturedCount > 0 ||
         (payload.attachmentResolution.currentCount ?? 0) > 0) &&
@@ -224,16 +264,16 @@ export function createSubmitController(
     }
 
     try {
-      if (payload.attachments.length > 0 && canFanOutAttachments) {
+      if (sourceAttachments.length > 0 && canFanOutAttachments) {
         await dependencies.logDebug({
           level: 'info',
           message: 'Staging submit attachments',
-          detail: `submit=${shortSubmitId(submitId)}; ${formatAttachmentSummary(payload.attachments)}`,
+          detail: `submit=${shortSubmitId(submitId)}; ${formatAttachmentSummary(sourceAttachments)}`,
         });
       }
 
       attachments = canFanOutAttachments
-        ? await stageSubmitAttachments(submitId, payload.attachments)
+        ? await stageSubmitAttachments(submitId, sourceAttachments)
         : [];
 
       if (attachments.length > 0) {
@@ -265,7 +305,7 @@ export function createSubmitController(
       await dependencies.logDebug({
         level: 'warn',
         message: 'Skipped attachment fan-out',
-        detail: `submit=${shortSubmitId(submitId)}; ${formatAttachmentSummary(payload.attachments)}; reason=${reason}`,
+        detail: `submit=${shortSubmitId(submitId)}; ${formatAttachmentSummary(sourceAttachments)}; reason=${reason}`,
       });
       attachments = [];
     } finally {
@@ -295,6 +335,12 @@ export function createSubmitController(
     );
     if (attachmentLimitToast) {
       state.showToast(attachmentLimitToast, 'warning');
+    }
+    const promptOnlyAttachmentToast = buildPromptOnlyAttachmentToast(
+      response?.deliveryResults,
+    );
+    if (promptOnlyAttachmentToast) {
+      state.showToast(promptOnlyAttachmentToast, 'warning');
     }
     state.applyIndicatorPresentation();
   };

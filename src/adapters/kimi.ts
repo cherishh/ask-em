@@ -10,6 +10,7 @@ import {
 import { createDomProviderAdapter } from './factory';
 import { readAttachmentFiles, setFileInputFiles } from './attachment-delivery';
 import {
+  KIMI_ATTACHMENT_FANOUT_ENABLED,
   PROVIDER_UPLOAD_CAPABILITIES,
   type AttachmentRef,
 } from '../runtime/protocol';
@@ -372,7 +373,10 @@ export const kimiAdapter = createDomProviderAdapter({
   async setComposerPayload(payload, context) {
     setKimiComposerText(context.findComposer(), payload.text);
 
-    if (payload.attachments.length === 0) {
+    if (
+      !KIMI_ATTACHMENT_FANOUT_ENABLED ||
+      payload.attachments.length === 0
+    ) {
       return;
     }
 
@@ -388,6 +392,10 @@ export const kimiAdapter = createDomProviderAdapter({
     );
   },
   getComposerAttachmentPresence(_context, expectedAttachments) {
+    if (!KIMI_ATTACHMENT_FANOUT_ENABLED) {
+      return { count: 0, keys: [] };
+    }
+
     const items = getKimiAttachmentItems(expectedAttachments);
 
     return {
@@ -412,7 +420,9 @@ export const kimiAdapter = createDomProviderAdapter({
     );
   },
   detectAttachmentUploadError() {
-    return detectKimiUploadErrorText();
+    return KIMI_ATTACHMENT_FANOUT_ENABLED
+      ? detectKimiUploadErrorText()
+      : null;
   },
   isSendButtonEnabled(button) {
     return (

@@ -3,11 +3,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSubmitController } from './submit-controller';
 import type { ProviderAdapter } from '../adapters/types';
-import { ATTACHMENT_MAX_FILE_BYTES } from '../runtime/protocol';
+import {
+  ATTACHMENT_MAX_FILE_BYTES,
+  PROVIDER_UPLOAD_CAPABILITIES,
+} from '../runtime/protocol';
 
-function createAdapter(): ProviderAdapter {
+function createAdapter(provider: 'claude' | 'kimi' = 'claude'): ProviderAdapter {
+  const currentUrl =
+    provider === 'kimi'
+      ? 'https://www.kimi.com/chat/k-1'
+      : 'https://claude.ai/chat/c-1';
+
   return {
-    name: 'claude',
+    name: provider,
+    uploadCapability: PROVIDER_UPLOAD_CAPABILITIES[provider],
     getUiSpec() {
       return {
         mountId: 'ask-em-test-ui',
@@ -15,11 +24,11 @@ function createAdapter(): ProviderAdapter {
       };
     },
     session: {
-      getCurrentUrl: () => 'https://claude.ai/chat/c-1',
+      getCurrentUrl: () => currentUrl,
       getStatus: () => ({
-        provider: 'claude',
-        currentUrl: 'https://claude.ai/chat/c-1',
-        sessionId: 'c-1',
+        provider,
+        currentUrl,
+        sessionId: provider === 'kimi' ? 'k-1' : 'c-1',
         pageKind: 'existing-session',
         pageState: 'ready',
       }),
@@ -208,6 +217,163 @@ describe('submit controller attachment staging', () => {
 
     expect(state.showToast).toHaveBeenCalledWith(
       'Manus skipped: this prompt has 2 files; Manus supports 1 file. Other providers synced.',
+      'warning',
+    );
+  });
+
+  it('drops Kimi source attachments, shows a toast, and fans out the prompt', async () => {
+    const sendMessage = vi.fn(async () => ({ ok: true }));
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const state = createState();
+    const controller = createSubmitController(
+      createAdapter('kimi'),
+      state as unknown as Parameters<typeof createSubmitController>[1],
+      {
+        reportPresence: vi.fn(),
+        logDebug: vi.fn(),
+      },
+    );
+
+    await controller.reportUserSubmit({
+      text: 'hello',
+      attachments: [
+        {
+          id: 'a1',
+          name: 'sample.pdf',
+          mime: 'application/pdf',
+          size: 3,
+          source: 'file-input',
+          file: new File(['abc'], 'sample.pdf', {
+            type: 'application/pdf',
+          }),
+        },
+      ],
+    });
+
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'USER_SUBMIT',
+        content: 'hello',
+        attachments: [],
+      }),
+    );
+    expect(state.showToast).toHaveBeenCalledWith(
+      "Kimi attachments aren't supported yet. Only text prompts are synced.",
+      'warning',
+    );
+  });
+
+  it('shows the Kimi attachment toast without sending an empty prompt', async () => {
+    const sendMessage = vi.fn();
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const state = createState();
+    const onConsumed = vi.fn();
+    const controller = createSubmitController(
+      createAdapter('kimi'),
+      state as unknown as Parameters<typeof createSubmitController>[1],
+      {
+        reportPresence: vi.fn(),
+        logDebug: vi.fn(),
+      },
+    );
+
+    await controller.reportUserSubmit({
+      text: '',
+      attachments: [
+        {
+          id: 'a1',
+          name: 'sample.pdf',
+          mime: 'application/pdf',
+          size: 3,
+          source: 'file-input',
+          file: new File(['abc'], 'sample.pdf', {
+            type: 'application/pdf',
+          }),
+        },
+      ],
+      onConsumed,
+    });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(onConsumed).toHaveBeenCalledOnce();
+    expect(state.showToast).toHaveBeenCalledWith(
+      "Kimi attachments aren't supported yet. Only text prompts are synced.",
+      'warning',
+    );
+  });
+
+  it('shows a toast when a target Kimi receives only the prompt', async () => {
+    const sendMessage = vi.fn(
+      async (message: { type: string; attachmentId?: string }) => {
+        if (message.type === 'ATTACHMENT_FINALIZE') {
+          return {
+            ok: true,
+            ref: {
+              id: message.attachmentId ?? 'a1',
+              name: 'sample.pdf',
+              mime: 'application/pdf',
+              size: 3,
+            },
+          };
+        }
+
+        if (message.type === 'USER_SUBMIT') {
+          return {
+            ok: true,
+            deliveryResults: [
+              {
+                provider: 'kimi',
+                ok: true,
+                skippedAttachmentCount: 1,
+              },
+            ],
+          };
+        }
+
+        return { ok: true };
+      },
+    );
+    vi.stubGlobal('chrome', {
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    const state = createState();
+    const controller = createSubmitController(createAdapter(), state as any, {
+      reportPresence: vi.fn(),
+      logDebug: vi.fn(),
+    });
+
+    await controller.reportUserSubmit({
+      text: 'hello',
+      attachments: [
+        {
+          id: 'a1',
+          name: 'sample.pdf',
+          mime: 'application/pdf',
+          size: 3,
+          source: 'file-input',
+          file: new File(['abc'], 'sample.pdf', {
+            type: 'application/pdf',
+          }),
+        },
+      ],
+    });
+
+    expect(state.showToast).toHaveBeenCalledWith(
+      "Kimi attachments aren't supported yet. Only text prompts are synced.",
       'warning',
     );
   });
