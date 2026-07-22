@@ -5,8 +5,11 @@ import { createSubmitController } from './submit-controller';
 import type { ProviderAdapter } from '../adapters/types';
 import {
   ATTACHMENT_MAX_FILE_BYTES,
+  KIMI_ATTACHMENT_FANOUT_ENABLED,
   PROVIDER_UPLOAD_CAPABILITIES,
 } from '../runtime/protocol';
+
+const itKimiPromptOnly = KIMI_ATTACHMENT_FANOUT_ENABLED ? it.skip : it;
 
 function createAdapter(provider: 'claude' | 'kimi' = 'claude'): ProviderAdapter {
   const currentUrl =
@@ -221,7 +224,7 @@ describe('submit controller attachment staging', () => {
     );
   });
 
-  it('drops Kimi source attachments, shows a toast, and fans out the prompt', async () => {
+  itKimiPromptOnly('drops Kimi source attachments, shows a toast, and fans out the prompt', async () => {
     const sendMessage = vi.fn(async () => ({ ok: true }));
     vi.stubGlobal('chrome', {
       runtime: {
@@ -269,7 +272,7 @@ describe('submit controller attachment staging', () => {
     );
   });
 
-  it('shows the Kimi attachment toast without sending an empty prompt', async () => {
+  itKimiPromptOnly('shows the Kimi attachment toast without sending an empty prompt', async () => {
     const sendMessage = vi.fn();
     vi.stubGlobal('chrome', {
       runtime: {
@@ -313,7 +316,7 @@ describe('submit controller attachment staging', () => {
     );
   });
 
-  it('shows a toast when a target Kimi receives only the prompt', async () => {
+  itKimiPromptOnly('shows a toast when a target Kimi receives only the prompt', async () => {
     const sendMessage = vi.fn(
       async (message: { type: string; attachmentId?: string }) => {
         if (message.type === 'ATTACHMENT_FINALIZE') {

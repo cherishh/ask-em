@@ -8,6 +8,7 @@ import { isKimiChatRoute, kimiAdapter } from './kimi';
 const describeKimiAttachmentDelivery = KIMI_ATTACHMENT_FANOUT_ENABLED
   ? describe
   : describe.skip;
+const itKimiPromptOnly = KIMI_ATTACHMENT_FANOUT_ENABLED ? it.skip : it;
 
 function mockVisibleLayout() {
   return vi
@@ -186,7 +187,7 @@ describe('Kimi adapter', () => {
     );
   });
 
-  it('keeps prompt delivery text-only when attachments are present', async () => {
+  itKimiPromptOnly('keeps prompt delivery text-only when attachments are present', async () => {
     renderKimiComposer();
 
     await kimiAdapter.composer?.setComposerPayload?.({
@@ -207,7 +208,7 @@ describe('Kimi adapter', () => {
     expect(document.querySelector('input[type="file"]')).toBeNull();
   });
 
-  it('captures source attachment metadata for the prompt-only warning', () => {
+  it('captures source attachment metadata before submit', () => {
     renderKimiComposer();
     const composer = document.querySelector<HTMLElement>('.chat-input-editor');
     if (composer) {

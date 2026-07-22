@@ -1,6 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { getSiteInfo, getSiteInfoByProvider } from './sites';
 
+describe('chatgpt site info', () => {
+  it('keeps provisional WEB sessions on the new-chat surface', () => {
+    const site = getSiteInfoByProvider('chatgpt');
+    const provisionalUrl = 'https://chatgpt.com/c/WEB:3ab326f6-2910-4b5c-9aaf-c92e5378dcc4';
+
+    expect(site.isBlankChatUrl('https://chatgpt.com/')).toBe(true);
+    expect(site.isBlankChatUrl(provisionalUrl)).toBe(true);
+    expect(site.extractSessionId(provisionalUrl)).toBeNull();
+  });
+
+  it('extracts the canonical session after ChatGPT replaces a WEB session', () => {
+    const site = getSiteInfoByProvider('chatgpt');
+    const canonicalUrl = 'https://chatgpt.com/c/6a60a013-01c0-83ea-9467-12ba48807020';
+
+    expect(site.isBlankChatUrl(canonicalUrl)).toBe(false);
+    expect(site.extractSessionId(canonicalUrl)).toBe('6a60a013-01c0-83ea-9467-12ba48807020');
+    expect(getSiteInfo(canonicalUrl)?.name).toBe('chatgpt');
+  });
+});
+
 describe('manus site info', () => {
   it('treats /app as a blank chat url', () => {
     const site = getSiteInfoByProvider('manus');

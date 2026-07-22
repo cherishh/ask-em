@@ -1,9 +1,8 @@
 import type { AttachmentRef, Provider, UploadCapability } from './types';
 
-// Temporary product switch: keep Kimi in prompt-only fan-out mode while its
-// image/file delivery is disabled.
+// Temporary product switch for Kimi image/file fan-out.
 //
-// Before enabling this again, fix these known issues in the dormant Kimi path:
+// Known issues while this is enabled:
 // 1. A ready image or same-named file already present in the target composer can
 //    make the attachment-presence delta stay at zero until delivery times out.
 // 2. A restored attachment-only source draft has no captured bytes or prompt

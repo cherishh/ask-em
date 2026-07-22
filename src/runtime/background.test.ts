@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDefaultEnabledProviders } from './protocol';
+import {
+  createDefaultEnabledProviders,
+  KIMI_ATTACHMENT_FANOUT_ENABLED,
+} from './protocol';
 import type { LocalState, SessionState, UserSubmitMessage } from './protocol';
 import {
   makeClaimedTab,
@@ -9,6 +12,8 @@ import {
   makeSubmitMessage,
   makeWorkspace,
 } from '../test/builders';
+
+const itKimiPromptOnly = KIMI_ATTACHMENT_FANOUT_ENABLED ? it.skip : it;
 
 const storageMocks = vi.hoisted(() => ({
   appendDebugLog: vi.fn().mockResolvedValue(undefined),
@@ -1337,7 +1342,7 @@ describe('background submit routing', () => {
     expect(attachmentStoreMocks.releaseSubmitAttachments).toHaveBeenCalledWith('submit-success');
   });
 
-  it('delivers only the prompt to Kimi and reports skipped attachments', async () => {
+  itKimiPromptOnly('delivers only the prompt to Kimi and reports skipped attachments', async () => {
     const attachment = {
       id: 'a1',
       name: 'a.png',

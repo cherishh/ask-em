@@ -27,10 +27,12 @@ export const SUPPORTED_SITES: SiteInfo[] = [
     matches: ['*://chatgpt.com/*'],
     isBlankChatUrl(url) {
       const pathname = new URL(url).pathname;
-      return pathname === '/' || pathname === '/c';
+      const sessionId = extractLastPathSegment(url, '/c/');
+      return pathname === '/' || pathname === '/c' || isChatgptProvisionalSessionId(sessionId);
     },
     extractSessionId(url) {
-      return extractLastPathSegment(url, '/c/');
+      const sessionId = extractLastPathSegment(url, '/c/');
+      return isChatgptProvisionalSessionId(sessionId) ? null : sessionId;
     },
   },
   {
@@ -94,6 +96,10 @@ export const SUPPORTED_SITES: SiteInfo[] = [
     },
   },
 ];
+
+function isChatgptProvisionalSessionId(sessionId: string | null): boolean {
+  return sessionId?.startsWith('WEB:') ?? false;
+}
 
 function extractLastPathSegment(url: string, prefix: string): string | null {
   try {
