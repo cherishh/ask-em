@@ -241,9 +241,10 @@ export function AdvancedView(props: {
             </div>
             <div className="askem-log-actions">
               <button
-                className={`askem-provider-chip askem-log-toggle ${props.status?.debugLoggingEnabled ? 'is-active' : ''}`}
+                className={`askem-provider-chip askem-log-action askem-log-toggle ${props.status?.debugLoggingEnabled ? 'is-active' : ''}`}
                 onClick={props.onToggleDebugLogging}
                 disabled={props.logActionBusy}
+                type="button"
               >
                 <span>Trace</span>
                 <span>{props.status?.debugLoggingEnabled ? 'on' : 'off'}</span>
@@ -251,16 +252,18 @@ export function AdvancedView(props: {
               {props.status?.debugLoggingEnabled ? (
                 <>
                   <button
-                    className="askem-provider-clear"
+                    className="askem-provider-clear askem-log-action"
                     onClick={props.onDownloadLogs}
                     disabled={props.logActionBusy}
+                    type="button"
                   >
                     Download Logs
                   </button>
                   <button
-                    className="askem-provider-clear"
+                    className="askem-provider-clear askem-log-action"
                     onClick={props.onClearLogs}
                     disabled={props.logActionBusy}
+                    type="button"
                   >
                     Clear Logs
                   </button>
