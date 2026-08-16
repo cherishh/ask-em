@@ -40,6 +40,7 @@ export type UiContext = {
 
 export type UiHandlers = {
   onWorkspaceProviderToggle: (provider: Provider, nextEnabled: boolean) => Promise<void>;
+  onWorkspaceProvidersToggle: (providers: Provider[], nextEnabled: boolean) => Promise<void>;
   onStandaloneSetCreationToggle: (nextEnabled: boolean) => Promise<void>;
   onProviderTabSwitch: (direction: 'next' | 'previous') => Promise<{
     ok?: boolean;
@@ -205,7 +206,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
   };
 
   let panelPinned = false;
-  let currentProviderToggleBusy = false;
+  let providerToggleBusy = false;
   let currentPlacement = getDefaultIndicatorPlacement();
   let dragState: DragState | null = null;
   let suppressClickUntil = 0;
@@ -389,25 +390,21 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     applyPlacement();
   };
 
-  const setCurrentProviderToggleBusy = (busy: boolean) => {
-    currentProviderToggleBusy = busy;
+  const setProviderToggleBusy = (busy: boolean) => {
+    providerToggleBusy = busy;
     mount.dataset.busy = String(busy);
-    const currentToggle = panel.querySelector<HTMLButtonElement>(
-      `.ask-em-panel-switch[data-provider="${adapter.name}"]`,
-    );
-
-    if (currentToggle) {
-      currentToggle.dataset.busy = String(busy);
-    }
+    panel
+      .querySelectorAll<HTMLButtonElement>('.ask-em-panel-switch')
+      .forEach((toggle) => (toggle.dataset.busy = String(busy)));
   };
 
   const toggleCurrentProvider = async () => {
-    if (!context.workspaceId || currentProviderToggleBusy) {
+    if (!context.workspaceId || providerToggleBusy) {
       return;
     }
 
     const nextEnabled = !context.providerEnabled;
-    setCurrentProviderToggleBusy(true);
+    setProviderToggleBusy(true);
 
     try {
       await handlers.onWorkspaceProviderToggle(adapter.name, nextEnabled);
@@ -416,17 +413,17 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
       await refreshPanel();
       refreshLayout();
     } finally {
-      setCurrentProviderToggleBusy(false);
+      setProviderToggleBusy(false);
     }
   };
 
   const toggleStandaloneSetCreation = async () => {
-    if (currentProviderToggleBusy || !context.globalSyncEnabled || !context.canStartNewSet) {
+    if (providerToggleBusy || !context.globalSyncEnabled || !context.canStartNewSet) {
       return;
     }
 
     const nextEnabled = !context.standaloneCreateSetEnabled;
-    setCurrentProviderToggleBusy(true);
+    setProviderToggleBusy(true);
 
     try {
       await handlers.onStandaloneSetCreationToggle(nextEnabled);
@@ -436,7 +433,7 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
         renderStandaloneTooltip();
       }
     } finally {
-      setCurrentProviderToggleBusy(false);
+      setProviderToggleBusy(false);
     }
   };
 
@@ -600,29 +597,37 @@ export function createContentUi(adapter: ProviderAdapter, handlers: UiHandlers) 
     event.preventDefault();
     event.stopPropagation();
 
-    if (toggle.dataset.busy === 'true') {
+    if (providerToggleBusy || toggle.dataset.busy === 'true') {
       return;
     }
 
-    toggle.dataset.busy = 'true';
-    const provider = toggle.dataset.provider as Provider;
+    const isAllProvidersToggle = toggle.dataset.allProviders === 'true';
+    const providers = isAllProvidersToggle
+      ? Array.from(panel.querySelectorAll<HTMLButtonElement>('.ask-em-panel-switch[data-provider]'))
+          .map((providerToggle) => providerToggle.dataset.provider)
+          .filter((provider): provider is Provider => Boolean(provider))
+      : [toggle.dataset.provider as Provider];
     const nextEnabled = toggle.dataset.enabled !== 'true';
+    setProviderToggleBusy(true);
 
-    void handlers
-      .onWorkspaceProviderToggle(provider, nextEnabled)
+    const togglePromise = isAllProvidersToggle
+      ? handlers.onWorkspaceProvidersToggle(providers, nextEnabled)
+      : handlers.onWorkspaceProviderToggle(providers[0], nextEnabled);
+
+    void togglePromise
       .then(async () => {
-        if (provider === adapter.name) {
+        if (providers.includes(adapter.name)) {
           context.providerEnabled = nextEnabled;
           mount.dataset.providerEnabled = String(nextEnabled);
         }
         await refreshPanel();
-        if (provider === adapter.name) {
+        if (!isAllProvidersToggle && providers.includes(adapter.name)) {
           updateSyncLabel(nextEnabled ? 'Ready for next prompt' : 'This tab is paused');
-          refreshLayout();
         }
+        refreshLayout();
       })
       .finally(() => {
-        toggle.dataset.busy = 'false';
+        setProviderToggleBusy(false);
       });
   };
   panel.addEventListener('click', handlePanelClick);

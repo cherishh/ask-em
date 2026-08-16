@@ -111,6 +111,9 @@ export function renderWorkspacePanelHtml(input: {
   const badgeHtml = response.globalSyncEnabled
     ? ''
     : '<span class="ask-em-panel-badge is-paused">Paused</span>';
+  const allProvidersEnabled =
+    visibleProviders.length > 0 &&
+    visibleProviders.every((provider) => workspaceSummary.workspace.enabledProviders.includes(provider));
 
   return `
     <div class="ask-em-panel-top">
@@ -118,7 +121,18 @@ export function renderWorkspacePanelHtml(input: {
         <p class="ask-em-panel-kicker">Current Set</p>
         <h3 class="ask-em-panel-title">${getWorkspaceTitle(workspaceSummary)}</h3>
       </div>
-      ${badgeHtml}
+      <div class="ask-em-panel-top-actions">
+        ${badgeHtml}
+        <button
+          type="button"
+          class="ask-em-panel-switch ask-em-panel-switch-all"
+          data-all-providers="true"
+          data-enabled="${String(allProvidersEnabled)}"
+          aria-label="${allProvidersEnabled ? 'Pause all providers' : 'Resume all providers'}"
+          title="${allProvidersEnabled ? 'Pause all providers' : 'Resume all providers'}"
+          ${visibleProviders.length === 0 ? 'disabled' : ''}
+        ></button>
+      </div>
     </div>
     ${globalNote}
     <div class="ask-em-panel-list">

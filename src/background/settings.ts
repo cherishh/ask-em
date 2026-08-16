@@ -9,7 +9,12 @@ import {
 } from '../runtime/protocol';
 import { clearDebugLogs, getLocalState, getSessionState, setLocalState, setSessionState } from '../runtime/storage';
 import { clearAllAttachments } from '../runtime/attachment-store';
-import { clearWorkspace, clearWorkspaceProvider, setWorkspaceProviderEnabled } from '../runtime/workspace';
+import {
+  clearWorkspace,
+  clearWorkspaceProvider,
+  setWorkspaceEnabledProviders,
+  setWorkspaceProviderEnabled,
+} from '../runtime/workspace';
 import { removeClaimedTabsForWorkspace } from './claimed-tabs';
 import { logDebug } from './debug';
 import { scheduleEmptyGroupDeletion } from './gc';
@@ -216,6 +221,38 @@ export async function handleSetWorkspaceProviderEnabled(
     workspaceId: message.workspaceId,
     provider: message.provider,
     message: message.enabled ? 'Provider rejoined workspace sync' : 'Provider paused for workspace sync',
+  });
+  return { ok: true };
+}
+
+export async function handleSetWorkspaceProvidersEnabled(
+  message: Extract<RuntimeMessage, { type: 'SET_WORKSPACE_PROVIDERS_ENABLED' }>,
+) {
+  const [localState, sessionState] = await Promise.all([getLocalState(), getSessionState()]);
+  const workspace = localState.workspaces[message.workspaceId];
+  const providers = ALL_PROVIDERS.filter((provider) => message.providers.includes(provider));
+
+  if (!workspace) {
+    return { ok: true };
+  }
+
+  const providerSet = new Set(providers);
+  const enabledProviders = message.enabled
+    ? Array.from(new Set([...workspace.enabledProviders, ...providers]))
+    : workspace.enabledProviders.filter((provider) => !providerSet.has(provider));
+
+  await setLocalState(
+    setWorkspaceEnabledProviders(localState, message.workspaceId, enabledProviders),
+  );
+  await notifyTabsToRefreshContext(getClaimedTabIdsForWorkspace(sessionState, message.workspaceId));
+  await logDebug({
+    level: 'info',
+    scope: 'background',
+    workspaceId: message.workspaceId,
+    message: message.enabled
+      ? 'All workspace providers resumed sync'
+      : 'All workspace providers paused sync',
+    detail: providers.join(', '),
   });
   return { ok: true };
 }

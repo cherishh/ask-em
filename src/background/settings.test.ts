@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultEnabledProviders, type LocalState } from '../runtime/protocol';
-import { makeLocalState } from '../test/builders';
+import { makeLocalState, makeSessionState, makeWorkspace } from '../test/builders';
 
 const storageMocks = vi.hoisted(() => ({
   appendDebugLog: vi.fn().mockResolvedValue(undefined),
@@ -70,5 +70,37 @@ describe('settings handlers', () => {
     expect(storageMocks.setLocalState).toHaveBeenCalledWith(expect.objectContaining({
       popupProviderOrder: ['kimi', 'claude', 'chatgpt', 'gemini', 'grok', 'deepseek', 'manus'],
     }));
+  });
+
+  it('updates multiple workspace providers in one state write', async () => {
+    storageMocks.getLocalState.mockResolvedValue(
+      makeLocalState({
+        workspaces: {
+          w1: makeWorkspace({
+            id: 'w1',
+            enabledProviders: ['claude', 'chatgpt', 'grok'],
+          }),
+        },
+      }),
+    );
+    storageMocks.getSessionState.mockResolvedValue(makeSessionState());
+
+    const { handleSetWorkspaceProvidersEnabled } = await import('./settings');
+    const result = await handleSetWorkspaceProvidersEnabled({
+      type: 'SET_WORKSPACE_PROVIDERS_ENABLED',
+      workspaceId: 'w1',
+      providers: ['claude', 'chatgpt'],
+      enabled: false,
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(storageMocks.setLocalState).toHaveBeenCalledTimes(1);
+    expect(storageMocks.setLocalState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaces: expect.objectContaining({
+          w1: expect.objectContaining({ enabledProviders: ['grok'] }),
+        }),
+      }),
+    );
   });
 });

@@ -333,6 +333,14 @@
   gap: 12px;
 }
 
+.ask-em-panel-top-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .ask-em-panel-kicker {
   margin: 0 0 6px;
   color: rgba(107, 100, 89, 0.92);
@@ -635,6 +643,11 @@
 .ask-em-panel-switch[data-busy="true"] {
   opacity: 0.6;
   cursor: progress;
+}
+
+.ask-em-panel-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 @keyframes ask-em-pulse {

@@ -34,6 +34,31 @@ export function bootstrapContentScript(adapter: ProviderAdapter): void {
 
       state.applyIndicatorPresentation();
     },
+    async onWorkspaceProvidersToggle(providers, nextEnabled) {
+      const workspaceId = state.getUiContext().workspaceId;
+      if (!workspaceId) {
+        return;
+      }
+
+      await sendRuntimeMessage({
+        type: 'SET_WORKSPACE_PROVIDERS_ENABLED',
+        workspaceId,
+        providers,
+        enabled: nextEnabled,
+      });
+
+      const response = await sendRuntimeMessage<WorkspaceContextResponseMessage>({
+        type: 'GET_WORKSPACE_CONTEXT',
+        workspaceId,
+      });
+      const workspaceSummary = response?.workspaceSummary ?? state.getWorkspaceSummary();
+      state.setWorkspaceSummary(workspaceSummary);
+      state.setProviderEnabled(
+        workspaceSummary?.workspace.enabledProviders.includes(adapter.name) ??
+          state.getUiContext().providerEnabled,
+      );
+      state.applyIndicatorPresentation();
+    },
     async onStandaloneSetCreationToggle(nextEnabled) {
       await sendRuntimeMessage({
         type: 'SET_AUTO_SYNC_NEW_CHATS_ENABLED',

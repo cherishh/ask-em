@@ -319,6 +319,46 @@ describe('content bootstrap wiring', () => {
     expect(ui.setSyncStatus).toHaveBeenLastCalledWith('next prompt stays here', 'neutral');
   });
 
+  it('persists a workspace-wide provider toggle in one runtime message', async () => {
+    await bootstrap();
+
+    const handlers = uiMocks.createContentUi.mock.calls[0]?.[1] as
+      | {
+          onWorkspaceProvidersToggle(
+            providers: Array<'claude' | 'chatgpt' | 'gemini'>,
+            nextEnabled: boolean,
+          ): Promise<void>;
+        }
+      | undefined;
+    routingMocks.sendRuntimeMessage.mockClear();
+    const pausedSummary = createWorkspaceSummary();
+    pausedSummary.workspace.enabledProviders = [];
+    routingMocks.sendRuntimeMessage
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({
+        ...createHelloResponse(),
+        providerEnabled: false,
+        workspaceSummary: pausedSummary,
+      });
+
+    await handlers?.onWorkspaceProvidersToggle(['claude', 'chatgpt', 'gemini'], false);
+
+    expect(routingMocks.sendRuntimeMessage).toHaveBeenNthCalledWith(1, {
+      type: 'SET_WORKSPACE_PROVIDERS_ENABLED',
+      workspaceId: 'w1',
+      providers: ['claude', 'chatgpt', 'gemini'],
+      enabled: false,
+    });
+    expect(routingMocks.sendRuntimeMessage).toHaveBeenNthCalledWith(2, {
+      type: 'GET_WORKSPACE_CONTEXT',
+      workspaceId: 'w1',
+    });
+    expect(ui.setContext).toHaveBeenLastCalledWith(
+      expect.objectContaining({ providerEnabled: false }),
+    );
+    expect(ui.setState).toHaveBeenLastCalledWith('blocked', 'current model sync paused');
+  });
+
   it('marks progress failures as set warnings', async () => {
     await bootstrap();
 

@@ -34,6 +34,7 @@ import {
   handleResetIndicatorPositions,
   handleSetShortcuts,
   handleSetWorkspaceProviderEnabled,
+  handleSetWorkspaceProvidersEnabled,
   handleWorkspaceClear,
 } from '../background/settings';
 import {
@@ -69,6 +70,7 @@ export {
   handleResetIndicatorPositions,
   handleSetShortcuts,
   handleSetWorkspaceProviderEnabled,
+  handleSetWorkspaceProvidersEnabled,
   handleSwitchProviderTab,
   handleUserSubmit,
   handleWorkspaceClear,
@@ -181,6 +183,9 @@ export default defineBackground(() => {
           return;
         case 'SET_WORKSPACE_PROVIDER_ENABLED':
           sendResponse(await handleSetWorkspaceProviderEnabled(message));
+          return;
+        case 'SET_WORKSPACE_PROVIDERS_ENABLED':
+          sendResponse(await handleSetWorkspaceProvidersEnabled(message));
           return;
         case 'SET_GLOBAL_SYNC_ENABLED':
           sendResponse(await handleSetGlobalSyncEnabled(message));

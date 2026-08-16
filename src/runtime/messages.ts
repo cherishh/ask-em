@@ -213,6 +213,13 @@ export type SetWorkspaceProviderEnabledMessage = {
   enabled: boolean;
 };
 
+export type SetWorkspaceProvidersEnabledMessage = {
+  type: 'SET_WORKSPACE_PROVIDERS_ENABLED';
+  workspaceId: string;
+  providers: Provider[];
+  enabled: boolean;
+};
+
 export type SetDebugLoggingEnabledMessage = {
   type: 'SET_DEBUG_LOGGING_ENABLED';
   enabled: boolean;
@@ -303,6 +310,7 @@ export type RuntimeMessage =
   | SetDefaultFanOutProvidersMessage
   | SetPopupProviderOrderMessage
   | SetWorkspaceProviderEnabledMessage
+  | SetWorkspaceProvidersEnabledMessage
   | SetAutoSyncNewChatsEnabledMessage
   | SetPauseAfterFirstFanOutEnabledMessage
   | SetGlobalSyncEnabledMessage
