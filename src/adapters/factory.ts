@@ -616,8 +616,7 @@ export function createDomProviderAdapter(
             const currentUserMessages =
               config
                 .getUserMessageTexts?.()
-                .map(normalizeWhitespace)
-                .filter(Boolean) ?? [];
+                .filter((text) => text.trim().length > 0) ?? [];
             if (currentUserMessages.length <= baselineUserMessages.length) {
               return null;
             }
@@ -674,8 +673,7 @@ export function createDomProviderAdapter(
             button: submitButton,
             messages: config
               .getUserMessageTexts()
-              .map(normalizeWhitespace)
-              .filter(Boolean),
+              .filter((text) => text.trim().length > 0),
             capturedAt: Date.now(),
             waitStarted: true,
           };
@@ -718,8 +716,7 @@ export function createDomProviderAdapter(
               pendingBaseline ??
               config
                 .getUserMessageTexts?.()
-                .map(normalizeWhitespace)
-                .filter(Boolean);
+                .filter((text) => text.trim().length > 0);
             if (!baselineUserMessages) {
               return;
             }

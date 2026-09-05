@@ -134,7 +134,8 @@ export function createSubmitController(
 ) {
   const reportUserSubmit = async (input: SubmitInput) => {
     const payload = normalizeSubmitInput(input);
-    const content = payload.text.trim();
+    const content = payload.text;
+    const trimmedContent = content.trim();
     if (state.isSubmissionSuppressed()) {
       return;
     }
@@ -160,7 +161,7 @@ export function createSubmitController(
       );
     }
 
-    if (!content && sourceAttachments.length === 0) {
+    if (!trimmedContent && sourceAttachments.length === 0) {
       payload.onConsumed?.();
       return;
     }
@@ -185,8 +186,8 @@ export function createSubmitController(
       .sort();
     const fingerprint =
       attachmentIds.length > 0
-        ? `${status.currentUrl}::${content}::${attachmentIds.join(',')}`
-        : `${status.currentUrl}::${content}`;
+        ? `${status.currentUrl}::${trimmedContent}::${attachmentIds.join(',')}`
+        : `${status.currentUrl}::${trimmedContent}`;
 
     if (state.shouldSkipDuplicateSubmit(fingerprint)) {
       return;

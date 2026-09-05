@@ -1,4 +1,4 @@
-import { detectHardErrorPage, getVisibleButtonTexts, getVisibleHeadingTexts, isVisible, normalizeWhitespace } from './dom';
+import { detectHardErrorPage, getEditableText, getVisibleButtonTexts, getVisibleHeadingTexts, isVisible, normalizeWhitespace } from './dom';
 import { createDomProviderAdapter } from './factory';
 import { dispatchPasteFiles, readAttachmentFiles, setFileInputFiles } from './attachment-delivery';
 import { fileInputAcceptsAttachments, preferFileInputForAttachmentCount } from './file-input';
@@ -161,8 +161,8 @@ function getChatgptUserMessageTexts(): string[] {
     document.querySelectorAll<HTMLElement>('[data-message-author-role="user"], [data-testid*="user-message" i]'),
   )
     .filter(isVisible)
-    .map(getElementAccessibleText)
-    .filter(Boolean);
+    .map(getEditableText)
+    .filter((text) => text.trim().length > 0);
 
   if (roleMessages.length > 0) {
     return roleMessages;
@@ -170,10 +170,10 @@ function getChatgptUserMessageTexts(): string[] {
 
   return Array.from(document.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6'))
     .filter(isVisible)
-    .map(getElementAccessibleText)
+    .map(getEditableText)
     .filter((text) => /^you said:/i.test(text))
-    .map((text) => text.replace(/^you said:\s*/i, ''))
-    .filter((text) => text.length > 0);
+    .map((text) => text.replace(/^you said:(?:\r?\n|[ \t])?/i, ''))
+    .filter((text) => text.trim().length > 0);
 }
 
 // True when an element's accessible text exposes a filename token (e.g. a file

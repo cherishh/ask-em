@@ -146,7 +146,8 @@ export function getEditableText(element: HTMLElement | null): string {
     return element.value;
   }
 
-  return normalizeWhitespace(element.innerText || element.textContent || '');
+  // Prompt whitespace is content: preserve line breaks and code indentation.
+  return element.innerText ?? element.textContent ?? '';
 }
 
 export function setEditableText(element: HTMLElement | null, content: string): void {
