@@ -9,6 +9,8 @@ import type { ContentStateController } from './state';
 import { createSubmitController } from './submit-controller';
 
 const FORMATTED_PROMPT = '\n    def example():\n\treturn "a  b"\n\n```text\n  keep indentation  \n```\n\n';
+const RICH_PROMPT_HTML = '<h2>Example</h2><p><strong>bold</strong> and <code>a  b</code></p><ul><li><p>one</p></li><li><p>two</p></li></ul><pre><code class="language-python">  return 1\n</code></pre>';
+const RICH_PROMPT_MARKDOWN = '## Example\n\n**bold** and `a  b`\n\n- one\n- two\n\n```python\n  return 1\n```';
 
 function createState() {
   return {
@@ -48,6 +50,8 @@ describe('prompt formatting during sync', () => {
     ['contenteditable', 'Enter'],
     ['textarea', 'click'],
     ['textarea', 'Enter'],
+    ['rich DOM', 'click'],
+    ['rich DOM', 'Enter'],
   ])('preserves whitespace from %s via %s through capture, routing and target injection', async (kind, trigger) => {
     document.body.innerHTML = `
       ${kind === 'textarea' ? '<textarea id="source"></textarea>' : '<div id="source" contenteditable="true"></div>'}
@@ -55,12 +59,13 @@ describe('prompt formatting during sync', () => {
       <textarea id="target"></textarea>
     `;
     const composer = document.getElementById('source')!;
+    const expected = kind === 'rich DOM' ? RICH_PROMPT_MARKDOWN : FORMATTED_PROMPT;
     if (composer instanceof HTMLTextAreaElement) {
       composer.value = FORMATTED_PROMPT;
+    } else if (kind === 'rich DOM') {
+      composer.innerHTML = RICH_PROMPT_HTML;
     } else {
-      // jsdom does not implement layout-derived innerText; use the rendered
-      // text a browser exposes for a rich text composer.
-      Object.defineProperty(composer, 'innerText', { value: FORMATTED_PROMPT });
+      composer.textContent = FORMATTED_PROMPT;
     }
     const adapter = createDomProviderAdapter({
       provider: 'claude', mountId: 'ask-em-format-source', className: 'source',
@@ -85,17 +90,17 @@ describe('prompt formatting during sync', () => {
       }
       await submitted;
       expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({
-        type: 'USER_SUBMIT', content: FORMATTED_PROMPT,
+        type: 'USER_SUBMIT', content: expected,
       }));
       expect(state.rememberSubmitFingerprint).toHaveBeenCalledWith(
-        `${window.location.href}::${FORMATTED_PROMPT.trim()}`,
+        `${window.location.href}::${expected.trim()}`,
       );
       const target = createDomProviderAdapter({
         provider: 'grok', mountId: 'ask-em-format-target', className: 'target',
         composerSelectors: ['#target'],
       });
       await target.composer!.setComposerPayload!({ text: sendMessage.mock.calls[0][0].content, attachments: [] });
-      expect((document.getElementById('target') as HTMLTextAreaElement).value).toBe(FORMATTED_PROMPT);
+      expect((document.getElementById('target') as HTMLTextAreaElement).value).toBe(expected);
     } finally {
       unsubscribe();
     }
@@ -128,9 +133,7 @@ describe('prompt formatting during sync', () => {
       document.querySelector<HTMLButtonElement>('button')!.click();
       const message = document.createElement(kind === 'role' ? 'div' : 'h5');
       if (kind === 'role') message.setAttribute('data-message-author-role', 'user');
-      Object.defineProperty(message, 'innerText', {
-        value: kind === 'role' ? FORMATTED_PROMPT : `You said:\n${FORMATTED_PROMPT}`,
-      });
+      message.textContent = kind === 'role' ? FORMATTED_PROMPT : `You said:\n${FORMATTED_PROMPT}`;
       document.querySelector('main')!.append(message);
       await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith(
         expect.objectContaining({ text: FORMATTED_PROMPT }),

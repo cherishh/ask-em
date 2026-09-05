@@ -1,3 +1,5 @@
+import { getComposerMarkdown } from './composer-markdown';
+
 export function isVisible(element: Element | null): element is HTMLElement {
   if (!(element instanceof HTMLElement)) {
     return false;
@@ -146,8 +148,7 @@ export function getEditableText(element: HTMLElement | null): string {
     return element.value;
   }
 
-  // Prompt whitespace is content: preserve line breaks and code indentation.
-  return element.innerText ?? element.textContent ?? '';
+  return getComposerMarkdown(element);
 }
 
 export function setEditableText(element: HTMLElement | null, content: string): void {
@@ -177,7 +178,9 @@ export function setEditableText(element: HTMLElement | null, content: string): v
 
     if (inserted) {
       dispatchInputEvents(element, content);
-      return;
+      // Editors can retain the previous list/mark wrapper after select-all.
+      // A successful browser command alone does not prove the text survived.
+      if (getEditableText(element) === content) return;
     }
   }
 
@@ -195,6 +198,9 @@ export function setEditableText(element: HTMLElement | null, content: string): v
   }
 
   dispatchInputEvents(element, content);
+  if (getEditableText(element) !== content) {
+    throw new Error('Composer did not preserve Markdown text');
+  }
 }
 
 export function dispatchInputEvents(element: HTMLElement, data: string | null = null): void {
