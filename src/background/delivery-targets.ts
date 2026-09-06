@@ -4,6 +4,9 @@ import { getClaimedTab, getClaimedTabByTabId, isClaimedTabStale } from './claime
 import { getRecoveryStatusError } from './recovery-semantics';
 import { pingContentTab, waitForContentStatus, waitForTabLoad } from './tab-runtime';
 
+// Cold provider pages can render their editor well after the document loads.
+const DELIVERY_READINESS_TIMEOUT_MS = 40_000;
+
 export type DeliveryTarget = {
   tabId: number;
   expectedSessionId: string | null;
@@ -51,11 +54,31 @@ export async function resolveDeliveryTarget(
   workspace: Workspace,
   provider: Provider,
   sessionState: SessionState,
+  onTargetSelected?: (target: DeliveryTarget) => Promise<void>,
 ): Promise<DeliveryTarget> {
   const claimedTab = getClaimedTab(sessionState, workspace.id, provider);
   const member = workspace.members[provider];
   const desiredUrl = member?.url ?? getSiteInfoByProvider(provider).origin;
   const expectedSessionId = member?.sessionId ?? null;
+
+  async function waitForTarget(target: DeliveryTarget): Promise<DeliveryTarget> {
+    const startedAt = Date.now();
+    // Associate the tab before polling so its presence updates reach this workspace.
+    await onTargetSelected?.(target);
+    if (target.resolution === 'navigate-claimed-tab') {
+      // During navigation PING can still reach the previous document.
+      await waitForTabLoad(target.tabId);
+    }
+    const remainingMs = Math.max(0, DELIVERY_READINESS_TIMEOUT_MS - (Date.now() - startedAt));
+    const status = await waitForContentStatus(target.tabId, provider, remainingMs);
+    if (!status || status.pageState === 'not-ready') {
+      throw new Error(
+        `${provider} readiness timed out after ${DELIVERY_READINESS_TIMEOUT_MS / 1_000}s (last state: ${status?.pageState ?? 'no response'}); prompt was not sent`,
+      );
+    }
+    assertDeliverableStatus(provider, status, expectedSessionId);
+    return target;
+  }
 
   if (claimedTab) {
     const stale = isClaimedTabStale(claimedTab);
@@ -67,10 +90,11 @@ export async function resolveDeliveryTarget(
 
     if (
       ping &&
+      ping.provider === provider &&
       ping.pageState === 'ready' &&
       (!expectedSessionId || ping.sessionId === expectedSessionId)
     ) {
-      return {
+      const target: DeliveryTarget = {
         tabId: claimedTab.tabId,
         expectedSessionId,
         expectedUrl: member?.url ?? null,
@@ -79,16 +103,30 @@ export async function resolveDeliveryTarget(
           ? `${stale ? 'stale ' : ''}claimed tab responded ready with matching session ${ping.sessionId}`
           : `${stale ? 'stale ' : ''}claimed tab responded ready without a bound session yet`,
       };
+      await onTargetSelected?.(target);
+      return target;
+    }
+
+    if (
+      !member?.url &&
+      ping?.provider === provider &&
+      ping.pageKind === 'new-chat' &&
+      !ping.sessionId
+    ) {
+      return waitForTarget({
+        tabId: claimedTab.tabId,
+        expectedSessionId,
+        expectedUrl: null,
+        resolution: 'reuse-claimed-tab',
+        reason: 'claimed new-chat tab is still preparing its editor',
+      });
     }
 
     if (member?.url) {
       const updatedTab = await navigateTab(claimedTab.tabId, member.url);
 
       if (updatedTab?.id) {
-        await waitForTabLoad(updatedTab.id);
-        const status = await waitForContentStatus(updatedTab.id, provider);
-        assertDeliverableStatus(provider, status, expectedSessionId);
-        return {
+        return waitForTarget({
           tabId: updatedTab.id,
           expectedSessionId,
           expectedUrl: member.url,
@@ -96,7 +134,7 @@ export async function resolveDeliveryTarget(
           reason: ping
             ? `${stale ? 'stale ' : ''}claimed tab ping mismatch or not-ready (pageState=${ping.pageState}, sessionId=${ping.sessionId ?? 'null'})`
             : `${stale ? 'stale ' : ''}claimed tab did not respond to ping; navigated claimed tab back to bound URL`,
-        };
+        });
       }
     }
   }
@@ -107,11 +145,7 @@ export async function resolveDeliveryTarget(
     throw new Error(`Unable to create tab for provider: ${provider}`);
   }
 
-  await waitForTabLoad(createdTab.id);
-  const status = await waitForContentStatus(createdTab.id, provider);
-  assertDeliverableStatus(provider, status, expectedSessionId);
-
-  return {
+  return waitForTarget({
     tabId: createdTab.id,
     expectedSessionId,
     expectedUrl: member?.url ?? null,
@@ -123,7 +157,7 @@ export async function resolveDeliveryTarget(
           ? `claimed tab ${claimedTab.tabId} could not be recovered via navigation`
           : `claimed tab ${claimedTab.tabId} was unsuitable and no bound URL was available`
       : 'no claimed tab was available for this provider',
-  };
+  });
 }
 
 export async function resolveReadyProviderTabForWorkspace(

@@ -3,7 +3,7 @@ import {
   createDefaultEnabledProviders,
   KIMI_ATTACHMENT_FANOUT_ENABLED,
 } from './protocol';
-import type { LocalState, SessionState, UserSubmitMessage } from './protocol';
+import type { LocalState, SessionState } from './protocol';
 import {
   makeClaimedTab,
   makeConversationRef,
@@ -2613,7 +2613,7 @@ describe('background submit routing', () => {
       'manus',
       expect.objectContaining({
         tabId: 42,
-        currentUrl: '',
+        currentUrl: 'https://manus.im',
         sessionId: null,
       }),
     );

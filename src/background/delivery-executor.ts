@@ -10,7 +10,8 @@ import { upsertClaimedTab } from '../runtime/storage';
 import { formatAttachmentSummary } from '../runtime/attachment-log';
 import { logDebug } from './debug';
 import { checkProviderAttachmentCapability } from './attachment-capability';
-import { resolveDeliveryTarget, resolveReadyProviderTabForWorkspace } from './delivery-targets';
+import { getSiteInfoByProvider } from '../adapters/sites';
+import { resolveDeliveryTarget, resolveReadyProviderTabForWorkspace, type DeliveryTarget } from './delivery-targets';
 
 type DeliverPromptResponse = {
   ok?: boolean;
@@ -170,16 +171,25 @@ export async function attemptProviderDelivery({
   }
 
   try {
-    const target = deliveryTargetOverride ?? (await resolveDeliveryTarget(workspace, provider, sessionState));
-    await upsertClaimedTab(workspaceId, provider, {
-      provider,
-      workspaceId,
-      tabId: target.tabId,
-      lastSeenAt: Date.now(),
-      pageState: 'not-ready',
-      currentUrl: target.expectedUrl ?? '',
-      sessionId: target.expectedSessionId,
-    });
+    const startedAt = Date.now();
+    const claimTarget = async (target: DeliveryTarget) => {
+      await upsertClaimedTab(workspaceId, provider, {
+        provider,
+        workspaceId,
+        tabId: target.tabId,
+        lastSeenAt: Date.now(),
+        pageState: 'not-ready',
+        currentUrl: target.expectedUrl ?? getSiteInfoByProvider(provider).origin,
+        sessionId: target.expectedSessionId,
+      });
+      await logDebug({
+        level: 'info', scope: 'background', provider, workspaceId,
+        message: 'Selected delivery target',
+        detail: `${target.resolution}: ${target.reason}; tab=${target.tabId}`,
+      });
+    };
+    if (deliveryTargetOverride) await claimTarget(deliveryTargetOverride);
+    const target = deliveryTargetOverride ?? (await resolveDeliveryTarget(workspace, provider, sessionState, claimTarget));
 
     await logDebug({
       level: 'info',
@@ -187,7 +197,7 @@ export async function attemptProviderDelivery({
       provider,
       workspaceId,
       message: 'Resolved delivery target',
-      detail: `${target.resolution}: ${target.reason}`,
+      detail: `${target.resolution}: ${target.reason}; ready after ${Date.now() - startedAt}ms`,
     });
 
     await logDebug({

@@ -53,10 +53,10 @@ describe('workspace provider display', () => {
     });
   });
 
-  it('surfaces generic delivery failures as needs attention', () => {
+  it.each(['inactive', 'not-ready', 'ready'] as const)('surfaces a completed delivery failure even while the page is %s', (memberState) => {
     expect(
       getWorkspaceProviderDisplay({
-        memberState: 'inactive',
+        memberState,
         memberIssue: 'delivery-failed',
         enabled: true,
         globalSyncEnabled: true,
@@ -65,7 +65,7 @@ describe('workspace provider display', () => {
     ).toEqual({
       kind: 'needs-attention',
       label: 'Needs Attention',
-      detail: 'Last sync did not reach this model. Session may be deleted.',
+      detail: 'Last sync did not reach this model.',
     });
   });
 

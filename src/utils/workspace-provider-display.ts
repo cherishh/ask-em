@@ -96,19 +96,19 @@ export function getWorkspaceProviderDisplay(
     };
   }
 
+  if (input.memberIssue === 'delivery-failed') {
+    return {
+      kind: 'needs-attention',
+      label: 'Needs Attention',
+      detail: 'Last sync did not reach this model.',
+    };
+  }
+
   if (input.memberIssue === 'loading' || input.memberState === 'not-ready') {
     return {
       kind: 'loading',
       label: 'Loading',
       detail: 'Wait for this page to become ready',
-    };
-  }
-
-  if (input.memberIssue === 'delivery-failed') {
-    return {
-      kind: 'needs-attention',
-      label: 'Needs Attention',
-      detail: 'Last sync did not reach this model. Session may be deleted.',
     };
   }
 
