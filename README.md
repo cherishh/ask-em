@@ -73,6 +73,9 @@ pnpm dev                     # launches Chrome with the extension loaded (HMR)
 | `pnpm compile` | Type-check (`tsc --noEmit`) |
 | `pnpm lint` | ESLint |
 
+Before submitting code changes, run `pnpm test`, `pnpm compile`, and `pnpm lint`
+to check behavior, types, and code style.
+
 The only Chrome API permission requested is `storage`. Host access is limited to the
 supported AI chat providers so the extension can run its content scripts there. The
 support/feedback endpoint configured in `.env.local` is requested only as an optional
