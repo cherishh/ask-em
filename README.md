@@ -76,6 +76,10 @@ pnpm dev                     # launches Chrome with the extension loaded (HMR)
 Before submitting code changes, run `pnpm test`, `pnpm compile`, and `pnpm lint`
 to check behavior, types, and code style.
 
+For a release package, increment the patch version in both `package.json` and
+`wxt.config.ts` (unless targeting a specific version), then run `pnpm package:chrome`.
+Keep both version values synchronized.
+
 The only Chrome API permission requested is `storage`. Host access is limited to the
 supported AI chat providers so the extension can run its content scripts there. The
 support/feedback endpoint configured in `.env.local` is requested only as an optional
